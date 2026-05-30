@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../screens/ParentDashboard.dart';
 import '../screens/autresDashboard.dart';
 import '../screens/coach_dashboard_screen.dart';
 import '../screens/parent_dashboard_screen.dart';
 import '../screens/school_dashboard_screen.dart';
-import 'auth_provider_v2.dart';
-import 'auth_screen_unified.dart';
+import '../providers/auth_provider_v2.dart';
+import 'auth_screen.dart';
 import 'email_confirmation_screen.dart';
 import 'profile_completion_screen.dart';
 
@@ -52,7 +51,7 @@ class AuthWrapper extends StatelessWidget {
           }
 
           // Vérifier si le compte est actif
-          final isActive = userData['is_active'] ?? false;
+          final isActive = userData['is_active'] ?? true; // Par défaut true si absent
           if (!isActive) {
             return DeactivatedAccountScreen(
               onReactivate: () async {
@@ -67,12 +66,10 @@ class AuthWrapper extends StatelessWidget {
           switch (role) {
             case 'parent':
               return const ParentDashboard();
-              ParentDashboard(); //ParentDashboard();
             case 'coach':
               return const CoachDashboard();
             case 'school':
               return const SchoolDashboard();
-
             case 'autres':
               return const AutreDashboard();
             default:
@@ -89,35 +86,6 @@ class AuthWrapper extends StatelessWidget {
           onRetry: () => authProvider.logout(),
         );
       },
-    );
-  }
-}
-
-);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      body: Center(
-        child: Column(
-          children: [
-            ElevatedButton.icon(
-                icon: Icon(Icons.safety_check_rounded),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (ctx) => ParentDashboard())),
-                label: Text('ParentDashboard')),
-            SizedBox(
-              height: 30,
-            ),
-            ElevatedButton.icon(
-                icon: Icon(Icons.face),
-                onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (ctx) => ParentDashboard())),
-                label: Text('ParentDashboard'))
-          ],
-        ),
-      ),
     );
   }
 }

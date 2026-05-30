@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:readmore/readmore.dart';
 
-import '../claude/auth_provider_v2.dart';
+import '../providers/auth_provider_v2.dart';
 import '../models/user_model.dart';
 
 class AutreDashboard extends StatefulWidget {

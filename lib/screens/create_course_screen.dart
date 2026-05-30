@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:creche/claude/auth_provider_v2.dart';
+import '../providers/auth_provider_v2.dart';
 import 'package:provider/provider.dart';
 
 import '../models/course_model_complete.dart';

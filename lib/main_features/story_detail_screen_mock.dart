@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/app_models.dart';
-import '../theme/app_theme.dart';
+import 'app_models_mock.dart';
+import 'app_theme_mock.dart';
 
 class StoryDetailScreen extends StatelessWidget {
   final Story story;

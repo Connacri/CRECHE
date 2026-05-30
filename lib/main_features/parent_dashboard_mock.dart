@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/app_models.dart';
-import '../services/mock_services.dart';
-import '../theme/app_theme.dart';
-import 'story_detail_screen.dart';
-import 'package:intl/intl.dart';
+import 'app_models_mock.dart';
+import 'mock_services.dart';
+import 'app_theme_mock.dart';
+import 'story_detail_screen_mock.dart';
 
 class ParentDashboard extends StatelessWidget {
   const ParentDashboard({super.key});
@@ -12,7 +11,6 @@ class ParentDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = MockDatabaseService();
-    final user = context.watch<MockAuthService>().currentUser;
 
     return Scaffold(
       backgroundColor: AppColors.background,

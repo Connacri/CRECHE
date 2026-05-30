@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:creche/claude/auth_provider_v2.dart';
+import '../providers/auth_provider_v2.dart';
 import 'package:provider/provider.dart';
 
 import '../models/child_model_complete.dart';

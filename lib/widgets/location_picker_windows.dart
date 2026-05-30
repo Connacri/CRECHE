@@ -245,8 +245,7 @@ class _LocationPickerDialogWindowsState
           point: position,
           width: 50,
           height: 50,
-          builder: (context) =>
-          const Icon(
+          child: const Icon(
             Icons.location_on,
             color: Colors.red,
             size: 50,
@@ -482,11 +481,11 @@ class _LocationPickerDialogWindowsState
       mapController: _mapController,
       options: MapOptions(
         // API flutter_map version stable
-        center: _selectedPosition ?? LatLng(35.3967, 0.1403),
-        zoom: 13.0,
+        initialCenter: _selectedPosition ?? LatLng(35.3967, 0.1403),
+        initialZoom: 13.0,
         minZoom: 3.0,
         maxZoom: 19.0,
-        onTap: _onMapTap,
+        onTap: (tapPosition, point) => _onMapTap(tapPosition, point),
       ),
       children: [
         TileLayer(

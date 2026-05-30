@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'auth_provider_v2.dart';
+import '../providers/auth_provider_v2.dart';
 
 /// 🎯 Écran de réinitialisation de mot de passe - Design moderne
 class ForgotPasswordScreen extends StatefulWidget {

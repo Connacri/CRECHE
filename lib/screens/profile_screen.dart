@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../claude/auth_provider_v2.dart';
+import '../providers/auth_provider_v2.dart';
 import '../models/user_model.dart';
 import '../providers/locale_provider.dart';
 import '../services/hybrid_image_picker.dart';

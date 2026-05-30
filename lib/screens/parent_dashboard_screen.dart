@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../dependences/calendar_timeline/calendar_timeline.dart';
-import '../claude/auth_provider_v2.dart';
+import '../providers/auth_provider_v2.dart';
 import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
@@ -20,13 +20,13 @@ import '../widgets/modern_course_card_widget.dart';
 import '../widgets/weekly_timeline_widget.dart';
 
 class ParentDashboard extends StatefulWidget {
-  const ParentDashboard_screen({super.key});
+  const ParentDashboard({super.key});
 
   @override
-  State<ParentDashboard_screen> createState() => _ParentDashboard_screenState();
+  State<ParentDashboard> createState() => _ParentDashboardState();
 }
 
-class _ParentDashboard_screenState extends State<ParentDashboard_screen> {
+class _ParentDashboardState extends State<ParentDashboard> {
   int _selectedIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;

@@ -862,9 +862,11 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
             // Carte OpenStreetMap
             FlutterMap(
               options: MapOptions(
-                center: location,
-                zoom: 15.0,
-                interactiveFlags: InteractiveFlag.none,
+                initialCenter: location,
+                initialZoom: 15.0,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.none,
+                ),
               ),
               children: [
                 TileLayer(
@@ -877,7 +879,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                       point: location,
                       width: 60,
                       height: 60,
-                      builder: (context) => const Icon(
+                      child: const Icon(
                         Icons.location_on,
                         color: Colors.red,
                         size: 50,

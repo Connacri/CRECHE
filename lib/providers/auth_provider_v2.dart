@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'auth_service.dart';
+import '../services/auth_service.dart';
 
 /// 🎯 Provider d'authentification avec gestion cas edge
 class AuthProviderV2 extends ChangeNotifier {

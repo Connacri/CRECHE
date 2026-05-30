@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/app_models.dart';
+import 'app_models_mock.dart';
 
 class MockAuthService extends ChangeNotifier {
   AppUser? _currentUser;

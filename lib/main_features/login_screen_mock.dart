@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/mock_services.dart';
-import '../theme/app_theme.dart';
+import 'mock_services.dart';
+import 'app_theme_mock.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
