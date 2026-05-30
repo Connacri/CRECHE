@@ -6,11 +6,14 @@
   <p><i>Un petit nid douillet, connecté et sécurisé. / A cozy, connected, and secure little nest.</i></p>
   <br/>
   <div align="center">
-    <a href="https://github.com/Connacri/CRECHE/actions">
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/app-release.apk">
       <img src="https://img.shields.io/badge/Download-Android_APK-green?style=for-the-badge&logo=android" alt="Download Android APK"/>
     </a>
-    <a href="https://github.com/Connacri/CRECHE/actions">
-      <img src="https://img.shields.io/badge/Access-Web_Version-blue?style=for-the-badge&logo=google-chrome" alt="Access Web Version"/>
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche_windows.zip">
+      <img src="https://img.shields.io/badge/Download-Windows_EXE-blue?style=for-the-badge&logo=windows" alt="Download Windows EXE"/>
+    </a>
+    <a href="https://connacri.github.io/CRECHE/">
+      <img src="https://img.shields.io/badge/Access-Web_Version-orange?style=for-the-badge&logo=google-chrome" alt="Access Web Version"/>
     </a>
   </div>
 </div>
