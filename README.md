@@ -4,6 +4,15 @@
   <img src="assets/images/8e16ab25c9b6075a09c2d7990984e21d.jpg" width="300" alt="Crèche Logo" style="border-radius: 20px;"/>
   <br/>
   <p><i>Un petit nid douillet, connecté et sécurisé. / A cozy, connected, and secure little nest.</i></p>
+  <br/>
+  <div align="center">
+    <a href="https://github.com/Connacri/CRECHE/actions">
+      <img src="https://img.shields.io/badge/Download-Android_APK-green?style=for-the-badge&logo=android" alt="Download Android APK"/>
+    </a>
+    <a href="https://github.com/Connacri/CRECHE/actions">
+      <img src="https://img.shields.io/badge/Access-Web_Version-blue?style=for-the-badge&logo=google-chrome" alt="Access Web Version"/>
+    </a>
+  </div>
 </div>
 
 ---

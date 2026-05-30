@@ -107,6 +107,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () => _emailController.text = 'admin@creche.com', // Demo shortcut
                   child: const Text('Accès Admin (Démo)'),
                 ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  onPressed: () {}, // Link to APK download in real app
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Télécharger l\'App'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.softGreen,
+                    foregroundColor: AppColors.textMain,
+                  ),
+                ),
               ],
             ),
           ),
