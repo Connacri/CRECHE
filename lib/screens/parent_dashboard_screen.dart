@@ -1,0 +1,982 @@
+/// 🏠 Parent Dashboard - Version avec Calendar Timeline intégré
+/// Affiche un calendrier horizontal pour sélectionner une date et voir les cours du jour
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../dependences/calendar_timeline/calendar_timeline.dart';
+import '../claude/auth_provider_v2.dart';
+import '../models/child_model_complete.dart';
+import '../models/course_model_complete.dart';
+import '../models/enrollment_model_complete.dart';
+import '../models/session_schedule_model.dart';
+import '../models/user_model.dart';
+import '../providers/child_enrollment_provider.dart';
+import '../providers/course_provider_complete.dart';
+import '../services/responsive_layout_helper.dart';
+import '../widgets/modern_course_card_widget.dart';
+import '../widgets/weekly_timeline_widget.dart';
+
+class ParentDashboard extends StatefulWidget {
+  const ParentDashboard_screen({super.key});
+
+  @override
+  State<ParentDashboard_screen> createState() => _ParentDashboard_screenState();
+}
+
+class _ParentDashboard_screenState extends State<ParentDashboard_screen> {
+  int _selectedIndex = 0;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  UserModel? _user;
+  String? _error;
+
+  // ✅ NOUVEAU : Date sélectionnée pour le calendrier
+  DateTime _selectedDate = DateTime.now();
+  List<DateTime> _eventDates = [];
+
+  // Controllers pour édition inline
+  final Map<String, TextEditingController> _controllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+      _loadEventDates();
+    });
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final authProvider = context.read<AuthProviderV2>();
+      final userData = authProvider.userData;
+
+      if (userData == null) {
+        setState(() {
+          _error = 'Aucune donnée utilisateur disponible';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      _user = UserModel.fromSupabase(userData);
+      _initializeControllers();
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() {
+        _error = 'Erreur lors du chargement: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _initializeControllers() {
+    if (_user == null) return;
+    _controllers['name'] = TextEditingController(text: _user!.name);
+    _controllers['email'] = TextEditingController(text: _user!.email);
+  }
+
+  /// ✅ NOUVEAU : Charge les dates avec événements (cours)
+  Future<void> _loadEventDates() async {
+    try {
+      final childProvider = context.read<ChildEnrollmentProvider>();
+
+      // Dates avec des sessions programmées
+      final dates = <DateTime>{};
+
+      for (var schedule in childProvider.schedules) {
+        if (!schedule.isCancelled) {
+          // Ajouter les occurrences sur les 30 prochains jours
+          final now = DateTime.now();
+          for (var i = 0; i < 30; i++) {
+            final date = now.add(Duration(days: i));
+            if (schedule.isScheduledFor(date)) {
+              dates.add(DateTime(date.year, date.month, date.day));
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _eventDates = dates.toList()..sort();
+        });
+      }
+    } catch (e) {
+      print('❌ Erreur chargement dates événements: $e');
+    }
+  }
+
+  /// ✅ NOUVEAU : Appelé quand l'utilisateur sélectionne une date
+  void _onDateSelected(DateTime date) {
+    setState(() {
+      _selectedDate = date;
+    });
+    print('📅 Date sélectionnée: ${date.day}/${date.month}/${date.year}');
+  }
+
+  String _getErrorMessage(Object error) {
+    if (error is TimeoutException) {
+      return 'Le chargement prend trop de temps. Vérifiez votre connexion.';
+    }
+    return 'Erreur de chargement des données';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_errorMessage != null) {
+      return _buildErrorScreen();
+    }
+
+    return AdaptiveLayout(
+      mobile: _buildMobileLayout(),
+      desktop: _buildDesktopLayout(),
+    );
+  }
+
+  Widget _buildErrorScreen() {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dashboard Parent')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 80,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Erreur de chargement',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage ?? 'Une erreur est survenue',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard Parent'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: _getSelectedPage(),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          setState(() => _selectedIndex = index);
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today_outlined),
+            selectedIcon: Icon(Icons.calendar_today),
+            label: 'Planning',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.child_care_outlined),
+            selectedIcon: Icon(Icons.child_care),
+            label: 'Enfants',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.search_outlined),
+            selectedIcon: Icon(Icons.search),
+            label: 'Cours',
+          ),
+        ],
+      ),
+      floatingActionButton: _selectedIndex == 2
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddChildDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter un enfant'),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    return Scaffold(
+      body: Row(
+        children: [
+          NavigationRail(
+            extended: true,
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (index) {
+              setState(() => _selectedIndex = index);
+            },
+            leading: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.family_restroom,
+                      size: 32,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Espace Parent',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            destinations: const [
+              NavigationRailDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: Text('Accueil'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.calendar_today_outlined),
+                selectedIcon: Icon(Icons.calendar_today),
+                label: Text('Planning'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.child_care_outlined),
+                selectedIcon: Icon(Icons.child_care),
+                label: Text('Mes Enfants'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.search_outlined),
+                selectedIcon: Icon(Icons.search),
+                label: Text('Trouver des Cours'),
+              ),
+            ],
+          ),
+          const VerticalDivider(thickness: 1, width: 1),
+          Expanded(child: _getSelectedPage()),
+        ],
+      ),
+    );
+  }
+
+  Widget _getSelectedPage() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Chargement des données...'),
+          ],
+        ),
+      );
+    }
+
+    switch (_selectedIndex) {
+      case 0:
+        return _buildHomePage();
+      case 1:
+        return _buildPlanningPage();
+      case 2:
+        return _buildChildrenPage();
+      case 3:
+        return _buildCoursesPage();
+      default:
+        return _buildHomePage();
+    }
+  }
+
+  Widget _buildHomePage() {
+    return Consumer3<AuthProviderV2, ChildEnrollmentProvider, CourseProvider>(
+      builder: (context, authProvider, childProvider, courseProvider, _) {
+        if (authProvider.currentUser == null) {
+          return const Center(
+            child: Text('Session expirée. Veuillez vous reconnecter.'),
+          );
+        }
+
+        final userName = authProvider.userData?['name'] ??
+            authProvider.currentUser!.email?.split('@').first ??
+            'Parent';
+
+        final children = childProvider.children;
+        final enrollments = childProvider.enrollments;
+        final approvedEnrollments = enrollments
+            .where((e) => e.status == EnrollmentStatus.approved)
+            .length;
+
+        return ListView(
+          padding: ResponsiveLayout.getResponsivePadding(context),
+          children: [
+            // Header utilisateur
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.person,
+                    size: 28,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bonjour, $userName',
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      Text(
+                        'Bienvenue sur votre espace famille',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            // ✅ NOUVEAU : Calendar Timeline
+            _buildCalendarSection(childProvider),
+            const SizedBox(height: 32),
+
+            // Stats cards
+            ResponsiveBuilder(
+              builder: (context, deviceType) {
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    _buildStatCard(
+                      context,
+                      title: 'Enfants',
+                      value: children.length.toString(),
+                      icon: Icons.child_care,
+                      color: Colors.blue,
+                      width: deviceType == DeviceType.desktop ? 200 : null,
+                    ),
+                    _buildStatCard(
+                      context,
+                      title: 'Cours Actifs',
+                      value: approvedEnrollments.toString(),
+                      icon: Icons.school,
+                      color: Colors.green,
+                      width: deviceType == DeviceType.desktop ? 200 : null,
+                    ),
+                    _buildStatCard(
+                      context,
+                      title: 'En Attente',
+                      value: enrollments
+                          .where((e) => e.status == EnrollmentStatus.pending)
+                          .length
+                          .toString(),
+                      icon: Icons.hourglass_empty,
+                      color: Colors.orange,
+                      width: deviceType == DeviceType.desktop ? 200 : null,
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 32),
+
+            // Section enfants
+            if (children.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Mes Enfants',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => setState(() => _selectedIndex = 2),
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('Voir tout'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 120,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: children.length,
+                  itemBuilder: (context, index) {
+                    final child = children[index];
+                    return _buildChildQuickCard(child);
+                  },
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
+
+            // Section cours recommandés
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Cours Recommandés',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() => _selectedIndex = 3),
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Voir tout'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            if (courseProvider.courses.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('Aucun cours disponible pour le moment'),
+                ),
+              )
+            else
+              ...courseProvider.courses.take(3).map((course) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: CourseCard(
+                      course: course,
+                      onTap: () => _showCourseDetails(course),
+                    ),
+                  )),
+          ],
+        );
+      },
+    );
+  }
+
+  /// ✅ NOUVEAU : Section Calendar Timeline
+  Widget _buildCalendarSection(ChildEnrollmentProvider childProvider) {
+    return Card(
+      elevation: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Planning de la semaine',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Calendar Timeline
+          CalendarTimeline(
+            initialDate: _selectedDate,
+            firstDate: DateTime.now().subtract(const Duration(days: 30)),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+            onDateSelected: _onDateSelected,
+            eventDates: _eventDates,
+            leftMargin: 20,
+            monthColor: Theme.of(context).colorScheme.onSurface,
+            dayColor: Theme.of(context).colorScheme.onSurface,
+            dayNameColor: Theme.of(context).colorScheme.onPrimaryContainer,
+            activeDayColor: Theme.of(context).colorScheme.onPrimary,
+            activeBackgroundDayColor: Theme.of(context).colorScheme.primary,
+            dotColor: Theme.of(context).colorScheme.secondary,
+            locale: 'fr',
+          ),
+          const SizedBox(height: 12),
+
+          // Cours du jour sélectionné
+          _buildDaySchedules(childProvider),
+        ],
+      ),
+    );
+  }
+
+  /// ✅ NOUVEAU : Affiche les cours du jour sélectionné
+  Widget _buildDaySchedules(ChildEnrollmentProvider childProvider) {
+    final daySchedules = childProvider.getSchedulesForDate(_selectedDate);
+
+    if (daySchedules.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.event_busy,
+                size: 48,
+                color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Aucun cours prévu ce jour',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Cours du ${_selectedDate.day}/${_selectedDate.month}',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...daySchedules.map((schedule) => _buildScheduleTile(schedule)),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildScheduleTile(SessionSchedule schedule) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          Icons.schedule,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
+      ),
+      title: Text(
+        schedule.timeSlot.displayTime,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle:
+          Text('${schedule.currentEnrollment}/${schedule.maxCapacity} places'),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      onTap: () => _showSessionDetails(schedule),
+    );
+  }
+
+  Widget _buildPlanningPage() {
+    return Consumer2<ChildEnrollmentProvider, CourseProvider>(
+      builder: (context, childProvider, courseProvider, _) {
+        final now = DateTime.now();
+        final weekStart = now.subtract(Duration(days: now.weekday - 1));
+        final weekEnd = weekStart.add(const Duration(days: 6));
+
+        final schedules =
+            childProvider.groupSchedulesByDate(weekStart, weekEnd);
+        final coursesById = {
+          for (var course in courseProvider.courses) course.id: course
+        };
+        final childrenById = {
+          for (var child in childProvider.children) child.id: child
+        };
+
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(color: Theme.of(context).dividerColor),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Planning Hebdomadaire',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Visualisez tous les cours de la semaine',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: WeeklyTimeline(
+                schedulesByDate: schedules,
+                coursesById: coursesById,
+                childrenById: childrenById,
+                onSessionTap: (session) => _showSessionDetails(session),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildChildrenPage() {
+    return Consumer<ChildEnrollmentProvider>(
+      builder: (context, childProvider, _) {
+        final children = childProvider.children;
+
+        if (childProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (children.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.child_care_outlined,
+                  size: 80,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Aucun enfant ajouté',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Ajoutez vos enfants pour gérer leurs cours',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () => _showAddChildDialog(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Ajouter un enfant'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: ResponsiveLayout.getResponsivePadding(context),
+          itemCount: children.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Mes Enfants',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _showAddChildDialog(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Ajouter'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final child = children[index - 1];
+            return _buildChildDetailCard(child);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCoursesPage() {
+    return Consumer<CourseProvider>(
+      builder: (context, courseProvider, _) {
+        if (courseProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              child: SearchBar(
+                hintText: 'Rechercher un cours...',
+                leading: const Icon(Icons.search),
+                onChanged: (value) {
+                  // TODO: Implémenter la recherche
+                },
+              ),
+            ),
+            Expanded(
+              child: ResponsiveBuilder(
+                builder: (context, deviceType) {
+                  final crossAxisCount =
+                      ResponsiveLayout.getCrossAxisCount(context);
+
+                  return GridView.builder(
+                    padding: ResponsiveLayout.getResponsivePadding(context),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: 0.85,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: courseProvider.courses.length,
+                    itemBuilder: (context, index) {
+                      final course = courseProvider.courses[index];
+                      return CourseCard(
+                        course: course,
+                        onTap: () => _showCourseDetails(course),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ============================================================================
+  // WIDGETS UTILITAIRES
+  // ============================================================================
+
+  Widget _buildStatCard(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    double? width,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChildQuickCard(ChildModel child) {
+    return Card(
+      margin: const EdgeInsets.only(right: 16),
+      child: Container(
+        width: 100,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundImage:
+                  child.photoUrl != null ? NetworkImage(child.photoUrl!) : null,
+              child: child.photoUrl == null
+                  ? Text(child.firstName[0].toUpperCase())
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              child.firstName,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              '${child.age} ans',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChildDetailCard(ChildModel child) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundImage:
+                  child.photoUrl != null ? NetworkImage(child.photoUrl!) : null,
+              child: child.photoUrl == null
+                  ? Text(
+                      child.firstName[0].toUpperCase(),
+                      style: const TextStyle(fontSize: 24),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    child.fullName,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${child.age} ans${child.schoolGrade != null ? " • ${child.schoolGrade}" : ""}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => _showEditChildDialog(child),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _confirmDeleteChild(child),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // ACTIONS
+  // ============================================================================
+
+  void _showAddChildDialog() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fonctionnalité en développement')),
+    );
+  }
+
+  void _showEditChildDialog(ChildModel child) {
+    // TODO: Navigation vers écran d'édition d'enfant
+  }
+
+  Future<void> _confirmDeleteChild(ChildModel child) async {
+    // TODO: Dialogue de confirmation de suppression
+  }
+
+  void _showCourseDetails(CourseModel course) {
+    // TODO: Navigation vers détails du cours
+  }
+
+  void _showSessionDetails(SessionSchedule session) {
+    // TODO: Navigation vers détails de la session
+  }
+}
