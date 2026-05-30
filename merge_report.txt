@@ -1,0 +1,8 @@
+error: Your local changes to the following files would be overwritten by merge:
+  .metadata assets/images/3853e55108525c0630136383c0c0843e.jpg assets/images/5ac423335dba770991105fd30f6e3cf8.jpg assets/images/74cedd2a41f6ef0cbc37126ea12350c6.jpg assets/images/8e16ab25c9b6075a09c2d7990984e21d.jpg assets/images/b6e17255a7286b4356e1984bc4cbd075.jpg assets/images/bd8a5cdb0ab06e63da496e1d34edf385.jpg lib/main.dart lib/models/app_models.dart lib/screens/admin_dashboard.dart lib/screens/login_screen.dart lib/screens/parent_dashboard.dart lib/screens/story_detail_screen.dart lib/services/mock_services.dart lib/theme/app_theme.dart pubspec.lock pubspec.yaml
+<stdin>:6731: trailing whitespace.
+                    child: _isLoading
+<stdin>:6846: trailing whitespace.
+
+warning: 2 lines add whitespace errors.
+Merge with strategy ort failed.
