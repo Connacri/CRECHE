@@ -118,7 +118,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
               padding: const EdgeInsets.all(16),
               child: ListTile(
                 title: Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${course.category} • ${course.sessions.length} sessions'),
+                subtitle: Text('${course.category.name}'),
                 trailing: const Icon(Icons.chevron_right),
               ),
             ),
@@ -129,6 +129,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
   }
 
   Widget _buildBottomNav() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: GlassCard(
@@ -139,6 +140,8 @@ class _CoachDashboardState extends State<CoachDashboard> {
           backgroundColor: Colors.transparent,
           currentIndex: _selectedIndex,
           onTap: (i) => setState(() => _selectedIndex = i),
+          selectedItemColor: colorScheme.primary,
+          unselectedItemColor: colorScheme.onSurfaceVariant,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
             BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded), label: 'Nouveau'),

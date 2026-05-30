@@ -137,7 +137,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
                 children: [
                   Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center, maxLines: 2),
                   const SizedBox(height: 4),
-                  Text(course.category, style: const TextStyle(fontSize: 10)),
+                  Text(course.category.name, style: const TextStyle(fontSize: 10)),
                 ],
               ),
             );
@@ -148,6 +148,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
   }
 
   Widget _buildBottomNav() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: GlassCard(
@@ -158,6 +159,8 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
           backgroundColor: Colors.transparent,
           currentIndex: _selectedIndex,
           onTap: (i) => setState(() => _selectedIndex = i),
+          selectedItemColor: colorScheme.primary,
+          unselectedItemColor: colorScheme.onSurfaceVariant,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Gérer'),
             BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Élèves'),

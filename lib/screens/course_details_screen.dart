@@ -53,7 +53,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black.withOpacity(0.5)],
+                  colors: [Colors.black.withValues(alpha: 0.3), Colors.transparent, Colors.black.withValues(alpha: 0.5)],
                 ),
               ),
             ),
@@ -69,7 +69,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildBadge(_course.category),
+                        _buildBadge(_course.category.name),
                         const SizedBox(height: 8),
                         Text(_course.title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
@@ -77,7 +77,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                           children: [
                             const Icon(Icons.location_on_outlined, size: 16),
                             const SizedBox(width: 4),
-                            Expanded(child: Text(_course.location?.address ?? 'Lieu non spécifié', style: Theme.of(context).textTheme.bodySmall)),
+                            Expanded(child: Text(_course.location.address, style: Theme.of(context).textTheme.bodySmall)),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -90,7 +90,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text('Prix', style: TextStyle(fontSize: 12)),
-                                Text('${_course.price.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                                Text('${_course.price?.toStringAsFixed(2) ?? "0.00"} €', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                               ],
                             ),
                             FilledButton(
@@ -115,7 +115,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(color: colorScheme.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: colorScheme.primary.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
       child: Text(text, style: TextStyle(color: colorScheme.primary, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }

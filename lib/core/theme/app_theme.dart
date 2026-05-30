@@ -50,16 +50,16 @@ class AppTheme {
         labelSmall: bodyFont.labelSmall?.copyWith(color: colorScheme.onSurface),
       ),
 
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: BorderSide(
-            color: colorScheme.outlineVariant.withOpacity(0.1),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.1),
             width: 1,
           ),
         ),
-        color: colorScheme.surface.withOpacity(0.7),
+        color: colorScheme.surface.withValues(alpha: 0.7),
         clipBehavior: Clip.antiAlias,
       ),
 
@@ -73,7 +73,7 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surfaceContainerLow.withOpacity(0.5),
+        fillColor: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide.none,
@@ -81,7 +81,7 @@ class AppTheme {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide(
-            color: colorScheme.outlineVariant.withOpacity(0.2),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.2),
           ),
         ),
         focusedBorder: OutlineInputBorder(

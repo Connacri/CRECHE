@@ -59,14 +59,15 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildAvatarSection(BuildContext context, UserModel user) {
+    final photoUrl = user.profileImages.profileImage;
     return Column(
       children: [
         Stack(
           children: [
             CircleAvatar(
               radius: 60,
-              backgroundImage: user.photoUrl != null ? CachedNetworkImageProvider(user.photoUrl!) : null,
-              child: user.photoUrl == null ? Text(user.name[0].toUpperCase(), style: const TextStyle(fontSize: 40)) : null,
+              backgroundImage: photoUrl != null ? CachedNetworkImageProvider(photoUrl) : null,
+              child: photoUrl == null ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : "?", style: const TextStyle(fontSize: 40)) : null,
             ),
             Positioned(
               bottom: 0,
@@ -95,7 +96,7 @@ class ProfileScreen extends StatelessWidget {
           const Divider(height: 32),
           _buildInfoRow(Icons.location_on_outlined, 'Adresse', user.location?.address ?? 'Non renseigné'),
           const Divider(height: 32),
-          _buildInfoRow(Icons.person_outline, 'Rôle', user.role.toUpperCase()),
+          _buildInfoRow(Icons.person_outline, 'Rôle', user.role.name.toUpperCase()),
         ],
       ),
     );
@@ -110,7 +111,7 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, opacity: 0.7)),
+              Text(label, style: const TextStyle(fontSize: 12)),
               Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
             ],
           ),

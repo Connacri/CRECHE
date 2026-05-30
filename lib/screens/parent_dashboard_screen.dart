@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../dependences/calendar_timeline/calendar_timeline.dart';
 import '../providers/auth_provider_v2.dart';
-import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/session_schedule_model.dart';
@@ -249,7 +248,6 @@ class _ParentDashboardState extends State<ParentDashboard> {
             dayColor: Theme.of(context).colorScheme.onSurfaceVariant,
             activeDayColor: Colors.white,
             activeBackgroundDayColor: Theme.of(context).colorScheme.primary,
-            dotsColor: Theme.of(context).colorScheme.primary,
             locale: 'fr',
           ),
         ),
