@@ -12,7 +12,6 @@ class ProfileCompletionScreen extends StatefulWidget {
 }
 
 class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
-  final _formKey = GlobalKey<FormState>();
   final PageController _pageController = PageController();
 
   int _currentStep = 0;
@@ -21,11 +20,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
   final _cityController = TextEditingController();
-  final _postalCodeController = TextEditingController();
   final _organizationNameController = TextEditingController();
-  final _licenseNumberController = TextEditingController();
 
   @override
   void dispose() {
@@ -33,11 +29,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
     _cityController.dispose();
-    _postalCodeController.dispose();
     _organizationNameController.dispose();
-    _licenseNumberController.dispose();
     super.dispose();
   }
 
@@ -53,7 +46,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             ),
           ),
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.05)),
+            child: Container(color: Colors.black.withValues(alpha: 0.05)),
           ),
           SafeArea(
             child: Column(
@@ -125,7 +118,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
               height: 4,
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                color: isActive ? colorScheme.primary : colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                color: isActive ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -222,13 +215,13 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   Future<void> _completeProfile() async {
     final authProvider = context.read<AuthProviderV2>();
-    final result = await authProvider.updateProfile(
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      phone: _phoneController.text.trim(),
-      city: _cityController.text.trim(),
-      organizationName: _organizationNameController.text.trim(),
-    );
+    final result = await authProvider.updateUserProfile({
+      'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+      'phone_number': _phoneController.text.trim(),
+      'city': _cityController.text.trim(),
+      'organization_name': _organizationNameController.text.trim(),
+      'profile_completed': true,
+    });
     if (result.success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil complété !')));
     }
