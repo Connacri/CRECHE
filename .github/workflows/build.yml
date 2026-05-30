@@ -2,20 +2,70 @@ name: Flutter Build & Release
 
 on:
   push:
-    branches: [ main ]
-    tags:
-      - 'v*'
+    branches: [ main, master ]
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  version_bump:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version
+        id: bump
+        run: |
+          VERSION_LINE=$(grep 'version: ' pubspec.yaml)
+          VERSION=$(echo $VERSION_LINE | cut -d ' ' -f 2 | cut -d '+' -f 1)
+          BUILD=$(echo $VERSION_LINE | cut -d '+' -f 2)
+
+          IFS='.' read -ra ADDR <<< "$VERSION"
+          MAJOR=${ADDR[0]}
+          MINOR=${ADDR[1]}
+          PATCH=${ADDR[2]}
+
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          NEW_BUILD=$((BUILD + 1))
+
+          FULL_VERSION="$NEW_VERSION+$NEW_BUILD"
+          echo "New Version: $FULL_VERSION"
+
+          sed -i "s/version: .*/version: $FULL_VERSION/" pubspec.yaml
+          sed -i "s/v[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+/v$NEW_VERSION/g" README.md
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Commit & Push changes
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add pubspec.yaml README.md
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]" || echo "No changes"
+          git push
+
+  build:
+    needs: version_bump
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: apk
+          - os: windows-latest
+            target: windows
+          - os: ubuntu-latest
+            target: web
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       
       - name: Setup Java
+        if: matrix.target == 'apk'
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -24,30 +74,69 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.2'
+          flutter-version: '3.27.1'
           channel: 'stable'
           cache: true
+
+      - name: Enable Windows Support
+        if: matrix.target == 'windows'
+        run: flutter config --enable-windows-desktop
           
       - name: Install dependencies
         run: flutter pub get
         
-      - name: Build Web
-        run: flutter build web --release --base-href "/CRECHE/"
+      - name: Build
+        run: |
+          if [ "${{ matrix.target }}" == "apk" ]; then
+            flutter build apk --release --no-tree-shake-icons
+          elif [ "${{ matrix.target }}" == "windows" ]; then
+            flutter build windows --release
+          elif [ "${{ matrix.target }}" == "web" ]; then
+            flutter build web --release --base-href "/CRECHE/"
+          fi
+        shell: bash
         
-      - name: Build Android APK
-        run: flutter build apk --debug # Debug for now, release needs signing
+      - name: Package Windows
+        if: matrix.target == 'windows'
+        run: |
+          cd build/windows/x64/runner/Release/
+          7z a ../../../../../creche_windows.zip *
+        shell: bash
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.target }}
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            creche_windows.zip
+            build/web/
+
+  release:
+    needs: [version_bump, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         
+      - name: Move artifacts for release
+        run: |
+          mkdir -p release_assets
+          [ -d build-apk ] && cp build-apk/app-release.apk release_assets/ || echo "No APK"
+          [ -d build-windows ] && cp build-windows/creche_windows.zip release_assets/ || echo "No Windows ZIP"
+
       - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build/web
+          publish_dir: build-web
           
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/app/outputs/flutter-apk/app-debug.apk,build/web/*"
+          artifacts: "release_assets/*"
+          tag: "v${{ needs.version_bump.outputs.new_version }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           generateReleaseNotes: true
+          name: "Crèche v${{ needs.version_bump.outputs.new_version }}"

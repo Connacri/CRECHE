@@ -5,6 +5,9 @@ import '../screens/autresDashboard.dart';
 import '../screens/coach_dashboard_screen.dart';
 import '../screens/parent_dashboard_screen.dart';
 import '../screens/school_dashboard_screen.dart';
+import '../screens/transporteur_dashboard_screen.dart';
+import '../screens/fournisseur_dashboard_screen.dart';
+import '../screens/user_dashboard_screen.dart';
 import '../providers/auth_provider_v2.dart';
 import 'auth_screen.dart';
 import 'email_confirmation_screen.dart';
@@ -70,6 +73,12 @@ class AuthWrapper extends StatelessWidget {
               return const CoachDashboard();
             case 'school':
               return const SchoolDashboard();
+            case 'transporteur':
+              return const TransporteurDashboard();
+            case 'fournisseur':
+              return const FournisseurDashboard();
+            case 'user':
+              return const UserDashboard();
             case 'autres':
               return const AutreDashboard();
             default:
