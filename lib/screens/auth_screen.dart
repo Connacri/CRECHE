@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider_v2.dart';
 import '../widgets/glass_card.dart';
+import 'forgot_password_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -301,6 +302,7 @@ class _AuthScreenState extends State<AuthScreen>
         labelText: 'Mot de passe',
         prefixIcon: const Icon(Icons.lock_outline),
         suffixIcon: IconButton(
+          tooltip: _obscurePassword ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
           icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
@@ -381,7 +383,12 @@ class _AuthScreenState extends State<AuthScreen>
 
   Widget _buildForgotPasswordButton() {
     return TextButton(
-      onPressed: () {}, // TODO
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+        );
+      },
       child: const Text('Mot de passe oublié ?'),
     );
   }
