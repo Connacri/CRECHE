@@ -87,6 +87,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           alignment: Alignment.centerLeft,
           child: IconButton(
             onPressed: () => Navigator.pop(context),
+            tooltip: 'Retour',
             icon: const Icon(Icons.arrow_back),
             style: IconButton.styleFrom(
               backgroundColor: colorScheme.surfaceVariant,

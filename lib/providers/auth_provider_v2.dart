@@ -398,21 +398,6 @@ class AuthProviderV2 extends ChangeNotifier {
     }
   }
 
-  Future<bool> checkEmailExists(String email) async {
-    try {
-      final response = await Supabase.instance.client
-          .from('users')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
-
-      return response != null;
-    } catch (e) {
-      print('[AuthProviderV2] Erreur checkEmailExists: $e');
-      return false;
-    }
-  }
-
   Future<AuthResult> sendPasswordReset(String email) async {
     _setState(AppAuthState.loading);
     _errorMessage = null;

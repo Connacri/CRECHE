@@ -20,23 +20,23 @@ class AppColors extends ThemeExtension<AppColors> {
   });
 
   static const light = AppColors(
-    success: Color(0xFF4CAF50),
-    warning: Color(0xFFFF9800),
-    info: Color(0xFF2196F3),
-    gradientStart: Color(0xFF7C4DFF),
-    gradientEnd: Color(0xFF448AFF),
-    cardGradientStart: Color(0xFFF5F0FF),
-    cardGradientEnd: Color(0xFFE8F0FE),
+    success: Color(0xFF52634A),
+    warning: Color(0xFF8D4D36),
+    info: Color(0xFF476368),
+    gradientStart: Color(0xFF9DB093),
+    gradientEnd: Color(0xFF52634A),
+    cardGradientStart: Color(0xFFF9F9F7),
+    cardGradientEnd: Color(0xFFEEEEEC),
   );
 
   static const dark = AppColors(
-    success: Color(0xFF81C784),
-    warning: Color(0xFFFFB74D),
-    info: Color(0xFF64B5F6),
-    gradientStart: Color(0xFFB388FF),
-    gradientEnd: Color(0xFF82B1FF),
-    cardGradientStart: Color(0xFF1A1A2E),
-    cardGradientEnd: Color(0xFF16213E),
+    success: Color(0xFFB9CCAE),
+    warning: Color(0xFFFFB59C),
+    info: Color(0xFFAECCD2),
+    gradientStart: Color(0xFF3B4B34),
+    gradientEnd: Color(0xFF101F0C),
+    cardGradientStart: Color(0xFF1A1C1B),
+    cardGradientEnd: Color(0xFF2F3130),
   );
 
   @override

@@ -56,6 +56,9 @@ class AppLocation {
 }
 
 enum UserRole {
+  transporteur,
+  fournisseur,
+  user,
   parent,
   school,
   coach,
@@ -78,6 +81,12 @@ enum UserRole {
         return 'School';
       case UserRole.coach:
         return 'Coach';
+      case UserRole.transporteur:
+        return 'Transporteur';
+      case UserRole.fournisseur:
+        return 'Fournisseur';
+      case UserRole.user:
+        return 'Utilisateur';
       case UserRole.autres:
         return 'Autres';
     }
