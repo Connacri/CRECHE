@@ -58,8 +58,6 @@ jobs:
             target: apk
           - os: windows-latest
             target: windows
-          - os: ubuntu-latest
-            target: web
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -91,17 +89,14 @@ jobs:
             flutter build apk --release --no-tree-shake-icons
           elif [ "${{ matrix.target }}" == "windows" ]; then
             flutter build windows --release
-          elif [ "${{ matrix.target }}" == "web" ]; then
-            flutter build web --release --base-href "/CRECHE/"
           fi
         shell: bash
         
-      - name: Package Windows
+      - name: Compile Inno Setup
         if: matrix.target == 'windows'
-        run: |
-          cd build/windows/x64/runner/Release/
-          7z a ../../../../../creche_windows.zip *
-        shell: bash
+        uses: Local-Connectivity/inno-setup-action@v1.0.0
+        with:
+          filepath: windows/innosetup/setup.iss
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -109,8 +104,7 @@ jobs:
           name: build-${{ matrix.target }}
           path: |
             build/app/outputs/flutter-apk/app-release.apk
-            creche_windows.zip
-            build/web/
+            windows/innosetup/creche_windows_installer.exe
 
   release:
     needs: [version_bump, build]
@@ -124,14 +118,8 @@ jobs:
         run: |
           mkdir -p release_assets
           [ -d build-apk ] && cp build-apk/app-release.apk release_assets/ || echo "No APK"
-          [ -d build-windows ] && cp build-windows/creche_windows.zip release_assets/ || echo "No Windows ZIP"
+          [ -d build-windows ] && cp build-windows/creche_windows_installer.exe release_assets/ || echo "No Windows EXE"
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build-web
-          
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:

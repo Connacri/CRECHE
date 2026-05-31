@@ -1,5 +1,3 @@
-# Palette's Journal 🎨
-
-## 2025-05-14 - Authentication & Onboarding Flow
-**Learning:** Users often find themselves stuck in "Email Confirmation" screens even after they've clicked the link in their browser because the app doesn't always poll or refresh the state immediately. Providing a manual "Check status" button empowers the user and reduces friction.
-**Action:** Always include a manual refresh/verification button on screens that wait for external state changes (like email confirmation).
+## 2025-05-21 - [AuthScreen UX & CI/CD Release]
+**Learning:** Adding micro-interactions like haptic feedback and autofill hints significantly improves perceived app quality. Standardizing CI/CD for specific platforms (APK & Inno Setup) ensures reliable delivery.
+**Action:** Always include AutofillHints and TextInputAction in auth forms; use haptic feedback for primary navigation/selection elements.
