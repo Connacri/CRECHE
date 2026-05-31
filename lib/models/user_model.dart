@@ -116,10 +116,10 @@ class UserProfileImages {
       coverImageSupabase: map['coverImageSupabase'],
       lastUpdated: map['lastUpdated'] != null
           ? (map['lastUpdated'] is Timestamp
-              ? (map['lastUpdated'] as Timestamp).toDate()
-              : map['lastUpdated'] is String
-                  ? DateTime.parse(map['lastUpdated'])
-                  : DateTime.parse(map['lastUpdated'].toString()))
+                ? (map['lastUpdated'] as Timestamp).toDate()
+                : map['lastUpdated'] is String
+                ? DateTime.parse(map['lastUpdated'])
+                : DateTime.parse(map['lastUpdated'].toString()))
           : null,
     );
   }
@@ -131,8 +131,9 @@ class UserProfileImages {
       'profileImageSupabase': profileImageSupabase,
       'coverImageFirebase': coverImageFirebase,
       'coverImageSupabase': coverImageSupabase,
-      'lastUpdated':
-          lastUpdated != null ? Timestamp.fromDate(lastUpdated!) : null,
+      'lastUpdated': lastUpdated != null
+          ? Timestamp.fromDate(lastUpdated!)
+          : null,
     };
   }
 
@@ -149,7 +150,8 @@ class UserProfileImages {
 
   /// ⚠️ DEPRECATED: Utiliser toMapFirestore() ou toMapSupabase()
   @Deprecated(
-      'Utilisez toMapFirestore() ou toMapSupabase() selon votre backend')
+    'Utilisez toMapFirestore() ou toMapSupabase() selon votre backend',
+  )
   Map<String, dynamic> toMap() => toMapSupabase();
 
   String? get profileImage => profileImageSupabase ?? profileImageFirebase;
@@ -241,7 +243,9 @@ class UserModel {
       updatedAt: _parseDateTime(data['updatedAt']),
       isActive: data['isActive'] ?? data['state'] ?? true,
       deactivatedAt: _parseDateTimeNullable(data['deactivatedAt']),
-      scheduledDeletionDate: _parseDateTimeNullable(data['scheduledDeletionDate']),
+      scheduledDeletionDate: _parseDateTimeNullable(
+        data['scheduledDeletionDate'],
+      ),
       profileImages: data['profileImages'] != null
           ? UserProfileImages.fromMap(data['profileImages'])
           : UserProfileImages(
@@ -252,7 +256,9 @@ class UserModel {
           ? AppLocation.fromMap(data['location'])
           : null,
       bio: data['bio'],
-      phoneNumber: data['phoneNumber'] ?? (data['phone'] != null ? data['phone'].toString() : null),
+      phoneNumber:
+          data['phoneNumber'] ??
+          (data['phone'] != null ? data['phone'].toString() : null),
       metadata: data['metadata'],
     );
   }
@@ -265,8 +271,9 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'isActive': isActive,
-      'deactivatedAt':
-          deactivatedAt != null ? Timestamp.fromDate(deactivatedAt!) : null,
+      'deactivatedAt': deactivatedAt != null
+          ? Timestamp.fromDate(deactivatedAt!)
+          : null,
       'scheduledDeletionDate': scheduledDeletionDate != null
           ? Timestamp.fromDate(scheduledDeletionDate!)
           : null,
@@ -279,6 +286,12 @@ class UserModel {
   }
 
   factory UserModel.fromSupabase(Map<String, dynamic> data) {
+    final locationData = data['location'];
+    final hasFlatLocation =
+        data['address'] != null ||
+        data['city'] != null ||
+        data['country'] != null;
+
     return UserModel(
       uid: data['id'] ?? '',
       email: data['email'] ?? '',
@@ -296,8 +309,16 @@ class UserModel {
       profileImages: data['profile_images'] != null
           ? UserProfileImages.fromMap(data['profile_images'])
           : UserProfileImages(),
-      location: data['location'] != null
-          ? AppLocation.fromMap(data['location'])
+      location: locationData != null
+          ? AppLocation.fromMap(locationData)
+          : hasFlatLocation
+          ? AppLocation(
+              latitude: 0.0,
+              longitude: 0.0,
+              address: data['address'] ?? '',
+              city: data['city'],
+              country: data['country'],
+            )
           : null,
       bio: data['bio'],
       phoneNumber: data['phone_number'],
