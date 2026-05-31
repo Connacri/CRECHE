@@ -291,8 +291,32 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
 
   /// Boutons d'action
   Widget _buildActions(BuildContext context, String email) {
+    final authProvider = context.read<AuthProviderV2>();
     return Column(
       children: [
+        // Bouton Vérifier le statut
+        FilledButton.icon(
+          onPressed: () async {
+            final isConfirmed = await authProvider.checkEmailConfirmationStatus();
+            if (!context.mounted) return;
+
+            if (isConfirmed) {
+              _showSuccessSnackBar('Email confirmé ! Bienvenue.');
+            } else {
+              _showErrorSnackBar('Confirmation non détectée. Vérifiez votre boîte email.');
+            }
+          },
+          icon: const Icon(Icons.check_circle_outline),
+          label: const Text('J\'ai confirmé mon email'),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(double.infinity, 52),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
         // Bouton Renvoyer l'email
         if (_emailResent)
           Container(
