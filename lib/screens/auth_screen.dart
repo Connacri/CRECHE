@@ -20,7 +20,6 @@ class _AuthScreenState extends State<AuthScreen>
   late TabController _tabController;
   bool _obscurePassword = true;
   String? _selectedRole;
-  bool _isCheckingEmail = false;
 
   @override
   void initState() {
@@ -29,7 +28,6 @@ class _AuthScreenState extends State<AuthScreen>
     _tabController.addListener(() {
       setState(() {});
     });
-    _emailController.addListener(_onEmailChanged);
   }
 
   @override
@@ -40,72 +38,19 @@ class _AuthScreenState extends State<AuthScreen>
     super.dispose();
   }
 
-  void _onEmailChanged() {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (_emailController.text.contains('@') &&
-          _emailController.text.length > 5) {
-        _checkEmailExists();
-      }
-    });
-  }
-
-  Future<void> _checkEmailExists() async {
-    if (_isCheckingEmail) return;
-    setState(() => _isCheckingEmail = true);
-    final authProvider = context.read<AuthProviderV2>();
-    final exists = await authProvider.checkEmailExists(_emailController.text.trim());
-    setState(() => _isCheckingEmail = false);
-
-    if (exists && _tabController.index == 1) {
-      _showSnackBar(
-        'Cet email existe déjà. Passez à la connexion.',
-        isError: false,
-        action: SnackBarAction(
-          label: 'Connexion',
-          textColor: Colors.white,
-          onPressed: () => _tabController.animateTo(0),
-        ),
-      );
-    }
-  }
-
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     final authProvider = context.read<AuthProviderV2>();
-    final email = _emailController.text.trim();
     final result = await authProvider.login(
-      email: email,
+      email: _emailController.text.trim(),
       password: _passwordController.text,
     );
     if (!mounted) return;
     if (result.success) {
       _showSnackBar('Connexion réussie !', isError: false);
     } else {
-      if (result.errorCode == 'email_not_found') {
-        _showSnackBar(
-          'Cet email n\'est pas enregistré',
-          isError: false,
-          action: SnackBarAction(
-            label: 'Créer un compte',
-            textColor: Colors.white,
-            onPressed: () => _switchToSignupWithEmail(email),
-          ),
-        );
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) _switchToSignupWithEmail(email);
-        });
-      } else {
-        _showSnackBar(result.message ?? 'Erreur de connexion', isError: true);
-      }
+      _showSnackBar(result.message ?? 'Erreur de connexion', isError: true);
     }
-  }
-
-  void _switchToSignupWithEmail(String email) {
-    _tabController.animateTo(1);
-    _passwordController.clear();
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) _showSnackBar('Créez votre compte avec $email', isError: false);
-    });
   }
 
   Future<void> _handleSignup() async {
