@@ -1,7 +1,7 @@
 name: creche
 description: "🧸 Crèche - L'Avenir de la Petite Enfance / The Future of Childcare"
 publish_to: 'none'
-version: 1.2.3+6
+version: 1.2.4+7
 
 environment:
   sdk: ^3.11.0
