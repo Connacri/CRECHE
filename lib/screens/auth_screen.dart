@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider_v2.dart';
@@ -28,6 +29,9 @@ class _AuthScreenState extends State<AuthScreen>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       setState(() {});
+    });
+    _emailController.addListener(() {
+      if (mounted) setState(() {});
     });
   }
 
@@ -99,7 +103,7 @@ class _AuthScreenState extends State<AuthScreen>
           ),
           // Darker overlay for readability
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.1)),
+            child: Container(color: Colors.black.withValues(alpha: 0.1)),
           ),
           SafeArea(
             child: Center(
@@ -175,11 +179,12 @@ class _AuthScreenState extends State<AuthScreen>
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(30),
       ),
       child: TabBar(
         controller: _tabController,
+        onTap: (_) => HapticFeedback.selectionClick(),
         indicator: BoxDecoration(
           color: colorScheme.primary,
           borderRadius: BorderRadius.circular(26),
@@ -231,9 +236,20 @@ class _AuthScreenState extends State<AuthScreen>
     return TextFormField(
       controller: _emailController,
       keyboardType: TextInputType.emailAddress,
-      decoration: const InputDecoration(
+      autofillHints: const [AutofillHints.email],
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
         labelText: 'Email',
-        prefixIcon: Icon(Icons.email_outlined),
+        prefixIcon: const Icon(Icons.email_outlined),
+        suffixIcon: _emailController.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 20),
+                onPressed: () {
+                  _emailController.clear();
+                  setState(() {});
+                },
+              )
+            : null,
       ),
       validator: (v) => v == null || !v.contains('@') ? 'Email invalide' : null,
     );
@@ -243,6 +259,9 @@ class _AuthScreenState extends State<AuthScreen>
     return TextFormField(
       controller: _passwordController,
       obscureText: _obscurePassword,
+      autofillHints: const [AutofillHints.password],
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => _tabController.index == 0 ? _handleLogin() : _handleSignup(),
       decoration: InputDecoration(
         labelText: 'Mot de passe',
         prefixIcon: const Icon(Icons.lock_outline),
@@ -289,6 +308,7 @@ class _AuthScreenState extends State<AuthScreen>
               ),
               selected: isSelected,
               onSelected: (selected) {
+                HapticFeedback.selectionClick();
                 setState(() => _selectedRole = selected ? role['value'] as String : null);
               },
             );
