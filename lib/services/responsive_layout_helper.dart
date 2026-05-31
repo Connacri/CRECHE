@@ -15,7 +15,9 @@ class ResponsiveBuilder extends StatelessWidget {
   });
 
   static DeviceType getDeviceType(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+    // Optimization: Use sizeOf to only rebuild when the size changes,
+    // not for other MediaQuery changes like keyboard or text scale.
+    final width = MediaQuery.sizeOf(context).width;
     if (width < 600) {
       return DeviceType.mobile;
     } else if (width < 1200) {
@@ -59,7 +61,8 @@ class ResponsiveLayout {
   static const double tabletMaxWidth = 1024;
 
   static DeviceType getDeviceType(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+    // Optimization: Use sizeOf to only rebuild when the size changes.
+    final width = MediaQuery.sizeOf(context).width;
     if (width < mobileMaxWidth) {
       return DeviceType.mobile;
     } else if (width < tabletMaxWidth) {
