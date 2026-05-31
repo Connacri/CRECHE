@@ -338,7 +338,9 @@ class _CalendarTimelineState extends State<CalendarTimeline> {
 
   @override
   Widget build(BuildContext context) {
-    _scrollAlignment = widget.leftMargin / MediaQuery.of(context).size.width;
+    // BOLT OPTIMIZATION: Use MediaQuery.sizeOf instead of MediaQuery.of(context).size
+    // to prevent unnecessary rebuilds when non-size properties change.
+    _scrollAlignment = widget.leftMargin / MediaQuery.sizeOf(context).width;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
@@ -384,7 +386,7 @@ class _CalendarTimelineState extends State<CalendarTimeline> {
                 if (index == _years.length - 1)
                   // Last element to take space to do scroll to left side
                   SizedBox(
-                    width: MediaQuery.of(context).size.width -
+                    width: MediaQuery.sizeOf(context).width -
                         widget.leftMargin -
                         (yearName.length * 10),
                   ),
@@ -442,7 +444,7 @@ class _CalendarTimelineState extends State<CalendarTimeline> {
                 if (index == _months.length - 1)
                   // Last element to take space to do scroll to left side
                   SizedBox(
-                    width: MediaQuery.of(context).size.width -
+                    width: MediaQuery.sizeOf(context).width -
                         widget.leftMargin -
                         (monthName.length * 10),
                   ),
@@ -502,7 +504,7 @@ class _CalendarTimelineState extends State<CalendarTimeline> {
               if (index == _days.length - 1)
                 // Last element to take space to do scroll to left side
                 SizedBox(
-                  width: MediaQuery.of(context).size.width -
+                  width: MediaQuery.sizeOf(context).width -
                       widget.leftMargin -
                       65,
                 ),
