@@ -1,8 +1,12 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
+import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/auth_wrapper.dart';
 import 'providers/locale_provider.dart';
@@ -12,6 +16,13 @@ import 'providers/course_provider_complete.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
 
   runApp(
     MultiProvider(
@@ -43,11 +54,7 @@ class CrecheApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          supportedLocales: const [
-            Locale('en'),
-            Locale('fr'),
-            Locale('ar'),
-          ],
+          supportedLocales: const [Locale('en'), Locale('fr'), Locale('ar')],
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: ThemeMode.system,

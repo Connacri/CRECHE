@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1074625929550",
+    "firebase_url": "https://creche-66529-default-rtdb.firebaseio.com",
+    "project_id": "creche-66529",
+    "storage_bucket": "creche-66529.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074625929550:android:b7739929f2c76cdd757e1f",
+        "android_client_info": {
+          "package_name": "com.connacri.creche"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1074625929550-e7d40mt384j3cduc6202hujmbn22b7t6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUREdAFpQN4XyEY4ghbrxY9erLtnOCOn4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1074625929550-e7d40mt384j3cduc6202hujmbn22b7t6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1074625929550-c00lqf0h458frddg0b504bqgdhao1j4k.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.connacri.creche"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
