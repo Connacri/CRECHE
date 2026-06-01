@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Build APK
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
       - name: Rename APK
         run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/creche-android.apk
       - name: Upload APK
@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Build Windows
-        run: flutter build windows --release --build-number=${{ github.run_number }}
+        run: flutter build windows --release
       - name: Create Installer (Inno Setup)
         shell: pwsh
         run: |

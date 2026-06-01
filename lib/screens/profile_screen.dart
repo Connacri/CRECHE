@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/auth_provider_v2.dart';
 import '../models/user_model.dart';
+import '../services/image_storage_service.dart';
 import '../widgets/glass_card.dart';
 import '../services/hybrid_image_picker.dart';
 
