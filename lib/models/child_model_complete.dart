@@ -50,6 +50,12 @@ class ChildModel {
   final DateTime dateOfBirth;
   final ChildGender gender;
   final String? photoUrl;
+
+  String? get photoUrlWithCache {
+    if (photoUrl == null || photoUrl!.isEmpty) return null;
+    final separator = photoUrl!.contains('?') ? '&' : '?';
+    return '$photoUrl${separator}v=${updatedAt.millisecondsSinceEpoch}';
+  }
   final String? schoolGrade;
   final MedicalInfo medicalInfo;
   final DateTime createdAt;
@@ -158,6 +164,21 @@ class ChildModel {
       'updated_at': updatedAt.toIso8601String(),
       'is_active': isActive,
     };
+  }
+
+  factory ChildModel.mock() {
+    return ChildModel(
+      id: 'mock-id',
+      parentId: 'mock-parent',
+      firstName: 'Enfant',
+      lastName: 'Inconnu',
+      dateOfBirth: DateTime.now().subtract(const Duration(days: 365 * 3)),
+      gender: ChildGender.other,
+      medicalInfo: MedicalInfo(),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      isActive: false,
+    );
   }
 
   ChildModel copyWith({

@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
+import '../services/image_storage_service.dart';
 
 /// 🎯 Provider d'authentification avec gestion cas edge
 class AuthProviderV2 extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final ImageStorageService _imageService = ImageStorageService();
 
   // ============================================================================
   // ÉTAT
@@ -314,11 +317,14 @@ class AuthProviderV2 extends ChangeNotifier {
       print('[AuthProviderV2] 🔄 Début updateUserProfileSilent');
       print('[AuthProviderV2] Données à mettre à jour: $profileData');
 
-      // 1. Mettre à jour Supabase
-      await Supabase.instance.client.from('users').update({
+      final now = DateTime.now().toIso8601String();
+      final updates = {
         ...profileData,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', _currentUser!.id);
+        'updated_at': now,
+      };
+
+      // 1. Mettre à jour Supabase
+      await Supabase.instance.client.from('users').update(updates).eq('id', _currentUser!.id);
 
       print('[AuthProviderV2] ✅ Supabase mis à jour');
 
@@ -327,8 +333,8 @@ class AuthProviderV2 extends ChangeNotifier {
         _userData = {};
       }
 
-      // Merger chaque clé individuellement pour gérer les maps imbriquées
-      profileData.forEach((key, value) {
+      // Merger chaque clé de updates (qui contient déjà profileData + updated_at)
+      updates.forEach((key, value) {
         if (value is Map && _userData![key] is Map) {
           // Pour les maps imbriquées comme profile_images, faire un deep merge
           _userData![key] = {
@@ -392,6 +398,54 @@ class AuthProviderV2 extends ChangeNotifier {
     } catch (e) {
       final msg = e.toString();
       print('[AuthProviderV2] updateUserProfile ERROR: $msg');
+      _errorMessage = msg;
+      _setState(AppAuthState.error);
+      return AuthResult.error(msg);
+    }
+  }
+
+  /// 📸 Met à jour la photo de profil avec upload vers Supabase Storage
+  Future<AuthResult> updateProfileImage(File imageFile) async {
+    if (_currentUser == null) {
+      return AuthResult.error('Utilisateur non connecté');
+    }
+
+    _setState(AppAuthState.loading);
+    _errorMessage = null;
+
+    try {
+      print('[AuthProviderV2] 📤 Début updateProfileImage');
+
+      // 1. Upload de l'image
+      final imageUrl = await _imageService.uploadUserProfileImage(
+        imageFile: imageFile,
+        userId: _currentUser!.id,
+        isProfileImage: true,
+      );
+
+      if (imageUrl == null) {
+        throw Exception('Échec de l\'upload de l\'image');
+      }
+
+      print('[AuthProviderV2] ✅ Image uploadée: $imageUrl');
+
+      // 2. Mettre à jour le profil dans la base de données
+      // On prépare l'objet profile_images tel qu'attendu par le modèle
+      final profileImages = {
+        'profileImageSupabase': imageUrl,
+        'lastUpdated': DateTime.now().toIso8601String(),
+      };
+
+      final result = await updateUserProfileSilent({
+        'profile_images': profileImages,
+      });
+
+      print('[AuthProviderV2] ✅ Profil mis à jour avec la nouvelle image');
+      _setState(AppAuthState.authenticated); // Sortir du mode loading
+      return result;
+    } catch (e) {
+      final msg = e.toString();
+      print('[AuthProviderV2] ❌ updateProfileImage ERROR: $msg');
       _errorMessage = msg;
       _setState(AppAuthState.error);
       return AuthResult.error(msg);

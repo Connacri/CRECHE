@@ -240,20 +240,22 @@ class TimeSlot {
   }
 
   factory TimeSlot.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.parse(value);
+      return DateTime.now();
+    }
+
     return TimeSlot(
-      startTime: map['startTime'] is Timestamp
-          ? (map['startTime'] as Timestamp).toDate()
-          : DateTime.parse(map['startTime']),
-      endTime: map['endTime'] is Timestamp
-          ? (map['endTime'] as Timestamp).toDate()
-          : DateTime.parse(map['endTime']),
+      startTime: parseDate(map['startTime'] ?? map['start_time']),
+      endTime: parseDate(map['endTime'] ?? map['end_time']),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'startTime': Timestamp.fromDate(startTime),
-      'endTime': Timestamp.fromDate(endTime),
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime.toIso8601String(),
     };
   }
 }

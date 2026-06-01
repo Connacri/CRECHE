@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 /// 🎯 Service hybride d'image picking optimisé par plateforme
 ///
@@ -38,6 +40,9 @@ class HybridImagePickerService {
   /// - [maxWidth], [maxHeight] : Dimensions max (utilisé seulement sur mobile)
   /// - [imageQuality] : Qualité 0-100 (utilisé seulement sur mobile)
   /// - [allowedExtensions] : Extensions autorisées (par défaut: jpg, jpeg, png)
+  /// - [crop] : Si true, lance l'outil de recadrage après la sélection
+  /// - [aspectRatio] : Ratio imposé pour le recadrage
+  /// - [context] : Nécessaire pour le recadrage sur le Web
   ///
   /// **Retour :**
   /// - `File?` : Le fichier image sélectionné ou null si annulé
@@ -46,46 +51,84 @@ class HybridImagePickerService {
     double? maxHeight,
     int imageQuality = 85,
     List<String> allowedExtensions = const ['jpg', 'jpeg', 'png'],
+    bool crop = false,
+    CropAspectRatio? aspectRatio,
+    required BuildContext context, // ✅ Rendu obligatoire pour le dialogue
   }) async {
     try {
       print('🖼️ [HybridPicker] Début picking...');
-      print('🖼️ [HybridPicker] Platform: ${_getPlatformName()}');
+      
+      File? pickedFile;
 
-      // Sélection du picker selon la plateforme
       if (_isWindowsDesktop || _isWeb) {
-        return await _pickImageWithFilePicker(allowedExtensions);
+        pickedFile = await _pickImageWithFilePicker(allowedExtensions);
       } else if (_isMobile) {
-        return await _pickImageWithImagePicker(
+        pickedFile = await _pickImageWithImagePicker(
           maxWidth: maxWidth,
           maxHeight: maxHeight,
           imageQuality: imageQuality,
         );
       } else {
-        // Fallback pour autres plateformes (macOS, Linux)
-        return await _pickImageWithFilePicker(allowedExtensions);
+        pickedFile = await _pickImageWithFilePicker(allowedExtensions);
       }
+
+      if (pickedFile != null && crop && !_isWindowsDesktop) {
+        // ✅ Demander au user s'il veut recadrer
+        final bool? shouldCrop = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Recadrer l\'image ?'),
+            content: const Text('Souhaitez-vous ajuster ou recadrer votre photo avant de l\'enregistrer ?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Utiliser telle quelle'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Recadrer'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldCrop == true) {
+          return await _cropImage(
+            pickedFile,
+            aspectRatio: aspectRatio,
+            context: context,
+          );
+        }
+      }
+
+      return pickedFile;
     } catch (e, stackTrace) {
       print('❌ [HybridPicker] Erreur picking: $e');
-      print('❌ [HybridPicker] StackTrace: $stackTrace');
       rethrow;
     }
   }
 
-  /// 📸 Pick une image de profil (optimisé pour avatars)
-  static Future<File?> pickProfileImage() async {
+  /// 📸 Pick une image de profil (optimisé pour avatars avec recadrage optionnel)
+  static Future<File?> pickProfileImage({required BuildContext context}) async {
     return await pickImage(
       maxWidth: 800,
       maxHeight: 800,
       imageQuality: 85,
+      crop: true,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      context: context,
     );
   }
 
   /// 📸 Pick une image de couverture (optimisé pour headers)
-  static Future<File?> pickCoverImage() async {
+  static Future<File?> pickCoverImage({required BuildContext context}) async {
     return await pickImage(
       maxWidth: 1200,
       maxHeight: 600,
       imageQuality: 85,
+      crop: true,
+      aspectRatio: const CropAspectRatio(ratioX: 2, ratioY: 1),
+      context: context,
     );
   }
 
@@ -301,6 +344,56 @@ class HybridImagePickerService {
       print('❌ [HybridPicker] Erreur picking multiple: $e');
       print('❌ [HybridPicker] StackTrace: $stackTrace');
       rethrow;
+    }
+  }
+
+  // ============================================================================
+  // UTILITAIRES DE RECADRAGE
+  // ============================================================================
+
+  /// ✂️ Lance l'interface de recadrage
+  static Future<File?> _cropImage(
+    File imageFile, {
+    CropAspectRatio? aspectRatio,
+    BuildContext? context,
+  }) async {
+    try {
+      print('✂️ [HybridPicker] Début cropping: ${imageFile.path}');
+
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: imageFile.path,
+        aspectRatio: aspectRatio,
+        compressQuality: 90,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Recadrer l\'image',
+            toolbarColor: const Color(0xFF2E7D32),
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: aspectRatio != null,
+          ),
+          IOSUiSettings(
+            title: 'Recadrer l\'image',
+          ),
+          if (context != null && _isWeb)
+            WebUiSettings(
+              context: context,
+              presentStyle: WebPresentStyle.dialog,
+              size: const CropperSize(width: 500, height: 500),
+            ),
+        ],
+      );
+
+      if (croppedFile == null) {
+        print('✂️ [HybridPicker] Cropping annulé');
+        return null;
+      }
+
+      print('✅ [HybridPicker] Cropping réussi: ${croppedFile.path}');
+      return File(croppedFile.path);
+    } catch (e) {
+      print('❌ [HybridPicker] Erreur cropping: $e');
+      return imageFile; // Fallback au fichier original en cas d'erreur
     }
   }
 

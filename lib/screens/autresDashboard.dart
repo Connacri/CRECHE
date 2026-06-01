@@ -309,7 +309,7 @@ class _AutreDashboardState extends State<AutreDashboard> {
               radius: 60,
               backgroundColor: Theme.of(context).colorScheme.primaryContainer,
               backgroundImage:
-                  profileUrl != null ? NetworkImage(profileUrl) : null,
+                  profileUrl != null ? CachedNetworkImageProvider(profileUrl) : null,
               child: profileUrl == null
                   ? Text(
                       _user!.name.isNotEmpty
@@ -807,12 +807,18 @@ class _AutreDashboardState extends State<AutreDashboard> {
                 if (url != null) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      url,
+                    child: CachedNetworkImage(
+                      imageUrl: url,
                       height: 80,
                       width: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
+                      placeholder: (context, url) => Container(
+                        height: 80,
+                        width: 80,
+                        color: Colors.grey[200],
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                      errorWidget: (context, url, error) {
                         return Container(
                           height: 80,
                           width: 80,

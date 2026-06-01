@@ -154,9 +154,32 @@ class UserProfileImages {
   )
   Map<String, dynamic> toMap() => toMapSupabase();
 
-  String? get profileImage => profileImageSupabase ?? profileImageFirebase;
+  static String? _withCacheVersion(String? url, DateTime? lastUpdated) {
+    if (url == null || url.isEmpty) {
+      return url;
+    }
 
-  String? get coverImage => coverImageSupabase ?? coverImageFirebase;
+    // Si lastUpdated est nul, on ne peut pas vraiment bumper le cache
+    // sauf si on utilise une valeur aléatoire, mais ça casserait le cache à chaque build.
+    // On reste sur lastUpdated s'il existe.
+    if (lastUpdated == null) {
+      return url;
+    }
+
+    final separator = url.contains('?') ? '&' : '?';
+    // Utilisation de milliseconds pour un bumper de cache propre
+    return '$url${separator}v=${lastUpdated.millisecondsSinceEpoch}';
+  }
+
+  String? get profileImage => _withCacheVersion(
+        profileImageSupabase ?? profileImageFirebase,
+        lastUpdated,
+      );
+
+  String? get coverImage => _withCacheVersion(
+        coverImageSupabase ?? coverImageFirebase,
+        lastUpdated,
+      );
 
   UserProfileImages copyWith({
     String? profileImageFirebase,

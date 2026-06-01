@@ -337,6 +337,28 @@ class CourseModel {
 
   int get availableSpots => maxStudents - currentStudents;
 
+  factory CourseModel.mock() {
+    return CourseModel(
+      id: 'mock-id',
+      title: 'Cours non trouvé',
+      description: 'Ce cours n\'a pas pu être chargé.',
+      category: CourseCategory.other,
+      price: 0.0,
+      season: CourseSeason.yearRound,
+      seasonStartDate: DateTime.now().subtract(const Duration(days: 365)),
+      seasonEndDate: DateTime.now().add(const Duration(days: 365)),
+      location: CourseLocation(
+        latitude: 0.0,
+        longitude: 0.0,
+        address: 'N/A',
+      ),
+      images: [],
+      createdBy: 'system',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
   CourseModel copyWith({
     String? id,
     String? title,

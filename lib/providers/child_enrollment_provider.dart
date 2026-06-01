@@ -8,8 +8,9 @@ import '../models/session_schedule_model.dart';
 import '../services/image_storage_service.dart';
 import '../services/supabase_service.dart';
 
+import '../models/daily_activity_model.dart';
+
 /// ✅ VERSION CORRIGÉE ET COMPLÉTÉE du ChildEnrollmentProvider
-/// Toutes les méthodes sont maintenant implémentées correctement
 class ChildEnrollmentProvider extends ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
   final ImageStorageService _imageService = ImageStorageService();
@@ -17,19 +18,39 @@ class ChildEnrollmentProvider extends ChangeNotifier {
   List<ChildModel> _children = [];
   List<EnrollmentModel> _enrollments = [];
   List<SessionSchedule> _schedules = [];
+  List<DailyActivity> _dailyActivities = [];
 
   bool _isLoading = false;
   String? _error;
 
   List<ChildModel> get children => _children;
-
   List<EnrollmentModel> get enrollments => _enrollments;
-
   List<SessionSchedule> get schedules => _schedules;
+  List<DailyActivity> get dailyActivities => _dailyActivities;
 
   bool get isLoading => _isLoading;
-
   String? get error => _error;
+
+  // ... (existing code)
+
+  // === ✅ CHARGEMENT DES ACTIVITÉS QUOTIDIENNES ===
+  Future<void> loadDailyActivities(String parentId, DateTime date) async {
+    if (parentId.isEmpty) return;
+    try {
+      _setLoading(true);
+      _dailyActivities = await _supabaseChildService.getDailyActivities(parentId, date);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      print('❌ Erreur loadDailyActivities: $e');
+      _setError('Impossible de charger les activités');
+      _setLoading(false);
+    }
+  }
+
+  List<DailyActivity> getActivitiesForChild(String childId) {
+    return _dailyActivities.where((a) => a.childId == childId).toList();
+  }
 
   // === CHARGEMENT DES ENFANTS ===
   Future<void> loadChildren(String parentId) async {
@@ -66,7 +87,7 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     File? photo,
     String? schoolGrade,
     MedicalInfo? medicalInfo,
-    String? photoUrl, // ✅ Support URL directe
+    String? photoUrl,
   }) async {
     try {
       _setLoading(true);
@@ -74,17 +95,19 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
       String? finalPhotoUrl = photoUrl;
 
-      // Upload photo si fichier fourni
       if (photo != null) {
         finalPhotoUrl = await _imageService.uploadChildPhoto(
           imageFile: photo,
           childId: '$parentId-${DateTime.now().millisecondsSinceEpoch}',
         );
+        // Ajout d'un timestamp pour briser le cache
+        if (finalPhotoUrl != null) {
+          finalPhotoUrl = '$finalPhotoUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+        }
       }
 
       final child = ChildModel(
-        id: '',
-        // Supabase génère l'UUID
+        id: '', 
         parentId: parentId,
         firstName: firstName,
         lastName: lastName,
@@ -98,12 +121,14 @@ class ChildEnrollmentProvider extends ChangeNotifier {
         isActive: true,
       );
 
-      await _supabaseChildService.createChild(child);
-
-      // Recharger la liste pour avoir les données fraîches
-      await loadChildren(parentId);
-
+      final newId = await _supabaseChildService.createChild(child);
+      
+      // ✅ Mise à jour locale instantanée
+      final childWithId = child.copyWith(id: newId);
+      _children.add(childWithId);
+      
       _setLoading(false);
+      notifyListeners();
       return true;
     } catch (e) {
       print('❌ Erreur addChild: $e');
@@ -113,15 +138,15 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === ✅ MISE À JOUR D'UN ENFANT - VERSION COMPLÈTE ===
+  // === ✅ MISE À JOUR D'UN ENFANT - VERSION OPTIMISÉE ===
   Future<bool> updateChild({
     required String childId,
     String? firstName,
     String? lastName,
     DateTime? dateOfBirth,
     ChildGender? gender,
-    File? newPhoto, // ✅ Support fichier
-    String? newPhotoUrl, // ✅ Support URL directe
+    File? newPhoto,
+    String? newPhotoUrl,
     String? schoolGrade,
     MedicalInfo? medicalInfo,
   }) async {
@@ -130,24 +155,22 @@ class ChildEnrollmentProvider extends ChangeNotifier {
       _clearError();
 
       final childIndex = _children.indexWhere((c) => c.id == childId);
-      if (childIndex == -1) {
-        throw Exception('Enfant non trouvé localement');
-      }
+      if (childIndex == -1) throw Exception('Enfant non trouvé localement');
 
       final currentChild = _children[childIndex];
-
       String? photoUrl = currentChild.photoUrl;
 
-      // ✅ Priorité à newPhotoUrl si fournie
       if (newPhotoUrl != null) {
         photoUrl = newPhotoUrl;
-      }
-      // ✅ Sinon, upload le nouveau fichier si fourni
-      else if (newPhoto != null) {
+      } else if (newPhoto != null) {
         photoUrl = await _imageService.uploadChildPhoto(
           imageFile: newPhoto,
           childId: childId,
         );
+        // Ajout d'un timestamp pour briser le cache
+        if (photoUrl != null) {
+          photoUrl = '$photoUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+        }
       }
 
       final updates = <String, dynamic>{
@@ -163,10 +186,20 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
       await _supabaseChildService.updateChild(childId, updates);
 
-      // Recharger pour avoir les données à jour
-      await loadChildren(currentChild.parentId);
+      // ✅ Mise à jour locale instantanée sans recharger tout
+      _children[childIndex] = currentChild.copyWith(
+        firstName: firstName,
+        lastName: lastName,
+        dateOfBirth: dateOfBirth,
+        gender: gender,
+        photoUrl: photoUrl,
+        schoolGrade: schoolGrade,
+        medicalInfo: medicalInfo,
+        updatedAt: DateTime.now(),
+      );
 
       _setLoading(false);
+      notifyListeners();
       return true;
     } catch (e) {
       print('❌ Erreur updateChild: $e');
@@ -315,19 +348,7 @@ class ChildEnrollmentProvider extends ChangeNotifier {
       _setLoading(true);
       _clearError();
 
-      // 1. Charger toutes les inscriptions approuvées
-      if (_enrollments.isEmpty) {
-        await loadEnrollments(parentId);
-      }
-
-      final approvedEnrollments = _enrollments
-          .where((e) => e.status == EnrollmentStatus.approved)
-          .toList();
-
-      // 2. Pour chaque inscription, récupérer les sessions planifiées
-      // TODO: Implémenter la récupération des sessions depuis Supabase
-      // Pour l'instant, on utilise une liste vide
-      _schedules = [];
+      _schedules = await _supabaseChildService.getSchedulesForParent(parentId);
 
       _setLoading(false);
       notifyListeners();

@@ -24,6 +24,7 @@ dependencies:
   intl: ^0.20.2
   lottie: ^3.3.2
   image_picker: ^1.2.1
+  image_cropper: ^8.0.2
   geolocator: ^13.0.1
   geocoding: ^4.0.0
   flutter_osm_plugin: ^1.4.3

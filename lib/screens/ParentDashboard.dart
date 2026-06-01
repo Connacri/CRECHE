@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -420,17 +421,26 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   Widget _buildCoverImage(UserModel user) {
     return user.profileImages.coverImage != null
-        ? Image.network(user.profileImages.coverImage!, fit: BoxFit.cover)
-        : Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  GhibliTheme.skyBlue,
-                  GhibliTheme.lavenderPurple.withOpacity(0.7)
-                ],
-              ),
-            ),
-          );
+        ? CachedNetworkImage(
+            imageUrl: user.profileImages.coverImage!,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(color: Colors.grey[200]),
+            errorWidget: (context, url, error) => _buildDefaultCover(),
+          )
+        : _buildDefaultCover();
+  }
+
+  Widget _buildDefaultCover() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            GhibliTheme.skyBlue,
+            GhibliTheme.lavenderPurple.withOpacity(0.7)
+          ],
+        ),
+      ),
+    );
   }
 
   void _showEnrollmentDialog(CourseModel course) {
@@ -630,6 +640,9 @@ class _EnrollmentDialogState extends State<EnrollmentDialog> {
               subtitle: Text('${child.age} ans'),
               value: child.id,
               groupValue: _selectedChildId,
+              secondary: child.photoUrlWithCache != null 
+                  ? CircleAvatar(backgroundImage: CachedNetworkImageProvider(child.photoUrlWithCache!))
+                  : CircleAvatar(child: Text(child.firstName[0])),
               onChanged: _isLoading
                   ? null
                   : (value) {
@@ -881,11 +894,11 @@ class _ChildEnrollmentDialogState extends State<ChildEnrollmentDialog> {
                   radius: 50,
                   backgroundImage: _pickedImage != null
                       ? FileImage(_pickedImage!)
-                      : (widget.existingChild?.photoUrl != null
-                          ? NetworkImage(widget.existingChild!.photoUrl!)
+                      : (widget.existingChild?.photoUrlWithCache != null
+                          ? CachedNetworkImageProvider(widget.existingChild!.photoUrlWithCache!)
                           : null),
                   child: _pickedImage == null &&
-                          widget.existingChild?.photoUrl == null
+                          widget.existingChild?.photoUrlWithCache == null
                       ? const Icon(Icons.add_a_photo, color: Colors.white70)
                       : null,
                 ),
@@ -1057,10 +1070,11 @@ class CourseDetailsSheet extends StatelessWidget {
                           itemBuilder: (context, index) {
                             return ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                course.images[index].supabaseUrl ?? '',
+                              child: CachedNetworkImage(
+                                imageUrl: course.images[index].supabaseUrl ?? '',
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
+                                placeholder: (context, url) => Container(color: Colors.grey[200]),
+                                errorWidget: (context, url, error) {
                                   return Container(
                                     color: Colors.grey[300],
                                     child: const Center(
