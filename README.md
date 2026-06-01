@@ -1,19 +1,25 @@
 # 🧸 Crèche - L'Avenir de la Petite Enfance / The Future of Childcare
 
 <div align="center">
-  <img src="assets/images/8e16ab25c9b6075a09c2d7990984e21d.jpg" width="300" alt="Crèche Logo" style="border-radius: 20px;"/>
+  <img src="assets/images/creche_logo.png" width="200" alt="Crèche Logo" style="border-radius: 50%; box-shadow: 0 0 20px rgba(255,182,193,0.5); border: 4px solid #FFB6C1;"/>
   <br/>
+  <h1>✨ CRÈCHE ✨</h1>
   <p><i>Un petit nid douillet, connecté et sécurisé. / A cozy, connected, and secure little nest.</i></p>
+  
   <br/>
+
+  [![GitHub Release](https://img.shields.io/github/v/release/Connacri/CRECHE?label=Version&style=for-the-badge&color=FFB6C1)](https://github.com/Connacri/CRECHE/releases/latest)
+  <br/><br/>
+
   <div align="center">
-    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/app-release.apk">
-      <img src="https://img.shields.io/badge/Download-Android_APK-green?style=for-the-badge&logo=android" alt="Download Android APK"/>
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-android.apk">
+      <img src="https://img.shields.io/badge/Download-Android_APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK"/>
     </a>
-    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche_windows.zip">
-      <img src="https://img.shields.io/badge/Download-Windows_EXE-blue?style=for-the-badge&logo=windows" alt="Download Windows EXE"/>
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-windows-x64.zip">
+      <img src="https://img.shields.io/badge/Download-Windows_EXE-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download Windows EXE"/>
     </a>
     <a href="https://connacri.github.io/CRECHE/">
-      <img src="https://img.shields.io/badge/Access-Web_Version-orange?style=for-the-badge&logo=google-chrome" alt="Access Web Version"/>
+      <img src="https://img.shields.io/badge/Access-Web_Version-FF9900?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Access Web Version"/>
     </a>
   </div>
 </div>
@@ -21,94 +27,113 @@
 ---
 
 ## 🌍 Langues / Languages
-- [🇫🇷 Français](#-français)
-- [🇬🇧 English](#-english)
+<div align="center">
+  <a href="#français">🇫🇷 FR</a> | 
+  <a href="#english">🇬🇧 EN</a> | 
+  <a href="#español">🇪🇸 ES</a> | 
+  <a href="#português">🇵🇹 PT</a> | 
+  <a href="#русский">🇷🇺 RU</a> | 
+  <a href="#中文">🇨🇳 CN</a> | 
+  <a href="#日本語">🇯🇵 JP</a> | 
+  <a href="#العربية">🇸🇦 AR</a>
+</div>
 
 ---
 
-<a name="-français"></a>
-## 🇫🇷 Français
+<a id="français"></a>
+## 🇫🇷 Français - L'Avenir de la Petite Enfance
+**Crèche** est une application cross-platform conçue avec un univers **Kawaii** doux et futuriste. Elle réduit le stress administratif et renforce le lien entre les parents et les professionnels.
 
-### ✨ À propos
-**Crèche** est une application cross-platform (iOS, Android, Web) conçue pour transformer la gestion des crèches et jardins d'enfants. Avec un univers **Kawaii** doux et coloré, l'application réduit le stress administratif et renforce le lien entre les parents et les professionnels.
-
-### 🌟 Fonctionnalités Clés
-
-#### 🏠 Espace Parents (Le Petit Cocon)
-- **Timeline en Direct** ⏰ : Suivez les repas, les siestes et les activités de votre enfant en un clin d'œil.
-- **Histoires Enchantées** 📚 : Accédez à une bibliothèque d'histoires générées pour raconter de beaux récits à vos enfants le soir.
-- **Menu du Jour** 🍎 : Consultez les repas équilibrés prévus pour la semaine.
-- **Facturation Simplifiée** 💳 : Gérez vos paiements et recevez vos factures directement dans l'app.
-
-#### 👔 Espace Admin (La Tour de Contrôle)
-- **Gestion Multi-sites** 🏢 : Pilotez plusieurs établissements depuis un tableau de bord central.
-- **Pointage Intelligent** ✅ : Suivez les entrées et sorties des enfants en temps réel.
-- **Planning du Personnel** 📅 : Organisez vos équipes efficacement.
-- **Statistiques** 📊 : Visualisez le taux d'occupation et la santé financière de vos crèches.
-
-### 🎨 Design & Univers
-L'application utilise une palette de couleurs **pastels** (Rose poudré, Bleu ciel, Vert menthe) et des éléments **3D Kawaii** pour créer une atmosphère apaisante et joyeuse, parfaitement adaptée au monde de l'enfance.
+### 🌟 Fonctionnalités
+- **Timeline en Direct** ⏰ : Suivez la journée de votre enfant en temps réel.
+- **Histoires Enchantées** 📚 : Histoires générées pour le rituel du soir.
+- **Design Futuriste** 🎨 : Interface pastel avec effets de verre (Glassmorphism).
 
 ---
 
-<a name="-english"></a>
-## 🇬🇧 English
+<a id="english"></a>
+## 🇬🇧 English - The Future of Childcare
+**Crèche** is a cross-platform application designed with a soft **Kawaii** and futuristic universe. It reduces administrative stress and strengthens the bond between parents and professionals.
 
-### ✨ About
-**Crèche** is a cross-platform application (iOS, Android, Web) designed to revolutionize the management of daycares and nurseries. With a soft and colorful **Kawaii** universe, the app reduces administrative stress and strengthens the bond between parents and professionals.
+### 🌟 Features
+- **Live Timeline** ⏰: Follow your child's day in real-time.
+- **Enchanted Stories** 📚: Generated stories for the evening ritual.
+- **Futuristic Design** 🎨: Pastel interface with glassmorphism effects.
 
-### 🌟 Key Features
+---
 
-#### 🏠 Parent Space (The Little Cocoon)
-- **Live Timeline** ⏰: Follow your child's meals, naps, and activities at a glance.
-- **Enchanted Stories** 📚: Access a library of generated stories to tell beautiful tales to your children in the evening.
-- **Daily Menu** 🍎: Check the balanced meals planned for the week.
-- **Simplified Billing** 💳: Manage your payments and receive your invoices directly in the app.
+<a id="español"></a>
+## 🇪🇸 Español - El Futuro del Cuidado Infantil
+**Crèche** es una aplicación multiplataforma diseñada con un universo **Kawaii** suave y futurista. Reduce el estrés administrativo y fortalece el vínculo entre padres y profesionales.
 
-#### 👔 Admin Space (The Control Tower)
-- **Multi-site Management** 🏢: Manage multiple establishments from a central dashboard.
-- **Smart Attendance** ✅: Track children's entries and exits in real-time.
-- **Staff Planning** 📅: Organize your teams efficiently.
-- **Statistics** 📊: Visualize the occupancy rate and financial health of your nurseries.
+### 🌟 Características
+- **Línea de tiempo en vivo** ⏰: Siga el día de su hijo en tiempo real.
+- **Historias Encantadas** 📚: Historias generadas para el ritual nocturno.
+- **Diseño Futurista** 🎨: Interfaz pastel con efectos de glassmorphism.
 
-### 🎨 Design & Universe
-The app uses a **pastel** color palette (Powder Pink, Sky Blue, Mint Green) and **3D Kawaii** elements to create a soothing and joyful atmosphere, perfectly suited to the world of childhood.
+---
+
+<a id="português"></a>
+## 🇵🇹 Português - O Futuro da Creche
+**Crèche** é um aplicativo multiplataforma projetado com um universo **Kawaii** suave e futurista. Reduz o estresse administrativo e fortalece o vínculo entre pais e profissionais.
+
+### 🌟 Funcionalidades
+- **Linha do Tempo ao Vivo** ⏰: Acompanhe o dia do seu filho em tempo real.
+- **Histórias Encantadas** 📚: Histórias geradas para o ritual da noite.
+- **Design Futurista** 🎨: Interface pastel com efeitos de glassmorphism.
+
+---
+
+<a id="русский"></a>
+## 🇷🇺 Русский - Будущее детского сада
+**Crèche** — это кроссплатформенное приложение, созданное в нежной и футуристической вселенной **Kawaii**. Оно снижает административную нагрузку и укрепляет связь между родителями и специалистами.
+
+### 🌟 Особенности
+- **Живая хронология** ⏰: Следите за днем вашего ребенка в режиме реального времени.
+- **Волшебные сказки** 📚: Сгенерированные истории для вечернего ритуала.
+- **Футуристический дизайн** 🎨: Пастельный интерфейс с эффектами матового стекла.
+
+---
+
+<a id="中文"></a>
+## 🇨🇳 中文 - 幼教的未来
+**Crèche** 是一款跨平台应用程序，采用柔和且充满未来感的 **Kawaii** 风格设计。它旨在减少行政压力，并加强父母与专业人员之间的联系。
+
+### 🌟 核心功能
+- **实时时间线** ⏰：实时了解孩子的一天。
+- **魔法故事** 📚：为晚间仪式生成的睡前故事。
+- **未来感设计** 🎨：具有毛玻璃效果（Glassmorphism）的粉彩色界面.
+
+---
+
+<a id="日本語"></a>
+## 🇯🇵 日本語 - 託児所の未来
+**Crèche** は、ソフトで未来的な **Kawaii** の世界観でデザインされたクロスプラットフォームアプリケーションです。事務的なストレスを軽減し、保護者と専門家の絆を深めます。
+
+### 🌟 主な機能
+- **ライブタイムライン** ⏰：お子様の一日をリアルタイムで追跡。
+- **魔法の物語** 📚：夜の読み聞かせのために生成されたストーリー。
+- **未来的なデザイン** 🎨：グラスモーフィズム効果を備えたパステルカラーのUI。
+
+---
+
+<a id="العربية"></a>
+## 🇸🇦 العربية - مستقبل حضانة الأطفال
+**Crèche** هو تطبيق متعدد المنصات مصمم بكون **Kawaii** ناعم ومستقبلي. يقلل من الضغط الإداري ويعزز الروابط بين الآباء والمهنيين.
+
+### 🌟 المميزات
+- **الجدول الزمني المباشر** ⏰: تابع يوم طفلك في الوقت الفعلي.
+- **قصص ساحرة** 📚: قصص مولدة لطقوس المساء.
+- **تصميم مستقبلي** 🎨: واجهة بألوان الباستيل مع تأثيرات الزجاج (Glassmorphism).
 
 ---
 
 ## 🛠 Stack Technique / Technical Stack
-
-- **Flutter** & **Dart** 🚀 : Pour une expérience fluide sur tous les supports.
-- **Provider** 🧠 : Gestion d'état robuste et réactive.
-- **Firebase Auth** 🔒 : Sécurité et connexion simplifiée.
-- **Supabase** 💾 : Base de données performante et scalable.
-- **GitHub Actions** 🤖 : Build et déploiement automatisés.
-
----
-
-## 🚀 Installation & Build
-
-### Prérequis
-- [Flutter SDK](https://docs.flutter.dev/get-started/install)
-- Un simulateur Android/iOS ou un navigateur Web.
-
-### Lancement Rapide
-```bash
-flutter pub get
-flutter run
-```
-
-### Build pour Distribution
-```bash
-# Web
-flutter build web
-
-# Android
-flutter build apk
-
-# iOS
-flutter build ios --no-codesign
-```
+<div align="center">
+  <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"/>
+  <img src="https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase"/>
+  <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/>
+</div>
 
 ---
 
