@@ -413,6 +413,18 @@ class _AutreDashboardState extends State<AutreDashboard> {
         icon = Icons.school;
         color = Colors.orange;
         break;
+      case UserRole.transporteur:
+        icon = Icons.local_shipping;
+        color = Colors.teal;
+        break;
+      case UserRole.fournisseur:
+        icon = Icons.inventory_2;
+        color = Colors.deepPurple;
+        break;
+      case UserRole.user:
+        icon = Icons.person;
+        color = Colors.indigo;
+        break;
       case UserRole.autres:
         icon = Icons.account_box;
         color = Colors.blue;
