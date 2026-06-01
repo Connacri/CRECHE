@@ -69,37 +69,10 @@ jobs:
         with:
           name: windows-installer
           path: build/windows/installer/creche-windows-installer.exe
-          
-  build-ios:
-    name: Build iOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.44.0'
-          channel: 'stable'
-          cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Build iOS
-        run: |
-          flutter config --no-enable-swift-package-manager
-          flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
-      - name: Zip iOS App
-        run: |
-          cd build/ios/iphoneos
-          zip -r ../../../creche-ios-app.zip Runner.app
-      - name: Upload iOS App
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-zip
-          path: creche-ios-app.zip
 
   release:
     name: Create Release
-    needs: [build-android, build-windows, build-ios]
+    needs: [build-android, build-windows]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -117,6 +90,5 @@ jobs:
             android-apk/creche-android.apk
             windows-installer/creche-windows-installer.exe
             windows-zip/creche-windows-x64.zip
-            ios-zip/creche-ios-app.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: true
