@@ -31,7 +31,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
     final courseProvider = context.read<CourseProvider>();
     if (auth.userData != null) {
       _user = UserModel.fromSupabase(auth.userData!);
-      await courseProvider.loadUserCourses(auth.currentUser!.id);
+      await courseProvider.loadUserCourses(auth.currentUser!.uid);
     }
     setState(() => _isLoading = false);
   }

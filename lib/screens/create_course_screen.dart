@@ -307,7 +307,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
       }
       return;
     }
-    print('✅ [SAVE] currentUser: ${authProvider.currentUser!.id}');
+    print('✅ [SAVE] currentUser: ${authProvider.currentUser!.uid}');
 
     if (authProvider.userData == null) {
       print('❌ [SAVE] userData NULL');
@@ -398,7 +398,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
           seasonEndDate: _seasonEndDate,
           location: _selectedLocation!,
           imageFiles: _selectedImages,
-          currentUserId: authProvider.currentUser!.id,
+          currentUserId: authProvider.currentUser!.uid,
           // ✅ UUID direct
           currentUserRole: authProvider.userData!['role'],
           // ✅ Rôle depuis userData

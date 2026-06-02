@@ -253,12 +253,12 @@ class _ParentDashboardState extends State<ParentDashboard>
       final userModel = UserModel.fromSupabase(authProvider.userData!);
 
       final childProvider = context.read<ChildEnrollmentProvider>();
-      await childProvider.loadChildren(authProvider.currentUser!.id);
+      await childProvider.loadChildren(authProvider.currentUser!.uid);
 
       await _loadUserLocation(userModel);
       await _loadNearbyCourses();
       await childProvider
-          .loadAllSchedulesForParent(authProvider.currentUser!.id);
+          .loadAllSchedulesForParent(authProvider.currentUser!.uid);
     } catch (e) {
       setState(() => _errorMessage = 'Erreur: $e');
     }
