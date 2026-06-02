@@ -18,6 +18,7 @@ class SchoolDashboard extends StatefulWidget {
 class _SchoolDashboardState extends State<SchoolDashboard> {
   int _selectedIndex = 0;
   bool _isLoadingData = false;
+  UserModel? _user;
 
   @override
   void initState() {
@@ -31,9 +32,9 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
     final courseProvider = context.read<CourseProvider>();
     if (auth.userData != null) {
       _user = UserModel.fromSupabase(auth.userData!);
-      await courseProvider.loadUserCourses(auth.currentUser!.uid);
+    }
     if (auth.currentUser != null) {
-      await courseProvider.loadUserCourses(auth.currentUser!.id);
+      await courseProvider.loadUserCourses(auth.currentUser!.uid);
     }
     setState(() => _isLoadingData = false);
   }

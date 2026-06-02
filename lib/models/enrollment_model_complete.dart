@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum EnrollmentStatus {
   pending,
   approved,
@@ -56,18 +54,18 @@ class AttendanceRecord {
 
   factory AttendanceRecord.fromMap(Map<String, dynamic> map) {
     return AttendanceRecord(
-      date: map['date'] is Timestamp
-          ? (map['date'] as Timestamp).toDate()
-          : DateTime.parse(map['date']),
-      isPresent: map['isPresent'] ?? false,
+      date: map['date'] is String
+          ? DateTime.parse(map['date'])
+          : DateTime.fromMillisecondsSinceEpoch(0),
+      isPresent: map['isPresent'] ?? map['is_present'] ?? false,
       notes: map['notes'],
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'date': Timestamp.fromDate(date),
-      'isPresent': isPresent,
+      'date': date.toIso8601String(),
+      'is_present': isPresent,
       'notes': notes,
     };
   }
@@ -120,55 +118,6 @@ class EnrollmentModel {
   }
 
   bool get isFullyPaid => remainingAmount <= 0;
-
-  factory EnrollmentModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return EnrollmentModel(
-      id: doc.id,
-      courseId: data['courseId'] ?? '',
-      childId: data['childId'] ?? '',
-      parentId: data['parentId'] ?? '',
-      status: EnrollmentStatus.values.firstWhere(
-        (s) => s.name == data['status'],
-        orElse: () => EnrollmentStatus.pending,
-      ),
-      enrolledAt: (data['enrolledAt'] as Timestamp).toDate(),
-      approvedAt: data['approvedAt'] != null
-          ? (data['approvedAt'] as Timestamp).toDate()
-          : null,
-      approvedBy: data['approvedBy'],
-      rejectionReason: data['rejectionReason'],
-      paymentStatus: PaymentStatus.values.firstWhere(
-        (p) => p.name == data['paymentStatus'],
-        orElse: () => PaymentStatus.pending,
-      ),
-      totalAmount: data['totalAmount']?.toDouble(),
-      paidAmount: data['paidAmount']?.toDouble(),
-      attendanceHistory: (data['attendanceHistory'] as List<dynamic>?)
-              ?.map((a) => AttendanceRecord.fromMap(a))
-              .toList() ??
-          [],
-      metadata: data['metadata'],
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'courseId': courseId,
-      'childId': childId,
-      'parentId': parentId,
-      'status': status.name,
-      'enrolledAt': Timestamp.fromDate(enrolledAt),
-      'approvedAt': approvedAt != null ? Timestamp.fromDate(approvedAt!) : null,
-      'approvedBy': approvedBy,
-      'rejectionReason': rejectionReason,
-      'paymentStatus': paymentStatus.name,
-      'totalAmount': totalAmount,
-      'paidAmount': paidAmount,
-      'attendanceHistory': attendanceHistory.map((a) => a.toMap()).toList(),
-      'metadata': metadata,
-    };
-  }
 
   factory EnrollmentModel.fromSupabase(Map<String, dynamic> data) {
     return EnrollmentModel(

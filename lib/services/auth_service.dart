@@ -7,8 +7,9 @@ class AuthService {
   final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
   final supabase.SupabaseClient _supabase = supabase.Supabase.instance.client;
 
-  // Instance de GoogleSignIn
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  bool _initialized = false;
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   firebase_auth.User? get currentUser => _firebaseAuth.currentUser;
 
@@ -44,30 +45,61 @@ class AuthService {
     }
   }
 
+  Future<void> init({
+    String? clientId,
+    String? serverClientId,
+  }) async {
+    if (_initialized) return;
+    await _googleSignIn.initialize(
+      clientId: clientId,
+      serverClientId: serverClientId,
+    );
+    _initialized = true;
+  }
+
   Future<AuthResult> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return AuthResult.error('Connexion annulée');
+      // 1. Déclencher le flux d'authentification
+      // Note: Dans la v7.2.0, authenticate() est la méthode recommandée
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      // 2. Récupérer les détails de l'authentification
+      // Note: Dans la v7.2.0, authentication peut être synchrone
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      
+      // 3. Récupérer l'ID Token (crucial pour Firebase)
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        return AuthResult.error('Échec de récupération de l\'ID Token Google');
+      }
+
+      // 4. Créer le credential Firebase
+      // Note: On n'utilise plus accessToken car il peut être absent dans la v7.2.0
       final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
+        idToken: idToken,
       );
 
+      // 5. Se connecter à Firebase
       final userCredential = await _firebaseAuth.signInWithCredential(credential);
       final user = userCredential.user;
 
-      if (user == null) return AuthResult.error('Échec de la connexion Google');
+      if (user == null) return AuthResult.error('Échec de la connexion Firebase avec Google');
 
+      // 6. Vérifier les données dans Supabase
       final userData = await getUserData(user.uid);
 
       return AuthResult.success(
         firebaseUser: user,
         needsProfileCompletion: userData == null,
       );
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return AuthResult.error('Connexion annulée par l\'utilisateur');
+      }
+      return AuthResult.error('Erreur Google Sign-In (${e.code})');
     } catch (e) {
-      return AuthResult.error('Erreur Google Sign-In: $e');
+      return AuthResult.error('Une erreur inattendue est survenue lors de la connexion Google: $e');
     }
   }
 

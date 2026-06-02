@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum CourseCategory {
   mathematics,
   sciences,
@@ -173,7 +171,6 @@ class CourseModel {
   final CourseCategory category;
   final double? price;
 
-  // ✅ REMOVED: Currency n'existe plus
   final CourseSeason season;
   final DateTime seasonStartDate;
   final DateTime seasonEndDate;
@@ -194,7 +191,6 @@ class CourseModel {
     required this.description,
     required this.category,
     this.price,
-    // ✅ REMOVED: Pas de currency
     required this.season,
     required this.seasonStartDate,
     required this.seasonEndDate,
@@ -210,63 +206,6 @@ class CourseModel {
     this.metadata,
   });
 
-  factory CourseModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return CourseModel(
-      id: doc.id,
-      title: data['title'] ?? '',
-      description: data['description'] ?? '',
-      category: CourseCategory.values.firstWhere(
-        (e) => e.name == data['category'],
-        orElse: () => CourseCategory.other,
-      ),
-      price: data['price']?.toDouble(),
-      // ✅ REMOVED: Pas de currency
-      season: CourseSeason.values.firstWhere(
-        (e) => e.name == data['season'],
-        orElse: () => CourseSeason.yearRound,
-      ),
-      seasonStartDate: (data['seasonStartDate'] as Timestamp).toDate(),
-      seasonEndDate: (data['seasonEndDate'] as Timestamp).toDate(),
-      location: CourseLocation.fromMap(data['location'] ?? {}),
-      images: (data['images'] as List<dynamic>?)
-              ?.map((img) => CourseImage.fromMap(img))
-              .toList() ??
-          [],
-      createdBy: data['createdBy'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
-      isActive: data['isActive'] ?? true,
-      maxStudents: data['maxStudents'] ?? 30,
-      currentStudents: data['currentStudents'] ?? 0,
-      tags: List<String>.from(data['tags'] ?? []),
-      metadata: data['metadata'],
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'title': title,
-      'description': description,
-      'category': category.name,
-      'price': price,
-      // ✅ REMOVED: Pas de currency
-      'season': season.name,
-      'seasonStartDate': Timestamp.fromDate(seasonStartDate),
-      'seasonEndDate': Timestamp.fromDate(seasonEndDate),
-      'location': location.toMap(),
-      'images': images.map((img) => img.toMap()).toList(),
-      'createdBy': createdBy,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
-      'isActive': isActive,
-      'maxStudents': maxStudents,
-      'currentStudents': currentStudents,
-      'tags': tags,
-      'metadata': metadata,
-    };
-  }
-
   factory CourseModel.fromSupabase(Map<String, dynamic> data) {
     return CourseModel(
       id: data['id'] ?? '',
@@ -277,7 +216,6 @@ class CourseModel {
         orElse: () => CourseCategory.other,
       ),
       price: data['price']?.toDouble(),
-      // ✅ REMOVED: Pas de currency
       season: CourseSeason.values.firstWhere(
         (e) => e.name == data['season'],
         orElse: () => CourseSeason.yearRound,
@@ -306,7 +244,6 @@ class CourseModel {
       'description': description,
       'category': category.name,
       'price': price,
-      // ✅ REMOVED: Pas de currency
       'season': season.name,
       'season_start_date': seasonStartDate.toIso8601String(),
       'season_end_date': seasonEndDate.toIso8601String(),
@@ -365,7 +302,6 @@ class CourseModel {
     String? description,
     CourseCategory? category,
     double? price,
-    // ✅ REMOVED: Pas de currency
     CourseSeason? season,
     DateTime? seasonStartDate,
     DateTime? seasonEndDate,
@@ -387,7 +323,6 @@ class CourseModel {
       description: description ?? this.description,
       category: category ?? this.category,
       price: price ?? this.price,
-      // ✅ REMOVED: Pas de currency
       season: season ?? this.season,
       seasonStartDate: seasonStartDate ?? this.seasonStartDate,
       seasonEndDate: seasonEndDate ?? this.seasonEndDate,

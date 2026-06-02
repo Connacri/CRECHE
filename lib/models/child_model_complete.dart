@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum ChildGender { male, female, other }
 
 class MedicalInfo {
@@ -87,45 +85,6 @@ class ChildModel {
       age--;
     }
     return age;
-  }
-
-  factory ChildModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return ChildModel(
-      id: doc.id,
-      parentId: data['parentId'] ?? '',
-      firstName: data['firstName'] ?? '',
-      lastName: data['lastName'] ?? '',
-      dateOfBirth: (data['dateOfBirth'] as Timestamp).toDate(),
-      gender: ChildGender.values.firstWhere(
-        (g) => g.name == data['gender'],
-        orElse: () => ChildGender.other,
-      ),
-      photoUrl: data['photoUrl'],
-      schoolGrade: data['schoolGrade'],
-      medicalInfo: data['medicalInfo'] != null
-          ? MedicalInfo.fromMap(data['medicalInfo'])
-          : MedicalInfo(),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
-      isActive: data['isActive'] ?? true,
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'parentId': parentId,
-      'firstName': firstName,
-      'lastName': lastName,
-      'dateOfBirth': Timestamp.fromDate(dateOfBirth),
-      'gender': gender.name,
-      'photoUrl': photoUrl,
-      'schoolGrade': schoolGrade,
-      'medicalInfo': medicalInfo.toMap(),
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
-      'isActive': isActive,
-    };
   }
 
   factory ChildModel.fromSupabase(Map<String, dynamic> data) {

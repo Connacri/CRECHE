@@ -559,19 +559,11 @@ class _AutreDashboardState extends State<AutreDashboard> {
       onTap: () => setState(() => _imagesExpanded = !_imagesExpanded),
       children: [
         _buildImageInfo(
-          label: 'Photo de profil (Firebase)',
-          url: _user!.profileImages.profileImageFirebase,
-        ),
-        _buildImageInfo(
-          label: 'Photo de profil (Supabase)',
+          label: 'Photo de profil',
           url: _user!.profileImages.profileImageSupabase,
         ),
         _buildImageInfo(
-          label: 'Image de couverture (Firebase)',
-          url: _user!.profileImages.coverImageFirebase,
-        ),
-        _buildImageInfo(
-          label: 'Image de couverture (Supabase)',
+          label: 'Image de couverture',
           url: _user!.profileImages.coverImageSupabase,
         ),
         if (_user!.profileImages.lastUpdated != null)

@@ -590,7 +590,7 @@ class _EnrollmentDialogState extends State<EnrollmentDialog> {
         id: '',
         courseId: widget.course.id,
         childId: _selectedChildId!,
-        parentId: currentUser.id,
+        parentId: currentUser.uid,
         status: EnrollmentStatus.pending,
         enrolledAt: DateTime.now(),
         paymentStatus: PaymentStatus.pending,
@@ -819,7 +819,7 @@ class _ChildEnrollmentDialogState extends State<ChildEnrollmentDialog> {
       if (_pickedImage != null) {
         photoUrl = await _imageService.uploadChildPhoto(
           imageFile: _pickedImage!,
-          userId: currentUser.id,
+          userId: currentUser.uid,
           childId: widget.existingChild?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         );
       }
@@ -841,7 +841,7 @@ class _ChildEnrollmentDialogState extends State<ChildEnrollmentDialog> {
       } else {
         // Création
         success = await childProvider.addChild(
-          parentId: currentUser.id,
+          parentId: currentUser.uid,
           firstName: _firstNameCtrl.text.trim(),
           lastName: _lastNameCtrl.text.trim(),
           dateOfBirth: _birthDate!,

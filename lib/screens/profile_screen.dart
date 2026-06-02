@@ -187,7 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (imageUrl != null && mounted) {
         final profileImagesUpdate = {
           'profile_images': {
-            ...user.profileImages.toMapSupabase(),
+            ...user.profileImages.toMap(),
             'profileImageSupabase': '$imageUrl?t=${DateTime.now().millisecondsSinceEpoch}',
           }
         };

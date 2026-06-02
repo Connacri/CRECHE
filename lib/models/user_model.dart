@@ -1,6 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart'
-    show Timestamp, DocumentSnapshot;
-
 class AppLocation {
   final double latitude;
   final double longitude;
@@ -94,104 +91,66 @@ enum UserRole {
 }
 
 class UserProfileImages {
-  final String? profileImageFirebase;
   final String? profileImageSupabase;
-  final String? coverImageFirebase;
   final String? coverImageSupabase;
   final DateTime? lastUpdated;
 
   UserProfileImages({
-    this.profileImageFirebase,
     this.profileImageSupabase,
-    this.coverImageFirebase,
     this.coverImageSupabase,
     this.lastUpdated,
   });
 
   factory UserProfileImages.fromMap(Map<String, dynamic> map) {
     return UserProfileImages(
-      profileImageFirebase: map['profileImageFirebase'],
-      profileImageSupabase: map['profileImageSupabase'],
-      coverImageFirebase: map['coverImageFirebase'],
-      coverImageSupabase: map['coverImageSupabase'],
+      profileImageSupabase: map['profileImageSupabase'] ?? map['profileImage'],
+      coverImageSupabase: map['coverImageSupabase'] ?? map['coverImage'],
       lastUpdated: map['lastUpdated'] != null
-          ? (map['lastUpdated'] is Timestamp
-                ? (map['lastUpdated'] as Timestamp).toDate()
-                : map['lastUpdated'] is String
-                ? DateTime.parse(map['lastUpdated'])
-                : DateTime.parse(map['lastUpdated'].toString()))
+          ? (map['lastUpdated'] is String
+              ? DateTime.parse(map['lastUpdated'])
+              : DateTime.fromMillisecondsSinceEpoch(0)) // Fallback if format is weird
           : null,
     );
   }
 
-  /// ✅ FIX: Méthode pour Firestore (avec Timestamp)
-  Map<String, dynamic> toMapFirestore() {
+  Map<String, dynamic> toMap() {
     return {
-      'profileImageFirebase': profileImageFirebase,
       'profileImageSupabase': profileImageSupabase,
-      'coverImageFirebase': coverImageFirebase,
-      'coverImageSupabase': coverImageSupabase,
-      'lastUpdated': lastUpdated != null
-          ? Timestamp.fromDate(lastUpdated!)
-          : null,
-    };
-  }
-
-  /// ✅ FIX: Méthode pour Supabase (avec String ISO 8601)
-  Map<String, dynamic> toMapSupabase() {
-    return {
-      'profileImageFirebase': profileImageFirebase,
-      'profileImageSupabase': profileImageSupabase,
-      'coverImageFirebase': coverImageFirebase,
       'coverImageSupabase': coverImageSupabase,
       'lastUpdated': lastUpdated?.toIso8601String(),
     };
   }
-
-  /// ⚠️ DEPRECATED: Utiliser toMapFirestore() ou toMapSupabase()
-  @Deprecated(
-    'Utilisez toMapFirestore() ou toMapSupabase() selon votre backend',
-  )
-  Map<String, dynamic> toMap() => toMapSupabase();
 
   static String? _withCacheVersion(String? url, DateTime? lastUpdated) {
     if (url == null || url.isEmpty) {
       return url;
     }
 
-    // Si lastUpdated est nul, on ne peut pas vraiment bumper le cache
-    // sauf si on utilise une valeur aléatoire, mais ça casserait le cache à chaque build.
-    // On reste sur lastUpdated s'il existe.
     if (lastUpdated == null) {
       return url;
     }
 
     final separator = url.contains('?') ? '&' : '?';
-    // Utilisation de milliseconds pour un bumper de cache propre
     return '$url${separator}v=${lastUpdated.millisecondsSinceEpoch}';
   }
 
   String? get profileImage => _withCacheVersion(
-        profileImageSupabase ?? profileImageFirebase,
+        profileImageSupabase,
         lastUpdated,
       );
 
   String? get coverImage => _withCacheVersion(
-        coverImageSupabase ?? coverImageFirebase,
+        coverImageSupabase,
         lastUpdated,
       );
 
   UserProfileImages copyWith({
-    String? profileImageFirebase,
     String? profileImageSupabase,
-    String? coverImageFirebase,
     String? coverImageSupabase,
     DateTime? lastUpdated,
   }) {
     return UserProfileImages(
-      profileImageFirebase: profileImageFirebase ?? this.profileImageFirebase,
       profileImageSupabase: profileImageSupabase ?? this.profileImageSupabase,
-      coverImageFirebase: coverImageFirebase ?? this.coverImageFirebase,
       coverImageSupabase: coverImageSupabase ?? this.coverImageSupabase,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
@@ -233,7 +192,6 @@ class UserModel {
 
   static DateTime _parseDateTime(dynamic value) {
     if (value == null) return DateTime.now();
-    if (value is Timestamp) return value.toDate();
     if (value is String) return DateTime.parse(value);
     if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
     try {
@@ -245,7 +203,6 @@ class UserModel {
 
   static DateTime? _parseDateTimeNullable(dynamic value) {
     if (value == null) return null;
-    if (value is Timestamp) return value.toDate();
     if (value is String) return DateTime.parse(value);
     if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
     try {
@@ -253,59 +210,6 @@ class UserModel {
     } catch (_) {
       return null;
     }
-  }
-
-  factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return UserModel(
-      uid: doc.id,
-      email: data['email'] ?? '',
-      name: data['name'] ?? data['displayName'] ?? '',
-      role: UserRole.fromJson(data['role'] ?? 'parent'),
-      createdAt: _parseDateTime(data['createdAt']),
-      updatedAt: _parseDateTime(data['updatedAt']),
-      isActive: data['isActive'] ?? data['state'] ?? true,
-      deactivatedAt: _parseDateTimeNullable(data['deactivatedAt']),
-      scheduledDeletionDate: _parseDateTimeNullable(
-        data['scheduledDeletionDate'],
-      ),
-      profileImages: data['profileImages'] != null
-          ? UserProfileImages.fromMap(data['profileImages'])
-          : UserProfileImages(
-              profileImageFirebase: data['avatar'],
-              coverImageFirebase: data['timeline'],
-            ),
-      location: data['location'] != null
-          ? AppLocation.fromMap(data['location'])
-          : null,
-      bio: data['bio'],
-      phoneNumber:
-          data['phoneNumber'] ??
-          (data['phone'] != null ? data['phone'].toString() : null),
-      metadata: data['metadata'],
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'email': email,
-      'name': name,
-      'role': role.toJson(),
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
-      'isActive': isActive,
-      'deactivatedAt': deactivatedAt != null
-          ? Timestamp.fromDate(deactivatedAt!)
-          : null,
-      'scheduledDeletionDate': scheduledDeletionDate != null
-          ? Timestamp.fromDate(scheduledDeletionDate!)
-          : null,
-      'profileImages': profileImages.toMap(),
-      'location': location?.toMap(),
-      'bio': bio,
-      'phoneNumber': phoneNumber,
-      'metadata': metadata,
-    };
   }
 
   factory UserModel.fromSupabase(Map<String, dynamic> data) {
@@ -316,19 +220,15 @@ class UserModel {
         data['country'] != null;
 
     return UserModel(
-      uid: data['id'] ?? '',
+      uid: data['id'] ?? data['uid'] ?? '',
       email: data['email'] ?? '',
       name: data['name'] ?? '',
       role: UserRole.fromJson(data['role'] ?? 'parent'),
-      createdAt: DateTime.parse(data['created_at']),
-      updatedAt: DateTime.parse(data['updated_at']),
+      createdAt: _parseDateTime(data['created_at']),
+      updatedAt: _parseDateTime(data['updated_at']),
       isActive: data['is_active'] ?? true,
-      deactivatedAt: data['deactivated_at'] != null
-          ? DateTime.parse(data['deactivated_at'])
-          : null,
-      scheduledDeletionDate: data['scheduled_deletion_date'] != null
-          ? DateTime.parse(data['scheduled_deletion_date'])
-          : null,
+      deactivatedAt: _parseDateTimeNullable(data['deactivated_at']),
+      scheduledDeletionDate: _parseDateTimeNullable(data['scheduled_deletion_date']),
       profileImages: data['profile_images'] != null
           ? UserProfileImages.fromMap(data['profile_images'])
           : UserProfileImages(),
@@ -344,7 +244,7 @@ class UserModel {
             )
           : null,
       bio: data['bio'],
-      phoneNumber: data['phone_number'],
+      phoneNumber: data['phone_number'] ?? data['phone'],
       metadata: data['metadata'],
     );
   }
@@ -403,10 +303,7 @@ class UserModel {
   }
 
   int? getDaysUntilDeletion() {
-    if (scheduledDeletionDate == null) return null;
-    final now = DateTime.now();
-    final difference = scheduledDeletionDate!.difference(now);
-    return difference.inDays;
+    return scheduledDeletionDate?.difference(DateTime.now()).inDays;
   }
 
   bool canReactivate() {

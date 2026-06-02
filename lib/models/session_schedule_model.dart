@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 /// Modèle pour représenter une session de cours planifiée
 /// Utilisé pour la timeline hebdomadaire dans le ParentDashboard
 class SessionSchedule {
@@ -82,44 +80,6 @@ class SessionSchedule {
       'cancellation_reason': cancellationReason,
       'current_enrollment': currentEnrollment,
       'max_capacity': maxCapacity,
-      'location': location,
-      'metadata': metadata,
-    };
-  }
-
-  /// Désérialisation depuis Firestore
-  factory SessionSchedule.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return SessionSchedule(
-      id: doc.id,
-      courseId: data['courseId'] ?? '',
-      enrollmentId: data['enrollmentId'] ?? '',
-      dayOfWeek: DayOfWeek.values[data['dayOfWeek'] ?? 0],
-      timeSlot: TimeSlot.fromMap(data['timeSlot'] ?? {}),
-      startDate: (data['startDate'] as Timestamp).toDate(),
-      endDate: (data['endDate'] as Timestamp).toDate(),
-      isCancelled: data['isCancelled'] ?? false,
-      cancellationReason: data['cancellationReason'],
-      currentEnrollment: data['currentEnrollment'] ?? 0,
-      maxCapacity: data['maxCapacity'] ?? 30,
-      location: data['location'],
-      metadata: data['metadata'],
-    );
-  }
-
-  /// Sérialisation vers Firestore
-  Map<String, dynamic> toFirestore() {
-    return {
-      'courseId': courseId,
-      'enrollmentId': enrollmentId,
-      'dayOfWeek': dayOfWeek.index,
-      'timeSlot': timeSlot.toMap(),
-      'startDate': Timestamp.fromDate(startDate),
-      'endDate': Timestamp.fromDate(endDate),
-      'isCancelled': isCancelled,
-      'cancellationReason': cancellationReason,
-      'currentEnrollment': currentEnrollment,
-      'maxCapacity': maxCapacity,
       'location': location,
       'metadata': metadata,
     };
@@ -241,7 +201,6 @@ class TimeSlot {
 
   factory TimeSlot.fromMap(Map<String, dynamic> map) {
     DateTime parseDate(dynamic value) {
-      if (value is Timestamp) return value.toDate();
       if (value is String) return DateTime.parse(value);
       return DateTime.now();
     }

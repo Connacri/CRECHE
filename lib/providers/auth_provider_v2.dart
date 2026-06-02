@@ -27,10 +27,18 @@ class AuthProviderV2 with ChangeNotifier {
     _init();
   }
 
-  void _init() {
+  Future<void> _init() async {
+    await _authService.init();
     _authSubscription = firebase_auth.FirebaseAuth.instance.authStateChanges().listen((user) async {
       _currentUser = user;
+      
+      // ✅ Mise à jour des headers Supabase pour le RLS basé sur Firebase UID
+      final supabaseClient = supabase.Supabase.instance.client;
       if (user != null) {
+        supabaseClient.rest.headers['x-firebase-id'] = user.uid;
+        // On l'ajoute aussi au storage pour le RLS des buckets
+        supabaseClient.storage.headers['x-firebase-id'] = user.uid;
+        
         if (user.emailVerified) {
           _needsEmailConfirmation = false;
           await _checkUserStatus();
@@ -40,6 +48,8 @@ class AuthProviderV2 with ChangeNotifier {
           _setState(AppAuthState.needsEmailConfirmation);
         }
       } else {
+        supabaseClient.rest.headers.remove('x-firebase-id');
+        supabaseClient.storage.headers.remove('x-firebase-id');
         _userData = null;
         _setState(AppAuthState.unauthenticated);
       }
