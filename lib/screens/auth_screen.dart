@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../providers/auth_provider_v2.dart';
 import '../widgets/glass_card.dart';
@@ -13,13 +14,11 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen>
-    with SingleTickerProviderStateMixin {
+class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
-  late TabController _tabController;
   bool _obscurePassword = true;
   String? _selectedRole;
 
@@ -27,12 +26,8 @@ class _AuthScreenState extends State<AuthScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {});
-    });
-    _emailController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _tabController.addListener(() => setState(() {}));
+    _emailController.addListener(() => setState(() {}));
   }
 
   @override
@@ -58,6 +53,17 @@ class _AuthScreenState extends State<AuthScreen>
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProviderV2>();
+    final result = await authProvider.signInWithGoogle();
+    if (!mounted) return;
+    if (result.success) {
+      _showSnackBar('Connexion Google réussie !', isError: false);
+    } else {
+      _showSnackBar(result.message ?? 'Erreur connexion Google', isError: true);
+    }
+  }
+
   Future<void> _handleSignup() async {
     if (_selectedRole == null) {
       _showSnackBar('Veuillez sélectionner votre rôle', isError: true);
@@ -73,19 +79,7 @@ class _AuthScreenState extends State<AuthScreen>
     if (result.success) {
       _showSnackBar('Compte créé avec succès !', isError: false);
     } else {
-      if (result.errorCode == 'email_exists') {
-        _showSnackBar(
-          result.message!,
-          isError: false,
-          action: SnackBarAction(
-            label: 'Connexion',
-            textColor: Colors.white,
-            onPressed: () => _tabController.animateTo(0),
-          ),
-        );
-      } else {
-        _showSnackBar(result.message ?? 'Erreur d\'inscription', isError: true);
-      }
+      _showSnackBar(result.message ?? 'Erreur d\'inscription', isError: true);
     }
   }
 
@@ -94,16 +88,15 @@ class _AuthScreenState extends State<AuthScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Background Image
           Positioned.fill(
             child: Image.asset(
               'assets/images/forest_bg_zoomed.jpg',
               fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(color: Colors.blueGrey),
             ),
           ),
-          // Darker overlay for readability
           Positioned.fill(
-            child: Container(color: Colors.black.withValues(alpha: 0.1)),
+            child: Container(color: Colors.black.withOpacity(0.1)),
           ),
           SafeArea(
             child: Center(
@@ -134,7 +127,7 @@ class _AuthScreenState extends State<AuthScreen>
             const SizedBox(height: 24),
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              height: _tabController.index == 1 ? 480 : 250,
+              height: _tabController.index == 1 ? 520 : 330,
               child: TabBarView(
                 controller: _tabController,
                 children: [
@@ -143,7 +136,7 @@ class _AuthScreenState extends State<AuthScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             _buildForgotPasswordButton(),
           ],
         ),
@@ -157,6 +150,7 @@ class _AuthScreenState extends State<AuthScreen>
         Image.asset(
           'assets/images/creche_logo.png',
           height: 80,
+          errorBuilder: (context, error, stackTrace) => const Icon(Icons.child_care, size: 80),
         ),
         const SizedBox(height: 16),
         Text(
@@ -179,7 +173,7 @@ class _AuthScreenState extends State<AuthScreen>
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(30),
       ),
       child: TabBar(
@@ -211,6 +205,8 @@ class _AuthScreenState extends State<AuthScreen>
           _buildPasswordField(),
           const SizedBox(height: 24),
           _buildLoginButton(),
+          const SizedBox(height: 16),
+          _buildGoogleSignInButton(),
         ],
       ),
     );
@@ -227,6 +223,8 @@ class _AuthScreenState extends State<AuthScreen>
           _buildRoleSelector(),
           const SizedBox(height: 24),
           _buildSignupButton(),
+          const SizedBox(height: 16),
+          _buildGoogleSignInButton(),
         ],
       ),
     );
@@ -236,20 +234,9 @@ class _AuthScreenState extends State<AuthScreen>
     return TextFormField(
       controller: _emailController,
       keyboardType: TextInputType.emailAddress,
-      autofillHints: const [AutofillHints.email],
-      textInputAction: TextInputAction.next,
       decoration: InputDecoration(
         labelText: 'Email',
         prefixIcon: const Icon(Icons.email_outlined),
-        suffixIcon: _emailController.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear, size: 20),
-                onPressed: () {
-                  _emailController.clear();
-                  setState(() {});
-                },
-              )
-            : null,
       ),
       validator: (v) => v == null || !v.contains('@') ? 'Email invalide' : null,
     );
@@ -259,14 +246,10 @@ class _AuthScreenState extends State<AuthScreen>
     return TextFormField(
       controller: _passwordController,
       obscureText: _obscurePassword,
-      autofillHints: const [AutofillHints.password],
-      textInputAction: TextInputAction.done,
-      onFieldSubmitted: (_) => _tabController.index == 0 ? _handleLogin() : _handleSignup(),
       decoration: InputDecoration(
         labelText: 'Mot de passe',
         prefixIcon: const Icon(Icons.lock_outline),
         suffixIcon: IconButton(
-          tooltip: _obscurePassword ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
           icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
@@ -288,27 +271,17 @@ class _AuthScreenState extends State<AuthScreen>
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            'Choisissez votre profil',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
+          child: Text('Choisissez votre profil', style: Theme.of(context).textTheme.titleSmall),
         ),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          alignment: WrapAlignment.center,
           children: roles.map((role) {
             final isSelected = _selectedRole == role['value'];
             return ChoiceChip(
               label: Text(role['label'] as String),
-              avatar: Icon(
-                role['icon'] as IconData,
-                size: 18,
-                color: isSelected ? Colors.white : null,
-              ),
               selected: isSelected,
               onSelected: (selected) {
-                HapticFeedback.selectionClick();
                 setState(() => _selectedRole = selected ? role['value'] as String : null);
               },
             );
@@ -322,10 +295,10 @@ class _AuthScreenState extends State<AuthScreen>
     return Consumer<AuthProviderV2>(
       builder: (context, auth, _) {
         return FilledButton(
-          onPressed: auth.isLoading ? null : _handleLogin,
+          onPressed: auth.state == AppAuthState.loading ? null : _handleLogin,
           style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 56)),
-          child: auth.isLoading
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          child: auth.state == AppAuthState.loading
+              ? const CircularProgressIndicator(color: Colors.white)
               : const Text('Se connecter'),
         );
       },
@@ -336,13 +309,25 @@ class _AuthScreenState extends State<AuthScreen>
     return Consumer<AuthProviderV2>(
       builder: (context, auth, _) {
         return FilledButton(
-          onPressed: auth.isLoading || _selectedRole == null ? null : _handleSignup,
+          onPressed: auth.state == AppAuthState.loading ? null : _handleSignup,
           style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 56)),
-          child: auth.isLoading
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          child: auth.state == AppAuthState.loading
+              ? const CircularProgressIndicator(color: Colors.white)
               : const Text('Créer mon compte'),
         );
       },
+    );
+  }
+
+  Widget _buildGoogleSignInButton() {
+    return OutlinedButton.icon(
+      onPressed: _handleGoogleSignIn,
+      icon: const FaIcon(FontAwesomeIcons.google, size: 20),
+      label: const Text('Continuer avec Google'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 56),
+        side: BorderSide(color: Theme.of(context).colorScheme.outline),
+      ),
     );
   }
 
@@ -358,13 +343,12 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
-  void _showSnackBar(String message, {required bool isError, SnackBarAction? action}) {
+  void _showSnackBar(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red[700] : Colors.green[700],
+        backgroundColor: isError ? Colors.red : Colors.green,
         behavior: SnackBarBehavior.floating,
-        action: action,
       ),
     );
   }

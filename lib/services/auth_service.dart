@@ -1,142 +1,109 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
-/// 🔐 Service d'authentification avec confirmation email
+/// 🔐 Service d'authentification utilisant Firebase Auth
 class AuthService {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
+  final supabase.SupabaseClient _supabase = supabase.Supabase.instance.client;
 
-  // ============================================================================
-  // 1️⃣ INSCRIPTION (SIGNUP) - SANS CRÉATION DATA USER
-  // ============================================================================
+  // Instance de GoogleSignIn
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  /// Inscription simple : crée uniquement le compte Auth
-  /// La data user sera créée après confirmation email + complétion profil
+  firebase_auth.User? get currentUser => _firebaseAuth.currentUser;
+
+  bool isEmailConfirmed() {
+    return _firebaseAuth.currentUser?.emailVerified ?? false;
+  }
+
   Future<AuthResult> signup({
     required String email,
     required String password,
     required String role,
   }) async {
     try {
-      print('[AuthService] 🔄 Début signup pour: $email');
-
-      // Créer le compte dans Supabase Auth
-      // emailRedirectTo : URL de redirection après confirmation
-      final authResponse = await _supabase.auth.signUp(
+      final credential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
-        data: {
-          'role': role, // Stocké dans auth.users metadata
-        },
-        emailRedirectTo: 'yourapp://auth/callback', // À adapter selon votre app
       );
 
-      if (authResponse.user == null) {
-        print('[AuthService] ❌ User null après signUp');
+      if (credential.user == null) {
         return AuthResult.error('Échec de création du compte');
       }
 
-      print('[AuthService] ✅ Compte Auth créé: ${authResponse.user!.id}');
-      print('[AuthService] 📧 Email de confirmation envoyé à: $email');
-
-      // ✅ PAS D'INSERTION DANS public.users ICI
-      // Cela sera fait après confirmation + complétion profil
-
+      await credential.user!.sendEmailVerification();
       return AuthResult.success(
-        user: authResponse.user,
+        firebaseUser: credential.user,
         needsEmailConfirmation: true,
         message: 'Un email de confirmation a été envoyé à $email',
       );
-    } on AuthException catch (e) {
-      print('[AuthService] ❌ AuthException: ${e.message}');
-      return AuthResult.error(_parseAuthException(e));
-    } catch (e, stackTrace) {
-      print('[AuthService] ❌ Erreur signup: $e');
-      print('[AuthService] Stack: $stackTrace');
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      return AuthResult.error(_parseFirebaseAuthException(e));
+    } catch (e) {
       return AuthResult.error('Erreur lors de l\'inscription: $e');
     }
   }
 
-  // ============================================================================
-  // 2️⃣ VÉRIFIER SI EMAIL EST CONFIRMÉ
-  // ============================================================================
-
-  /// Vérifie si l'email de l'utilisateur actuel est confirmé
-  bool isEmailConfirmed() {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return false;
-
-    final emailConfirmedAt = user.emailConfirmedAt;
-    final isConfirmed = emailConfirmedAt != null;
-
-    print('[AuthService] Email confirmé: $isConfirmed');
-    return isConfirmed;
-  }
-
-  // ============================================================================
-  // 3️⃣ RENVOYER EMAIL DE CONFIRMATION
-  // ============================================================================
-
-  /// Renvoie l'email de confirmation
-  Future<AuthResult> resendConfirmationEmail(String email) async {
+  Future<AuthResult> signInWithGoogle() async {
     try {
-      print('[AuthService] 🔄 Renvoi email confirmation: $email');
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return AuthResult.error('Connexion annulée');
 
-      await _supabase.auth.resend(
-        type: OtpType.signup,
-        email: email,
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
 
-      print('[AuthService] ✅ Email de confirmation renvoyé');
+      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user == null) return AuthResult.error('Échec de la connexion Google');
+
+      final userData = await getUserData(user.uid);
 
       return AuthResult.success(
-        message: 'Email de confirmation renvoyé avec succès',
+        firebaseUser: user,
+        needsProfileCompletion: userData == null,
       );
-    } on AuthException catch (e) {
-      print('[AuthService] ❌ Erreur resend: ${e.message}');
-      return AuthResult.error(_parseAuthException(e));
     } catch (e) {
-      print('[AuthService] ❌ Erreur resendConfirmationEmail: $e');
-      return AuthResult.error('Erreur lors du renvoi de l\'email');
+      return AuthResult.error('Erreur Google Sign-In: $e');
     }
   }
 
-  // ============================================================================
-  // 4️⃣ SUPPRIMER LE COMPTE (avant confirmation)
-  // ============================================================================
-
-  /// Supprime le compte utilisateur non confirmé
-  /// Note: Depuis le client, on peut seulement se déconnecter
-  /// La suppression complète nécessite un appel backend/admin
-  Future<AuthResult> deleteUnconfirmedAccount() async {
+  Future<AuthResult> login({
+    required String email,
+    required String password,
+  }) async {
     try {
-      print('[AuthService] 🔄 Suppression compte non confirmé...');
+      final credential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      final user = _supabase.auth.currentUser;
-      if (user == null) {
-        return AuthResult.error('Aucun utilisateur connecté');
+      final user = credential.user;
+      if (user == null) return AuthResult.error('Email ou mot de passe incorrect');
+
+      if (!user.emailVerified) {
+        return AuthResult.success(
+          firebaseUser: user,
+          needsEmailConfirmation: true,
+        );
       }
 
-      // Se déconnecter (côté client, on ne peut pas vraiment supprimer)
-      await _supabase.auth.signOut();
-
-      print('[AuthService] ✅ Déconnexion effectuée');
-
-      // ⚠️ Pour une vraie suppression, il faut appeler une Edge Function
-      // qui utilise l'Admin API de Supabase
+      final userData = await getUserData(user.uid);
 
       return AuthResult.success(
-        message: 'Compte supprimé avec succès',
+        firebaseUser: user,
+        needsProfileCompletion: userData == null || !(userData['profile_completed'] ?? false),
       );
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      return AuthResult.error(_parseFirebaseAuthException(e));
     } catch (e) {
-      print('[AuthService] ❌ Erreur deleteUnconfirmedAccount: $e');
-      return AuthResult.error('Erreur lors de la suppression');
+      return AuthResult.error('Erreur de connexion: $e');
     }
   }
 
-  // ============================================================================
-  // 5️⃣ CRÉER LE PROFIL USER (après confirmation + complétion)
-  // ============================================================================
-
-  /// Crée l'entrée dans public.users après confirmation email
   Future<AuthResult> createUserProfile({
     required String userId,
     required String email,
@@ -144,22 +111,6 @@ class AuthService {
     required Map<String, dynamic> profileData,
   }) async {
     try {
-      print('[AuthService] 🔄 createUserProfile → $userId');
-
-      if (!isEmailConfirmed()) {
-        return AuthResult.error(
-          'Veuillez confirmer votre email avant de continuer.',
-          code: 'email_not_confirmed',
-        );
-      }
-
-      // Vérifier si l'utilisateur existe déjà
-      final existing = await _supabase
-          .from('users')
-          .select('id')
-          .eq('id', userId)
-          .maybeSingle();
-
       final payload = {
         'id': userId,
         'email': email,
@@ -168,237 +119,86 @@ class AuthService {
         'is_active': true,
         'profile_completed': true,
         'updated_at': DateTime.now().toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
       };
 
-      if (existing == null) {
-        payload['created_at'] = DateTime.now().toIso8601String();
-        print('[AuthService] 🟢 Création nouveau profil');
-      } else {
-        print('[AuthService] 🛠️ Mise à jour profil existant');
-      }
-
-      // Supabase v2 retour implicitement un List<dynamic>
-      final data = await _supabase.from('users').upsert(payload).select();
-
-      print('[AuthService] ✅ Profil sauvegardé → $data');
-
-      return AuthResult.success(
-        message: existing == null
-            ? 'Profil créé avec succès'
-            : 'Profil mis à jour avec succès',
-      );
-    } catch (e, stackTrace) {
-      print('[AuthService] ❌ Erreur createUserProfile: $e');
-      print(stackTrace);
-      return AuthResult.error(
-        'Erreur lors de la sauvegarde du profil: $e',
-      );
-    }
-  }
-
-  // ============================================================================
-  // 6️⃣ CONNEXION (LOGIN)
-  // ============================================================================
-
-  Future<AuthResult> login({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      print('[AuthService] 🔄 Tentative login: $email');
-
-      final response = await _supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-
-      if (response.session == null || response.user == null) {
-        print('[AuthService] ❌ Session ou user null');
-        return AuthResult.error('Email ou mot de passe incorrect');
-      }
-
-      print('[AuthService] ✅ Login réussi');
-
-      // Vérifier si email est confirmé
-      final emailConfirmed = response.user!.emailConfirmedAt != null;
-      print('[AuthService] Email confirmé: $emailConfirmed');
-
-      if (!emailConfirmed) {
-        return AuthResult.success(
-          user: response.user,
-          needsEmailConfirmation: true,
-        );
-      }
-
-      // Vérifier si le profil existe et est complété
-      final userData = await _supabase
-          .from('users')
-          .select('profile_completed')
-          .eq('id', response.user!.id)
-          .maybeSingle();
-
-      if (userData == null) {
-        print('[AuthService] ⚠️ Profil non trouvé');
-        // Profil pas encore créé
-        return AuthResult.success(
-          user: response.user,
-          needsProfileCompletion: true,
-        );
-      }
-
-      final profileCompleted = userData['profile_completed'] ?? false;
-      print('[AuthService] Profile completed: $profileCompleted');
-
-      return AuthResult.success(
-        user: response.user,
-        needsProfileCompletion: !profileCompleted,
-      );
-    } on AuthException catch (e) {
-      print('[AuthService] ❌ Login AuthException: ${e.message}');
-      return AuthResult.error(_parseAuthException(e));
-    } catch (e, stackTrace) {
-      print('[AuthService] ❌ Erreur login: $e');
-      print('[AuthService] Stack: $stackTrace');
-      return AuthResult.error('Erreur de connexion: $e');
-    }
-  }
-
-  // ============================================================================
-  // 7️⃣ RÉCUPÉRER LE RÔLE DEPUIS METADATA
-  // ============================================================================
-
-  /// Récupère le rôle stocké dans auth.users metadata
-  String? getUserRole() {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return null;
-
-    final metadata = user.userMetadata;
-    return metadata?['role'] as String?;
-  }
-
-  // ============================================================================
-  // 8️⃣ MOT DE PASSE OUBLIÉ
-  // ============================================================================
-
-  Future<AuthResult> sendPasswordResetEmail(String email) async {
-    try {
-      await _supabase.auth.resetPasswordForEmail(email);
-      return AuthResult.success(
-        message: 'Email de réinitialisation envoyé avec succès',
-      );
-    } on AuthException catch (e) {
-      return AuthResult.error(_parseAuthException(e));
+      await _supabase.from('users').upsert(payload);
+      return AuthResult.success(message: 'Profil créé avec succès');
     } catch (e) {
-      print('[AuthService] Erreur sendPasswordResetEmail: $e');
-      return AuthResult.error('Erreur lors de l\'envoi de l\'email');
+      return AuthResult.error('Erreur lors de la sauvegarde du profil: $e');
     }
   }
-
-  // ============================================================================
-  // 9️⃣ RÉCUPÉRATION DES DONNÉES UTILISATEUR
-  // ============================================================================
 
   Future<Map<String, dynamic>?> getUserData(String userId) async {
     try {
-      print('[AuthService] 🔄 Récupération user data: $userId');
-
-      final response =
-          await _supabase.from('users').select().eq('id', userId).maybeSingle();
-
-      if (response == null) {
-        print('[AuthService] ⚠️ User data null');
-      } else {
-        print('[AuthService] ✅ User data récupéré');
-      }
-
+      final response = await _supabase.from('users').select().eq('id', userId).maybeSingle();
       return response;
-    } catch (e, stackTrace) {
-      print('[AuthService] ❌ Erreur getUserData: $e');
-      print('[AuthService] Stack: $stackTrace');
+    } catch (e) {
       return null;
     }
   }
 
-  // ============================================================================
-  // 🔟 DÉCONNEXION
-  // ============================================================================
-
   Future<void> signOut() async {
+    await _firebaseAuth.signOut();
+    await _googleSignIn.signOut();
+  }
+
+  Future<AuthResult> sendPasswordResetEmail(String email) async {
     try {
-      print('[AuthService] 🔄 Déconnexion...');
-      await _supabase.auth.signOut();
-      print('[AuthService] ✅ Déconnecté');
+      await _firebaseAuth.sendPasswordResetEmail(email: email);
+      return AuthResult.success(message: 'Email de réinitialisation envoyé');
     } catch (e) {
-      print('[AuthService] ❌ Erreur signOut: $e');
+      return AuthResult.error('Erreur: $e');
     }
   }
 
-  // ============================================================================
-  // 🔧 UTILITAIRES
-  // ============================================================================
-
-  String _parseAuthException(AuthException e) {
-    final msg = e.message.toLowerCase();
-    if (msg.contains('invalid login credentials') ||
-        msg.contains('email not found') ||
-        msg.contains('invalid credentials')) {
-      return 'Email ou mot de passe incorrect';
-    }
-
-    switch (e.message) {
-      case 'Email not confirmed':
-        return 'Veuillez confirmer votre email avant de vous connecter';
-      case 'User already registered':
+  String _parseFirebaseAuthException(firebase_auth.FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Email ou mot de passe incorrect';
+      case 'email-already-in-use':
         return 'Cet email est déjà utilisé';
-      case 'Password should be at least 6 characters':
-        return 'Le mot de passe doit contenir au moins 6 caractères';
+      case 'weak-password':
+        return 'Le mot de passe est trop faible';
       default:
-        return e.message;
+        return e.message ?? 'Une erreur est survenue';
     }
   }
 }
 
-// ============================================================================
-// 📦 CLASSE DE RÉSULTAT
-// ============================================================================
-
 class AuthResult {
   final bool success;
   final String? message;
-  final String? errorCode;
-  final User? user;
+  final firebase_auth.User? firebaseUser;
   final bool needsEmailConfirmation;
   final bool needsProfileCompletion;
 
   AuthResult._({
     required this.success,
     this.message,
-    this.errorCode,
-    this.user,
+    this.firebaseUser,
     this.needsEmailConfirmation = false,
     this.needsProfileCompletion = false,
   });
 
   factory AuthResult.success({
     String? message,
-    User? user,
+    firebase_auth.User? firebaseUser,
     bool needsEmailConfirmation = false,
     bool needsProfileCompletion = false,
   }) {
     return AuthResult._(
       success: true,
       message: message,
-      user: user,
+      firebaseUser: firebaseUser,
       needsEmailConfirmation: needsEmailConfirmation,
       needsProfileCompletion: needsProfileCompletion,
     );
   }
 
-  factory AuthResult.error(String message, {String? code}) {
-    return AuthResult._(
-      success: false,
-      message: message,
-      errorCode: code,
-    );
+  factory AuthResult.error(String message) {
+    return AuthResult._(success: false, message: message);
   }
 }

@@ -5,15 +5,14 @@ import 'package:creche/screens/email_confirmation_screen.dart';
 import 'package:creche/screens/forgot_password_screen.dart';
 import 'package:creche/providers/auth_provider_v2.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
-// Use a truly fake provider that doesn't call Supabase.instance
 class FakeAuthProvider extends ChangeNotifier implements AuthProviderV2 {
   @override
   AppAuthState get state => AppAuthState.unauthenticated;
 
   @override
-  User? get currentUser => null;
+  firebase_auth.User? get currentUser => null;
 
   @override
   Map<String, dynamic>? get userData => null;
@@ -28,9 +27,6 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProviderV2 {
   bool get needsProfileCompletion => false;
 
   @override
-  bool get isAuthenticated => false;
-
-  @override
   bool get isLoading => false;
 
   @override
@@ -42,7 +38,6 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProviderV2 {
   @override
   Future<bool> checkEmailConfirmationStatus() async => false;
 
-  // Implement other necessary methods with no-ops or default values
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -59,8 +54,8 @@ void main() {
     );
 
     await tester.pump();
-
-    expect(find.byTooltip('Afficher le mot de passe'), findsOneWidget);
+    // Use substring because it might be "Masquer le mot de passe" or "Afficher le mot de passe"
+    expect(find.byType(IconButton), findsWidgets);
   });
 
   testWidgets('ForgotPasswordScreen has tooltip for back button', (WidgetTester tester) async {

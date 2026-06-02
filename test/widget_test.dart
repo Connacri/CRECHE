@@ -8,7 +8,6 @@ import 'package:creche/providers/auth_provider_v2.dart';
 import 'package:creche/providers/child_enrollment_provider.dart';
 import 'package:creche/providers/course_provider_complete.dart';
 
-// Create mock classes
 class MockLocaleProvider extends Mock implements LocaleProvider {}
 class MockAuthProviderV2 extends Mock implements AuthProviderV2 {}
 class MockChildEnrollmentProvider extends Mock implements ChildEnrollmentProvider {}
@@ -26,15 +25,12 @@ void main() {
     mockChildEnrollmentProvider = MockChildEnrollmentProvider();
     mockCourseProvider = MockCourseProvider();
 
-    // Stub necessary methods and getters
     when(() => mockLocaleProvider.locale).thenReturn(const Locale('fr'));
     when(() => mockAuthProvider.state).thenReturn(AppAuthState.initial);
-    when(() => mockAuthProvider.isAuthenticated).thenReturn(false);
+    when(() => mockAuthProvider.isLoading).thenReturn(false);
   });
 
   testWidgets('App smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    // Use ChangeNotifierProvider.value to provide the mock instances
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -47,7 +43,6 @@ void main() {
       ),
     );
 
-    // Verify that the app starts (finds the CrecheApp)
     expect(find.byType(CrecheApp), findsOneWidget);
   });
 }
