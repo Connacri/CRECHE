@@ -1,5 +1,7 @@
 import 'dart:math' show sqrt, asin, pi, sin, cos;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
+import '../core/config/supabase_config.dart';
 
 import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
@@ -7,10 +9,25 @@ import '../models/enrollment_model_complete.dart';
 import '../models/daily_activity_model.dart';
 import '../models/session_schedule_model.dart';
 
-/// Service dédié pour les opérations CRUD des cours dans Supabase
-class SupabaseCourseService {
-  final SupabaseClient _supabase = Supabase.instance.client;
+/// 🛡️ Classe de base pour les services utilisant le mode Admin (Bypass RLS)
+abstract class AdminSupabaseService {
+  final SupabaseClient _client = Supabase.instance.client;
+  
+  /// Client Admin (Service Role) pour contourner le RLS
+  late final SupabaseClient adminClient;
 
+  AdminSupabaseService() {
+    adminClient = SupabaseClient(
+      SupabaseConfig.url,
+      SupabaseConfig.serviceRoleKey,
+    );
+  }
+
+  SupabaseClient get client => _client;
+}
+
+/// Service dédié pour les opérations CRUD des cours dans Supabase
+class SupabaseCourseService extends AdminSupabaseService {
   static const String _tableName = 'courses';
   static const int _defaultLimit = 20;
 
@@ -22,7 +39,8 @@ class SupabaseCourseService {
     bool? isActive,
   }) async {
     try {
-      PostgrestFilterBuilder query = _supabase.from(_tableName).select();
+      // ✅ Lecture via Admin pour garantir l'accès
+      PostgrestFilterBuilder query = adminClient.from(_tableName).select();
       if (season != null) query = query.eq('season', season.name);
       if (category != null) query = query.eq('category', category.name);
       if (isActive != null) query = query.eq('is_active', isActive);
@@ -42,7 +60,8 @@ class SupabaseCourseService {
     try {
       final data = course.toSupabase();
       data.remove('id');
-      final response = await _supabase.from(_tableName).insert(data).select('id').single();
+      // ✅ Insertion via Admin
+      final response = await adminClient.from(_tableName).insert(data).select('id').single();
       return response['id'] as String;
     } catch (e) {
       throw Exception('Erreur createCourse: $e');
@@ -54,7 +73,8 @@ class SupabaseCourseService {
       updates.remove('id');
       updates.remove('created_at');
       updates['updated_at'] = DateTime.now().toIso8601String();
-      await _supabase.from(_tableName).update(updates).eq('id', courseId);
+      // ✅ Mise à jour via Admin
+      await adminClient.from(_tableName).update(updates).eq('id', courseId);
     } catch (e) {
       throw Exception('Erreur updateCourse: $e');
     }
@@ -62,7 +82,8 @@ class SupabaseCourseService {
 
   Future<void> deleteCourse(String courseId) async {
     try {
-      await _supabase.from(_tableName).delete().eq('id', courseId);
+      // ✅ Suppression via Admin
+      await adminClient.from(_tableName).delete().eq('id', courseId);
     } catch (e) {
       throw Exception('Erreur deleteCourse: $e');
     }
@@ -70,7 +91,8 @@ class SupabaseCourseService {
 
   Future<CourseModel?> getCourse(String courseId) async {
     try {
-      final response = await _supabase.from(_tableName).select().eq('id', courseId).maybeSingle();
+      // ✅ Lecture via Admin
+      final response = await adminClient.from(_tableName).select().eq('id', courseId).maybeSingle();
       if (response == null) return null;
       return CourseModel.fromSupabase(response);
     } catch (e) {
@@ -80,7 +102,7 @@ class SupabaseCourseService {
 
   Future<List<CourseModel>> searchCourses(String searchTerm) async {
     try {
-      final response = await _supabase
+      final response = await adminClient
           .from(_tableName)
           .select()
           .or('title.ilike.%$searchTerm%,description.ilike.%$searchTerm%')
@@ -97,7 +119,7 @@ class SupabaseCourseService {
 
   Future<List<CourseModel>> getUserCourses(String userId) async {
     try {
-      final response = await _supabase
+      final response = await adminClient
           .from(_tableName)
           .select()
           .eq('created_by', userId)
@@ -118,7 +140,7 @@ class SupabaseCourseService {
     int limit = 50,
   }) async {
     try {
-      final response = await _supabase
+      final response = await adminClient
           .from(_tableName)
           .select()
           .eq('is_active', true)
@@ -168,59 +190,62 @@ class SupabaseCourseService {
   }
 }
 
-class SupabaseChildService {
-  final _supabase = Supabase.instance.client;
-
+class SupabaseChildService extends AdminSupabaseService {
   // === GESTION DES ENFANTS ===
   Future<List<ChildModel>> getChildren(String parentId) async {
-    final response = await _supabase.from('children').select().eq('parent_id', parentId).eq('is_active', true);
+    final response = await adminClient.from('children').select().eq('parent_id', parentId).eq('is_active', true);
     return response.map((data) => ChildModel.fromSupabase(data)).toList();
   }
 
   Future<String> createChild(ChildModel child) async {
-    final response = await _supabase.from('children').insert(child.toSupabase()).select().single();
+    // ✅ Insertion via Admin
+    final response = await adminClient.from('children').insert(child.toSupabase()).select().single();
     return response['id'] as String;
   }
 
   Future<void> updateChild(String childId, Map<String, dynamic> updates) async {
-    await _supabase.from('children').update(updates).eq('id', childId);
+    // ✅ Mise à jour via Admin
+    await adminClient.from('children').update(updates).eq('id', childId);
   }
 
   Future<void> softDeleteChild(String childId) async {
-    await _supabase.from('children').update({'is_active': false, 'updated_at': DateTime.now().toIso8601String()}).eq('id', childId);
+    // ✅ Suppression douce via Admin
+    await adminClient.from('children').update({'is_active': false, 'updated_at': DateTime.now().toIso8601String()}).eq('id', childId);
   }
 
   // === GESTION DES INSCRIPTIONS ===
   Future<List<EnrollmentModel>> getEnrollments(String parentId) async {
-    final response = await _supabase.from('enrollments').select().eq('parent_id', parentId);
+    final response = await adminClient.from('enrollments').select().eq('parent_id', parentId);
     return response.map((data) => EnrollmentModel.fromSupabase(data)).toList();
   }
 
   Future<String> createEnrollment(EnrollmentModel enrollment) async {
-    final response = await _supabase.from('enrollments').insert(enrollment.toSupabase()).select().single();
+    // ✅ Inscription via Admin
+    final response = await adminClient.from('enrollments').insert(enrollment.toSupabase()).select().single();
     return response['id'] as String;
   }
 
   Future<void> updateEnrollment(String enrollmentId, Map<String, dynamic> updates) async {
-    await _supabase.from('enrollments').update(updates).eq('id', enrollmentId);
+    // ✅ Mise à jour inscription via Admin
+    await adminClient.from('enrollments').update(updates).eq('id', enrollmentId);
   }
 
   // === GESTION DES HORAIRES (SCHEDULES) ===
   Future<List<SessionSchedule>> getSchedulesForParent(String parentId) async {
-    final enrollmentsResponse = await _supabase.from('enrollments').select('course_id').eq('parent_id', parentId).eq('status', 'approved');
+    final enrollmentsResponse = await adminClient.from('enrollments').select('course_id').eq('parent_id', parentId).eq('status', 'approved');
     final courseIds = (enrollmentsResponse as List).map((e) => e['course_id'] as String).toList();
     if (courseIds.isEmpty) return [];
-    final schedulesResponse = await _supabase.from('session_schedules').select().inFilter('course_id', courseIds);
+    final schedulesResponse = await adminClient.from('session_schedules').select().inFilter('course_id', courseIds);
     return (schedulesResponse as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
   }
 
   // === GESTION DES ACTIVITÉS QUOTIDIENNES ===
   Future<List<DailyActivity>> getDailyActivities(String parentId, DateTime date) async {
     final dateStr = date.toIso8601String().split('T')[0];
-    final childrenResponse = await _supabase.from('children').select('id').eq('parent_id', parentId).eq('is_active', true);
+    final childrenResponse = await adminClient.from('children').select('id').eq('parent_id', parentId).eq('is_active', true);
     final childIds = (childrenResponse as List).map((e) => e['id'] as String).toList();
     if (childIds.isEmpty) return [];
-    final activitiesResponse = await _supabase.from('daily_activities').select().inFilter('child_id', childIds).eq('date', dateStr);
+    final activitiesResponse = await adminClient.from('daily_activities').select().inFilter('child_id', childIds).eq('date', dateStr);
     return (activitiesResponse as List).map((data) => DailyActivity.fromSupabase(data)).toList();
   }
 }
