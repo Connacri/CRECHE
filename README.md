@@ -23,13 +23,13 @@
 
 ## 🌍 Langues Disponibles / Available Languages
 <div align="center">
-  <a href="#fr">🇫🇷 FR</a> | <a href="#en">🇬🇧 EN</a> | <a href="#es">🇪🇸 ES</a> | <a href="#pt">🇵🇹 PT</a> | <a href="#ru">🇷🇺 RU</a> | <a href="#cn">🇨🇳 CN</a> | <a href="#jp">🇯🇵 JP</a> | <a href="#ar">🇸🇦 AR</a>
+  <a href="#fr"><img src="https://flagcdn.com/16x12/fr.png" width="16" height="12" alt="FR"> FR</a> | <a href="#en"><img src="https://flagcdn.com/16x12/gb.png" width="16" height="12" alt="EN"> EN</a> | <a href="#es"><img src="https://flagcdn.com/16x12/es.png" width="16" height="12" alt="ES"> ES</a> | <a href="#pt"><img src="https://flagcdn.com/16x12/pt.png" width="16" height="12" alt="PT"> PT</a> | <a href="#ru"><img src="https://flagcdn.com/16x12/ru.png" width="16" height="12" alt="RU"> RU</a> | <a href="#cn"><img src="https://flagcdn.com/16x12/cn.png" width="16" height="12" alt="CN"> CN</a> | <a href="#jp"><img src="https://flagcdn.com/16x12/jp.png" width="16" height="12" alt="JP"> JP</a> | <a href="#ar"><img src="https://flagcdn.com/16x12/sa.png" width="16" height="12" alt="AR"> AR</a>
 </div>
 
 ---
 
 <a id="fr"></a>
-## 🇫🇷 Français - L'Avenir de la Petite Enfance
+## <img src="https://flagcdn.com/24x18/fr.png" width="24" height="18" alt="FR" style="vertical-align: middle;"> Français - L'Avenir de la Petite Enfance
 **Crèche** est une plateforme révolutionnaire conçue avec une interface **Kawaii-Futuriste**. Elle centralise la communication entre parents, écoles et prestataires.
 
 ### 🚀 Fonctionnalités Clés
@@ -42,7 +42,7 @@
 ---
 
 <a id="en"></a>
-## 🇬🇧 English - The Future of Childcare
+## <img src="https://flagcdn.com/24x18/gb.png" width="24" height="18" alt="EN" style="vertical-align: middle;"> English - The Future of Childcare
 **Crèche** is a revolutionary platform designed with a **Kawaii-Futuristic** interface. It centralizes communication between parents, schools, and service providers.
 
 ### 🚀 Key Features
@@ -55,7 +55,7 @@
 ---
 
 <a id="es"></a>
-## 🇪🇸 Español - El Futuro del Cuidado Infantil
+## <img src="https://flagcdn.com/24x18/es.png" width="24" height="18" alt="ES" style="vertical-align: middle;"> Español - El Futuro del Cuidado Infantil
 **Crèche** es una plataforma con una interfaz **Kawaii-Futurista**. Centraliza la comunicación entre padres, escuelas y proveedores para un seguimiento transparente.
 
 ### 🚀 Características Principales
@@ -67,7 +67,7 @@
 ---
 
 <a id="pt"></a>
-## 🇵🇹 Português - O Futuro da Creche
+## <img src="https://flagcdn.com/24x18/pt.png" width="24" height="18" alt="PT" style="vertical-align: middle;"> Português - O Futuro da Creche
 **Crèche** é uma plataforma revolucionária projetada com uma interface **Kawaii-Futurista**. Centraliza a comunicação entre pais, escolas e prestadores.
 
 ### 🚀 Principais Funcionalidades
@@ -79,7 +79,7 @@
 ---
 
 <a id="ru"></a>
-## 🇷🇺 Русский - Будущее детского сада
+## <img src="https://flagcdn.com/24x18/ru.png" width="24" height="18" alt="RU" style="vertical-align: middle;"> Русский - Будущее детского сада
 **Crèche** — это революционная платформа, созданная с **Kawaii-футуристическим** интерфейсом. Она объединяет родителей, школы и поставщиков услуг.
 
 ### 🚀 Основные возможности
@@ -91,7 +91,7 @@
 ---
 
 <a id="cn"></a>
-## 🇨🇳 中文 - 幼教的未来
+## <img src="https://flagcdn.com/24x18/cn.png" width="24" height="18" alt="CN" style="vertical-align: middle;"> 中文 - 幼教的未来
 **Crèche** 是一款革命性的平台，采用 **Kawaii-未来感** 界面设计。它集中了家长、学校和服务提供商之间的沟通。
 
 ### 🚀 核心功能
@@ -103,7 +103,7 @@
 ---
 
 <a id="jp"></a>
-## 🇯🇵 日本語 - 託児所の未来
+## <img src="https://flagcdn.com/24x18/jp.png" width="24" height="18" alt="JP" style="vertical-align: middle;"> 日本語 - 託児所の未来
 **Crèche** は、**Kawaii-未来的**なインターフェースで設計された革新的なプラットフォームです。保護者、学校、プロバイダー間のコミュニケーションを一本化します。
 
 ### 🚀 主な機能
@@ -115,7 +115,7 @@
 ---
 
 <a id="ar"></a>
-## 🇸🇦 العربية - مستقبل حضانة الأطفال
+## <img src="https://flagcdn.com/24x18/sa.png" width="24" height="18" alt="AR" style="vertical-align: middle;"> العربية - مستقبل حضانة الأطفال
 **Crèche** هي منصة ثورية مصممة بواجهة **Kawaii-مستقبلية**. توحد التواصل بين الآباء والمدارس ومقدمي الخدمات لضمان متابعة شفافة للطفل.
 
 ### 🚀 المميزات الرئيسية
