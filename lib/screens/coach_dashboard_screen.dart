@@ -30,7 +30,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
     final auth = context.read<AuthProviderV2>();
     final courseProvider = context.read<CourseProvider>();
     if (auth.currentUser != null) {
-      await courseProvider.loadUserCourses(auth.currentUser!.id);
+      await courseProvider.loadUserCourses(auth.currentUser!.uid);
     }
     setState(() => _isLoadingData = false);
   }
