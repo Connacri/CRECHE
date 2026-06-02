@@ -8,6 +8,7 @@ class AuthService {
   final supabase.SupabaseClient _supabase = supabase.Supabase.instance.client;
 
   bool _initialized = false;
+  bool _googleSignInAvailable = true;
 
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
@@ -50,14 +51,21 @@ class AuthService {
     String? serverClientId,
   }) async {
     if (_initialized) return;
-    await _googleSignIn.initialize(
-      clientId: clientId,
-      serverClientId: serverClientId,
-    );
+    try {
+      await _googleSignIn.initialize(
+        clientId: clientId,
+        serverClientId: serverClientId,
+      );
+    } on UnimplementedError {
+      _googleSignInAvailable = false;
+    }
     _initialized = true;
   }
 
   Future<AuthResult> signInWithGoogle() async {
+    if (!_googleSignInAvailable) {
+      return AuthResult.error('Google Sign-In n\'est pas disponible sur cette plateforme');
+    }
     try {
       // 1. Déclencher le flux d'authentification
       // Note: Dans la v7.2.0, authenticate() est la méthode recommandée
@@ -172,7 +180,9 @@ class AuthService {
 
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
-    await _googleSignIn.signOut();
+    if (_googleSignInAvailable) {
+      await _googleSignIn.signOut();
+    }
   }
 
   Future<AuthResult> sendPasswordResetEmail(String email) async {
