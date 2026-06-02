@@ -96,7 +96,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             ),
           ),
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.1)),
+            child: Container(color: Colors.black.withValues(alpha: 0.1)),
           ),
           SafeArea(
             child: Center(
@@ -173,7 +173,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(30),
       ),
       child: TabBar(

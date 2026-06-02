@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Creates a Widget representing the day.
 class DayItem extends StatelessWidget {
   const DayItem({
-    Key? key,
+    super.key,
     required this.dayNumber,
     required this.shortName,
     required this.onTap,
@@ -24,7 +24,7 @@ class DayItem extends StatelessWidget {
     required this.dayNameFontSize,
     required this.shrinkDayNameFontSize,
     this.shrink = false,
-  }) : super(key: key);
+  });
   final int dayNumber;
   final String shortName;
   final bool isSelected;
@@ -50,8 +50,8 @@ class DayItem extends StatelessWidget {
     final textStyle = TextStyle(
       color: available
           ? dayColor ?? Theme.of(context).colorScheme.secondary
-          : dayColor?.withOpacity(0.5) ??
-              Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+          : dayColor?.withValues(alpha: 0.5) ??
+              Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5),
       fontSize: shrink ? shrinkFontSize : fontSize,
       height: 0.8,
     );

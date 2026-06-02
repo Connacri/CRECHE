@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider_v2.dart';
+import '../services/email_confirmation_listener.dart';
 
 /// 📧 Écran de confirmation email - Design moderne
 class EmailConfirmationScreen extends StatefulWidget {
@@ -12,9 +13,46 @@ class EmailConfirmationScreen extends StatefulWidget {
       _EmailConfirmationScreenState();
 }
 
-class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
+class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> with WidgetsBindingObserver {
   bool _isResending = false;
   bool _emailResent = false;
+  final EmailConfirmationListener _confirmationListener = EmailConfirmationListener();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startListening();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _confirmationListener.stopListening();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-vérifier immédiatement quand l'utilisateur revient dans l'app
+      context.read<AuthProviderV2>().checkEmailConfirmationStatus();
+    }
+  }
+
+  void _startListening() {
+    _confirmationListener.startListening(
+      onConfirmed: () {
+        if (mounted) {
+          context.read<AuthProviderV2>().checkEmailConfirmationStatus();
+          _showSuccessSnackBar('Email confirmé !');
+        }
+      },
+      onError: () {
+        // Optionnel: gérer le timeout du polling
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +67,8 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              colorScheme.primaryContainer.withOpacity(0.3),
-              colorScheme.secondaryContainer.withOpacity(0.3),
+              colorScheme.primaryContainer.withValues(alpha: 0.3),
+              colorScheme.secondaryContainer.withValues(alpha: 0.3),
             ],
           ),
         ),
@@ -62,13 +100,13 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
             children: [
               _buildHeader(context, colorScheme),
               const SizedBox(height: 32),
-              _buildEmailInfo(context, email),
+              _buildEmailInfo(context, colorScheme, email),
               const SizedBox(height: 24),
-              _buildInstructions(context),
+              _buildInstructions(context, colorScheme),
               const SizedBox(height: 32),
-              _buildActions(context, email),
+              _buildActions(context, colorScheme, email),
               const SizedBox(height: 24),
-              _buildFooter(context),
+              _buildFooter(context, colorScheme),
             ],
           ),
         ),
@@ -94,7 +132,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
+                      color: colorScheme.primary.withValues(alpha: 0.3),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -134,21 +172,21 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
   }
 
   /// Info sur l'email envoyé
-  Widget _buildEmailInfo(BuildContext context, String email) {
+  Widget _buildEmailInfo(BuildContext context, ColorScheme colorScheme, String email) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
         children: [
           Icon(
             Icons.email,
-            color: Theme.of(context).colorScheme.primary,
+            color: colorScheme.primary,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -158,7 +196,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
                 Text(
                   'Email envoyé à',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 4),
@@ -178,7 +216,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
   }
 
   /// Instructions
-  Widget _buildInstructions(BuildContext context) {
+  Widget _buildInstructions(BuildContext context, ColorScheme colorScheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -191,6 +229,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
         const SizedBox(height: 16),
         _buildInstructionItem(
           context,
+          colorScheme,
           '1',
           'Ouvrez votre boîte email',
           Icons.mail_outline,
@@ -198,6 +237,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
         const SizedBox(height: 12),
         _buildInstructionItem(
           context,
+          colorScheme,
           '2',
           'Cliquez sur le lien de confirmation',
           Icons.link,
@@ -205,6 +245,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
         const SizedBox(height: 12),
         _buildInstructionItem(
           context,
+          colorScheme,
           '3',
           'Revenez compléter votre profil',
           Icons.person_outline,
@@ -249,6 +290,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
   /// Item d'instruction
   Widget _buildInstructionItem(
     BuildContext context,
+    ColorScheme colorScheme,
     String number,
     String text,
     IconData icon,
@@ -259,7 +301,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
+            color: colorScheme.primary,
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -275,7 +317,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
         const SizedBox(width: 12),
         Icon(
           icon,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          color: colorScheme.onSurfaceVariant,
           size: 20,
         ),
         const SizedBox(width: 8),
@@ -290,7 +332,7 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
   }
 
   /// Boutons d'action
-  Widget _buildActions(BuildContext context, String email) {
+  Widget _buildActions(BuildContext context, ColorScheme colorScheme, String email) {
     final authProvider = context.read<AuthProviderV2>();
     return Column(
       children: [
@@ -313,6 +355,24 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 🛠 BOUTON DE DEBUG : Forcer le passage
+        TextButton.icon(
+          onPressed: () async {
+            final result = await authProvider.checkEmailConfirmationStatus(forceBypass: true);
+            if (!context.mounted) return;
+            if (result) {
+              _showSuccessSnackBar('Passage forcé réussi !');
+            }
+          },
+          icon: const Icon(Icons.bug_report, size: 16),
+          label: const Text('Forcer la vérification (Si le mail est déjà cliqué)'),
+          style: TextButton.styleFrom(
+            foregroundColor: colorScheme.secondary,
+            visualDensity: VisualDensity.compact,
           ),
         ),
         const SizedBox(height: 16),
@@ -398,11 +458,11 @@ class _EmailConfirmationScreenState extends State<EmailConfirmationScreen> {
   }
 
   /// Footer
-  Widget _buildFooter(BuildContext context) {
+  Widget _buildFooter(BuildContext context, ColorScheme colorScheme) {
     return Text(
       'Besoin d\'aide ? Contactez le support',
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: colorScheme.onSurfaceVariant,
           ),
       textAlign: TextAlign.center,
     );

@@ -87,19 +87,33 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
+      padding: const EdgeInsets.only(left: 24, right: 8, top: 24),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Complétez votre profil',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Complétez votre profil',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
+                Text(
+                  'Plus que quelques étapes pour commencer',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
           ),
-          Text(
-            'Plus que quelques étapes pour commencer',
-            style: Theme.of(context).textTheme.bodyMedium,
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Se déconnecter',
+            onPressed: () async {
+              await context.read<AuthProviderV2>().logout();
+            },
           ),
         ],
       ),
@@ -214,16 +228,24 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   }
 
   Future<void> _completeProfile() async {
+    debugPrint('[ProfileCompletion] _completeProfile called');
     final authProvider = context.read<AuthProviderV2>();
-    final result = await authProvider.updateUserProfile({
+    final data = {
       'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
       'phone_number': _phoneController.text.trim(),
       'city': _cityController.text.trim(),
       'organization_name': _organizationNameController.text.trim(),
       'profile_completed': true,
-    });
+    };
+    debugPrint('[ProfileCompletion] updateUserProfile data: $data');
+    final result = await authProvider.updateUserProfile(data);
+    debugPrint('[ProfileCompletion] updateUserProfile result: success=${result.success} message=${result.message}');
     if (result.success && mounted) {
+      debugPrint('[ProfileCompletion] succès, affichage snackbar');
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil complété !')));
+    } else if (!result.success && mounted) {
+      debugPrint('[ProfileCompletion] échec: ${result.message}');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.message ?? 'Erreur inconnue')));
     }
   }
 }

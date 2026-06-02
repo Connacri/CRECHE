@@ -227,48 +227,98 @@ class AuthProviderV2 with ChangeNotifier {
     return result;
   }
 
-  Future<bool> checkEmailConfirmationStatus() async {
+  Future<bool> checkEmailConfirmationStatus({bool forceBypass = false}) async {
     if (_currentUser != null) {
-      await _currentUser!.reload();
-      _currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (_currentUser?.emailVerified ?? false) {
-        _needsEmailConfirmation = false;
-        await _checkUserStatus();
-        return true;
+      debugPrint('[AuthProviderV2] checkEmailConfirmationStatus: reloading user ${_currentUser!.email}');
+      
+      try {
+        await _currentUser!.reload();
+        await _currentUser!.getIdToken(true);
+        _currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        
+        final isVerified = _currentUser?.emailVerified ?? false;
+        debugPrint('[AuthProviderV2] emailVerified (Firebase): $isVerified');
+        
+        if (isVerified || forceBypass) {
+          if (forceBypass) debugPrint('[AuthProviderV2] Bypassing Firebase verification check...');
+          
+          debugPrint('[AuthProviderV2] Proceeding to Supabase check...');
+          _needsEmailConfirmation = false;
+          await _checkUserStatus();
+          notifyListeners();
+          return true;
+        }
+      } catch (e) {
+        debugPrint('[AuthProviderV2] Error during confirmation check: $e');
       }
     }
     return false;
   }
 
-  // ============================================================================
-  // GESTION DU PROFIL (SUPABASE)
-  // ============================================================================
-
   Future<void> _checkUserStatus() async {
     if (_currentUser == null) return;
+    
+    debugPrint('[AuthProviderV2] _checkUserStatus for uid=${_currentUser!.uid}');
     try {
       final data = await _authService.getUserData(_currentUser!.uid);
+      debugPrint('[AuthProviderV2] _checkUserStatus: getUserData returned $data');
+      
       if (data == null) {
-        _needsProfileCompletion = true;
-        _setState(AppAuthState.needsProfileCompletion);
+        debugPrint('[AuthProviderV2] User data null in Supabase, ensuring row exists...');
+        await _ensureUserRow();
+        final retryData = await _authService.getUserData(_currentUser!.uid);
+        if (retryData != null) {
+          _userData = retryData;
+          _needsProfileCompletion = !(retryData['profile_completed'] ?? false);
+          _setState(_needsProfileCompletion ? AppAuthState.needsProfileCompletion : AppAuthState.authenticated);
+        } else {
+          debugPrint('[AuthProviderV2] Still no data after _ensureUserRow. RLS might be blocking.');
+          _needsProfileCompletion = true;
+          _setState(AppAuthState.needsProfileCompletion);
+        }
       } else {
         _userData = data;
         _needsProfileCompletion = !(data['profile_completed'] ?? false);
-        if (_needsProfileCompletion) {
-          _setState(AppAuthState.needsProfileCompletion);
-        } else {
-          _setState(AppAuthState.authenticated);
-        }
+        _setState(_needsProfileCompletion ? AppAuthState.needsProfileCompletion : AppAuthState.authenticated);
       }
     } catch (e) {
+      debugPrint('[AuthProviderV2] _checkUserStatus CRITICAL ERROR: $e');
       _errorMessage = e.toString();
       _setState(AppAuthState.error);
     }
   }
 
+  void _setAuthHeader(String? uid) {
+    final client = supabase.Supabase.instance.client;
+    if (uid != null) {
+      client.rest.headers['x-firebase-id'] = uid;
+      client.storage.headers['x-firebase-id'] = uid;
+    } else {
+      client.rest.headers.remove('x-firebase-id');
+      client.storage.headers.remove('x-firebase-id');
+    }
+  }
+
+  Future<void> _ensureUserRow() async {
+    if (_currentUser == null) return;
+    debugPrint('[AuthProviderV2] _ensureUserRow: créé ligne avec id=${_currentUser!.uid} email=${_currentUser!.email}');
+    try {
+      _setAuthHeader(_currentUser!.uid);
+      await supabase.Supabase.instance.client.from('users').upsert({
+        'id': _currentUser!.uid,
+        'email': _currentUser!.email,
+      });
+      debugPrint('[AuthProviderV2] _ensureUserRow: UPSERT réussi');
+    } catch (e) {
+      debugPrint('[AuthProviderV2] _ensureUserRow: UPSERT échec: $e');
+    }
+  }
+
+
   Future<AuthResult> createUserProfile(Map<String, dynamic> profileData) async {
     if (_currentUser == null) return AuthResult.error('Utilisateur non connecté');
     _setState(AppAuthState.loading);
+    _setAuthHeader(_currentUser!.uid);
     final result = await _authService.createUserProfile(
       userId: _currentUser!.uid,
       email: _currentUser!.email!,
@@ -287,19 +337,32 @@ class AuthProviderV2 with ChangeNotifier {
   }
 
   Future<AuthResult> updateUserProfile(Map<String, dynamic> profileData) async {
-    return await updateUserProfileSilent(profileData);
+    debugPrint('[AuthProviderV2] updateUserProfile called with: $profileData');
+    final result = await updateUserProfileSilent(profileData);
+    debugPrint('[AuthProviderV2] updateUserProfileSilent result: success=${result.success}');
+    if (result.success && profileData['profile_completed'] == true) {
+      debugPrint('[AuthProviderV2] profile_completed=true, calling _checkUserStatus');
+      await _checkUserStatus();
+    }
+    return result;
   }
 
   Future<AuthResult> updateUserProfileSilent(Map<String, dynamic> profileData) async {
-    if (_currentUser == null) return AuthResult.error('Utilisateur non connecté');
+    if (_currentUser == null) {
+      debugPrint('[AuthProviderV2] updateUserProfileSilent: currentUser is null');
+      return AuthResult.error('Utilisateur non connecté');
+    }
     try {
-      final updates = {
+      _setAuthHeader(_currentUser!.uid);
+      debugPrint('[AuthProviderV2] updateUserProfileSilent: calling direct UPDATE');
+      await supabase.Supabase.instance.client.from('users').update({
         ...profileData,
         'updated_at': DateTime.now().toIso8601String(),
-      };
-      await supabase.Supabase.instance.client.from('users').update(updates).eq('id', _currentUser!.uid);
-      if (_userData == null) _userData = {};
-      updates.forEach((key, value) {
+      }).eq('id', _currentUser!.uid);
+      
+      debugPrint('[AuthProviderV2] Direct UPDATE succeeded');
+      _userData ??= {};
+      profileData.forEach((key, value) {
         if (value is Map && _userData![key] is Map) {
           _userData![key] = {
             ...(_userData![key] as Map<String, dynamic>),
@@ -312,10 +375,10 @@ class AuthProviderV2 with ChangeNotifier {
       notifyListeners();
       return AuthResult.success(firebaseUser: _currentUser);
     } catch (e) {
+      debugPrint('[AuthProviderV2] updateUserProfileSilent: échec: $e');
       return AuthResult.error(e.toString());
     }
   }
-
   Future<AuthResult> updateProfileImage(File imageFile) async {
     if (_currentUser == null) return AuthResult.error('Utilisateur non connecté');
     _setState(AppAuthState.loading);

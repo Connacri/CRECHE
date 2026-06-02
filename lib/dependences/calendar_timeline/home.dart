@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'src/calendar_timeline.dart';
 
 class HomePageCalendar extends StatefulWidget {
-  const HomePageCalendar({Key? key}) : super(key: key);
+  const HomePageCalendar({super.key});
 
   @override
   State<HomePageCalendar> createState() => _HomePageCalendarState();

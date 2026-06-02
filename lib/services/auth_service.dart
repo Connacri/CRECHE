@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:flutter/cupertino.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
@@ -18,6 +19,19 @@ class AuthService {
     return _firebaseAuth.currentUser?.emailVerified ?? false;
   }
 
+  /// Sets the custom header for Supabase RLS based on Firebase UID
+  void _setAuthHeader(String? uid) {
+    if (uid != null) {
+      debugPrint('[AuthService] Setting x-firebase-id header: $uid');
+      _supabase.rest.headers['x-firebase-id'] = uid;
+      _supabase.storage.headers['x-firebase-id'] = uid;
+    } else {
+      debugPrint('[AuthService] Removing x-firebase-id header');
+      _supabase.rest.headers.remove('x-firebase-id');
+      _supabase.storage.headers.remove('x-firebase-id');
+    }
+  }
+
   Future<AuthResult> signup({
     required String email,
     required String password,
@@ -33,9 +47,24 @@ class AuthService {
         return AuthResult.error('Échec de création du compte');
       }
 
-      await credential.user!.sendEmailVerification();
+      final user = credential.user!;
+      await user.sendEmailVerification();
+      
+      // ✅ Set header BEFORE Supabase call
+      _setAuthHeader(user.uid);
+
+      await _supabase.from('users').upsert({
+        'id': user.uid,
+        'email': email,
+        'role': role,
+        'is_active': true,
+        'profile_completed': false,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
       return AuthResult.success(
-        firebaseUser: credential.user,
+        firebaseUser: user,
         needsEmailConfirmation: true,
         message: 'Un email de confirmation a été envoyé à $email',
       );
@@ -56,6 +85,11 @@ class AuthService {
         clientId: clientId,
         serverClientId: serverClientId,
       );
+      
+      // Set initial header if user already logged in
+      if (_firebaseAuth.currentUser != null) {
+        _setAuthHeader(_firebaseAuth.currentUser!.uid);
+      }
     } on UnimplementedError {
       _googleSignInAvailable = false;
     }
@@ -68,31 +102,25 @@ class AuthService {
     }
     try {
       // 1. Déclencher le flux d'authentification
-      // Note: Dans la v7.2.0, authenticate() est la méthode recommandée
       final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-
-      // 2. Récupérer les détails de l'authentification
-      // Note: Dans la v7.2.0, authentication peut être synchrone
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-      
-      // 3. Récupérer l'ID Token (crucial pour Firebase)
       final String? idToken = googleAuth.idToken;
 
       if (idToken == null) {
         return AuthResult.error('Échec de récupération de l\'ID Token Google');
       }
 
-      // 4. Créer le credential Firebase
-      // Note: On n'utilise plus accessToken car il peut être absent dans la v7.2.0
       final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
         idToken: idToken,
       );
 
-      // 5. Se connecter à Firebase
       final userCredential = await _firebaseAuth.signInWithCredential(credential);
       final user = userCredential.user;
 
       if (user == null) return AuthResult.error('Échec de la connexion Firebase avec Google');
+
+      // ✅ Set header BEFORE Supabase call
+      _setAuthHeader(user.uid);
 
       // 6. Vérifier les données dans Supabase
       final userData = await getUserData(user.uid);
@@ -124,6 +152,9 @@ class AuthService {
       final user = credential.user;
       if (user == null) return AuthResult.error('Email ou mot de passe incorrect');
 
+      // ✅ Set header BEFORE Supabase call
+      _setAuthHeader(user.uid);
+
       if (!user.emailVerified) {
         return AuthResult.success(
           firebaseUser: user,
@@ -151,7 +182,8 @@ class AuthService {
     required Map<String, dynamic> profileData,
   }) async {
     try {
-      final payload = {
+      // ✅ Remplacement RPC par UPSERT direct
+      await _supabase.from('users').upsert({
         'id': userId,
         'email': email,
         'role': role,
@@ -159,10 +191,7 @@ class AuthService {
         'is_active': true,
         'profile_completed': true,
         'updated_at': DateTime.now().toIso8601String(),
-        'created_at': DateTime.now().toIso8601String(),
-      };
-
-      await _supabase.from('users').upsert(payload);
+      });
       return AuthResult.success(message: 'Profil créé avec succès');
     } catch (e) {
       return AuthResult.error('Erreur lors de la sauvegarde du profil: $e');
@@ -171,7 +200,11 @@ class AuthService {
 
   Future<Map<String, dynamic>?> getUserData(String userId) async {
     try {
-      final response = await _supabase.from('users').select().eq('id', userId).maybeSingle();
+      final response = await _supabase
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
       return response;
     } catch (e) {
       return null;

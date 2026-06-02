@@ -17,7 +17,7 @@ typedef OnDateSelected = void Function(DateTime);
 /// [lastDate] must not be null and the same or after [firstDate]
 class CalendarTimeline extends StatefulWidget {
   CalendarTimeline({
-    Key? key,
+    super.key,
     required this.initialDate,
     required this.firstDate,
     required this.lastDate,
@@ -61,8 +61,7 @@ class CalendarTimeline extends StatefulWidget {
         assert(
           locale == null || dateTimeSymbolMap().containsKey(locale),
           "Provided locale value doesn't exist",
-        ),
-        super(key: key);
+        );
   final DateTime initialDate;
   final DateTime firstDate;
   final DateTime lastDate;

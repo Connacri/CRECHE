@@ -36,7 +36,7 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProviderV2 {
   void clearError() {}
 
   @override
-  Future<bool> checkEmailConfirmationStatus() async => false;
+  Future<bool> checkEmailConfirmationStatus({bool forceBypass = false}) async => false;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
