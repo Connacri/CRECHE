@@ -6,6 +6,7 @@ import '../models/course_model_complete.dart';
 import '../models/user_model.dart';
 import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
+import 'create_course_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
   const SchoolDashboard({super.key});
@@ -16,29 +17,45 @@ class SchoolDashboard extends StatefulWidget {
 
 class _SchoolDashboardState extends State<SchoolDashboard> {
   int _selectedIndex = 0;
-  bool _isLoading = true;
-  UserModel? _user;
+  bool _isLoadingData = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialData());
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoadingData = true);
     final auth = context.read<AuthProviderV2>();
     final courseProvider = context.read<CourseProvider>();
-    if (auth.userData != null) {
-      _user = UserModel.fromSupabase(auth.userData!);
+    if (auth.currentUser != null) {
       await courseProvider.loadUserCourses(auth.currentUser!.id);
     }
-    setState(() => _isLoading = false);
+    setState(() => _isLoadingData = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ ÉCOUTE RÉACTIVE DU PROFIL
+    final auth = context.watch<AuthProviderV2>();
+    final userData = auth.userData;
+    final user = userData != null ? UserModel.fromSupabase(userData) : null;
+
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard École'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => auth.logout(),
+            tooltip: 'Déconnexion',
+          ),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         children: [
           Positioned.fill(
@@ -48,22 +65,27 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
             ),
           ),
           SafeArea(
-            child: _isLoading
+            child: auth.isLoading || _isLoadingData
               ? const Center(child: CircularProgressIndicator())
-              : _buildContent(),
+              : _buildContent(user),
           ),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CreateCourseScreen()),
+          );
+        },
         backgroundColor: Theme.of(context).colorScheme.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(UserModel? user) {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -74,7 +96,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('École ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                Text('École ${user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const Text('Gestion de l\'établissement'),
               ],
             ),
@@ -117,7 +139,8 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
   Widget _buildCourseGrid() {
     return Consumer<CourseProvider>(
       builder: (context, provider, _) {
-        if (provider.courses.isEmpty) return const Text('Aucune activité créée');
+        final userCourses = provider.userCourses;
+        if (userCourses.isEmpty) return const Text('Aucune activité créée');
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -125,25 +148,77 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 1.2,
+            childAspectRatio: 1.1,
           ),
-          itemCount: provider.courses.length,
+          itemCount: userCourses.length,
           itemBuilder: (context, index) {
-            final course = provider.courses[index];
+            final course = userCourses[index];
             return GlassCard(
               padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Stack(
                 children: [
-                  Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center, maxLines: 2),
-                  const SizedBox(height: 4),
-                  Text(course.category.name, style: const TextStyle(fontSize: 10)),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Text(course.category.displayName, style: const TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                  Positioned(
+                    top: -10,
+                    right: -10,
+                    child: PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 18),
+                      onSelected: (val) {
+                        if (val == 'edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => CreateCourseScreen(courseToEdit: course)),
+                          );
+                        } else if (val == 'delete') {
+                          _confirmDelete(context, course);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(value: 'edit', child: Text('Modifier')),
+                        const PopupMenuItem(value: 'delete', child: Text('Supprimer')),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             );
           },
         );
       },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, CourseModel course) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Supprimer le cours'),
+        content: Text('Voulez-vous vraiment supprimer "${course.title}" ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () async {
+              final success = await context.read<CourseProvider>().deleteCourse(course.id);
+              if (mounted) {
+                Navigator.pop(dialogContext);
+                if (!success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Erreur lors de la suppression')),
+                  );
+                }
+              }
+            },
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 

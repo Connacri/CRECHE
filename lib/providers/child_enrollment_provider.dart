@@ -61,19 +61,21 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
 
     try {
-      _setLoading(true);
-      _clearError();
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
 
       final childrenList = await _supabaseChildService.getChildren(parentId);
 
-      _children = childrenList;
+      _children = List.from(childrenList); // Nouveau instance de liste
 
-      _setLoading(false);
+      _isLoading = false;
       notifyListeners();
     } catch (e) {
       print('❌ Erreur loadChildren: $e');
-      _setError('Impossible de charger les enfants');
-      _setLoading(false);
+      _error = 'Impossible de charger les enfants';
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -90,24 +92,40 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     String? photoUrl,
   }) async {
     try {
-      _setLoading(true);
-      _clearError();
+      print('🆕 [ChildProvider] Début addChild pour $firstName $lastName');
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
 
       String? finalPhotoUrl = photoUrl;
 
       if (photo != null) {
-        finalPhotoUrl = await _imageService.uploadChildPhoto(
-          imageFile: photo,
-          childId: '$parentId-${DateTime.now().millisecondsSinceEpoch}',
-        );
-        // Ajout d'un timestamp pour briser le cache
-        if (finalPhotoUrl != null) {
-          finalPhotoUrl = '$finalPhotoUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+        try {
+          print('📸 [ChildProvider] Tentative upload photo...');
+          // ✅ Utilisation d'un UUID unique pour l'upload racine du bucket
+          final storageId = 'child_${DateTime.now().millisecondsSinceEpoch}';
+          finalPhotoUrl = await _imageService.uploadChildPhoto(
+            imageFile: photo,
+            userId: parentId,
+            childId: storageId,
+          );
+          
+          if (finalPhotoUrl != null) {
+            print('✅ [ChildProvider] Photo uploadée avec succès: $finalPhotoUrl');
+            finalPhotoUrl = '$finalPhotoUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+          }
+        } catch (e) {
+          print('❌ [ChildProvider] Erreur upload photo: $e');
+          _error = 'Échec de l\'envoi de la photo : $e';
+          _isLoading = false;
+          notifyListeners();
+          return false;
         }
       }
 
+      print('📝 [ChildProvider] Préparation du modèle ChildModel...');
       final child = ChildModel(
-        id: '', 
+        id: '', // Supabase va générer l'UUID
         parentId: parentId,
         firstName: firstName,
         lastName: lastName,
@@ -121,19 +139,29 @@ class ChildEnrollmentProvider extends ChangeNotifier {
         isActive: true,
       );
 
-      final newId = await _supabaseChildService.createChild(child);
-      
-      // ✅ Mise à jour locale instantanée
-      final childWithId = child.copyWith(id: newId);
-      _children.add(childWithId);
-      
-      _setLoading(false);
-      notifyListeners();
-      return true;
+      print('🚀 [ChildProvider] Envoi vers Supabase Database...');
+      try {
+        final newId = await _supabaseChildService.createChild(child);
+        print('✅ [ChildProvider] Enfant créé en base avec ID: $newId');
+        
+        final childWithId = child.copyWith(id: newId);
+        _children = [..._children, childWithId];
+        
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } catch (dbError) {
+        print('❌ [ChildProvider] Erreur CRITIQUE insertion base: $dbError');
+        _error = 'Erreur base de données : $dbError';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
     } catch (e) {
-      print('❌ Erreur addChild: $e');
-      _setError('Erreur lors de l\'ajout de l\'enfant');
-      _setLoading(false);
+      print('❌ [ChildProvider] Erreur inattendue: $e');
+      _error = 'Une erreur inattendue est survenue : $e';
+      _isLoading = false;
+      notifyListeners();
       return false;
     }
   }
@@ -151,8 +179,9 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     MedicalInfo? medicalInfo,
   }) async {
     try {
-      _setLoading(true);
-      _clearError();
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
 
       final childIndex = _children.indexWhere((c) => c.id == childId);
       if (childIndex == -1) throw Exception('Enfant non trouvé localement');
@@ -165,9 +194,9 @@ class ChildEnrollmentProvider extends ChangeNotifier {
       } else if (newPhoto != null) {
         photoUrl = await _imageService.uploadChildPhoto(
           imageFile: newPhoto,
+          userId: currentChild.parentId,
           childId: childId,
         );
-        // Ajout d'un timestamp pour briser le cache
         if (photoUrl != null) {
           photoUrl = '$photoUrl?t=${DateTime.now().millisecondsSinceEpoch}';
         }
@@ -186,8 +215,8 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
       await _supabaseChildService.updateChild(childId, updates);
 
-      // ✅ Mise à jour locale instantanée sans recharger tout
-      _children[childIndex] = currentChild.copyWith(
+      // ✅ Mise à jour locale instantanée avec NOUVELLE LISTE
+      final updatedChild = currentChild.copyWith(
         firstName: firstName,
         lastName: lastName,
         dateOfBirth: dateOfBirth,
@@ -198,13 +227,18 @@ class ChildEnrollmentProvider extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
 
-      _setLoading(false);
+      final newList = List<ChildModel>.from(_children);
+      newList[childIndex] = updatedChild;
+      _children = newList;
+
+      _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       print('❌ Erreur updateChild: $e');
-      _setError('Erreur lors de la modification');
-      _setLoading(false);
+      _error = 'Erreur lors de la modification';
+      _isLoading = false;
+      notifyListeners();
       return false;
     }
   }
@@ -212,22 +246,24 @@ class ChildEnrollmentProvider extends ChangeNotifier {
   // === SUPPRESSION DOUCE D'UN ENFANT ===
   Future<bool> deleteChild(String childId) async {
     try {
-      _setLoading(true);
-      _clearError();
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
 
       await _supabaseChildService.softDeleteChild(childId);
 
-      // Retirer localement
-      _children.removeWhere((c) => c.id == childId);
-      _enrollments.removeWhere((e) => e.childId == childId);
+      // ✅ NOUVELLE LISTE
+      _children = _children.where((c) => c.id != childId).toList();
+      _enrollments = _enrollments.where((e) => e.childId != childId).toList();
 
-      _setLoading(false);
+      _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       print('❌ Erreur deleteChild: $e');
-      _setError('Erreur lors de la suppression');
-      _setLoading(false);
+      _error = 'Erreur lors de la suppression';
+      _isLoading = false;
+      notifyListeners();
       return false;
     }
   }

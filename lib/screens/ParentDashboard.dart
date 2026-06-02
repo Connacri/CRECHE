@@ -370,6 +370,11 @@ class _ParentDashboardState extends State<ParentDashboard>
                       icon: const Icon(Icons.location_on),
                       onPressed: () => _loadUserLocation(currentUser),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.logout),
+                      onPressed: () => authProvider.logout(),
+                      tooltip: 'Déconnexion',
+                    ),
                     PopupMenuButton<String>(
                       onSelected: (value) {
                         if (value == 'profile') {
@@ -814,7 +819,8 @@ class _ChildEnrollmentDialogState extends State<ChildEnrollmentDialog> {
       if (_pickedImage != null) {
         photoUrl = await _imageService.uploadChildPhoto(
           imageFile: _pickedImage!,
-          childId: widget.existingChild?.id ?? DateTime.now().toString(),
+          userId: currentUser.id,
+          childId: widget.existingChild?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         );
       }
 

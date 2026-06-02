@@ -208,13 +208,15 @@ class AuthProviderV2 extends ChangeNotifier {
 
       if (_needsEmailConfirmation) {
         _setState(AppAuthState.needsEmailConfirmation);
+      } else {
+        // Si pas de confirmation requise, on vérifie le statut (profil etc.)
+        await _checkUserStatus();
       }
     } else {
       _errorMessage = result.message;
       _setState(AppAuthState.error);
     }
 
-    notifyListeners();
     return result;
   }
 
@@ -247,7 +249,6 @@ class AuthProviderV2 extends ChangeNotifier {
       _setState(AppAuthState.error);
     }
 
-    notifyListeners();
     return result;
   }
 
@@ -470,18 +471,32 @@ class AuthProviderV2 extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    _setState(AppAuthState.loading);
+    print('[AuthProviderV2] 🔄 Début de la déconnexion optimiste...');
 
-    await _authService.signOut();
-
+    // 1. Mise à jour IMMÉDIATE de l'état local pour débloquer l'UI
     _currentUser = null;
     _userData = null;
     _needsEmailConfirmation = false;
     _needsProfileCompletion = false;
     _errorMessage = null;
-
+    
+    // On passe directement à unauthenticated au lieu de loading
     _setState(AppAuthState.unauthenticated);
-    notifyListeners();
+    
+    print('[AuthProviderV2] 🏠 État local réinitialisé, UI devrait basculer');
+
+    // 2. Déconnexion serveur en arrière-plan
+    try {
+      // On ne 'await' pas obligatoirement ici pour ne pas bloquer l'UI
+      // mais on le fait pour s'assurer que la session est bien fermée côté Supabase
+      await _authService.signOut().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => print('[AuthProviderV2] ⚠️ Timeout signOut serveur (2s)'),
+      );
+      print('[AuthProviderV2] ✅ Déconnexion serveur réussie');
+    } catch (e) {
+      print('[AuthProviderV2] ❌ Erreur déconnexion serveur (non bloquant): $e');
+    }
   }
 
   // ============================================================================

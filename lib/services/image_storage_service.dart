@@ -362,17 +362,31 @@ class ImageStorageService {
   }
 
   /// Upload d'une photo d'enfant
+  /// ✅ STRUCTURE: {userId}/children/{childId}.jpg
   Future<String?> uploadChildPhoto({
     required File imageFile,
+    required String userId,
     required String childId,
   }) async {
     try {
+      print('📤 [ImageStorage] Début upload photo enfant: $childId pour parent: $userId');
+      
       final fileToUpload = await _compressImage(imageFile);
-      final path = '$childId/profile.jpg';
+      
+      // ✅ Utilisation de userId comme premier dossier pour passer les RLS
+      final path = '$userId/children/$childId.jpg';
+
+      // Utilisation du bucket 'profiles' qui est déjà utilisé pour les avatars
+      const String targetBucket = _profileBucket;
+
+      print('📤 [ImageStorage] Bucket cible: $targetBucket');
+      print('📤 [ImageStorage] Path final: $path');
 
       final bytes = await fileToUpload.readAsBytes();
+      final sizeKB = bytes.length / 1024;
+      print('📤 [ImageStorage] Taille brute: ${sizeKB.toStringAsFixed(2)} KB');
 
-      await _supabase.storage.from(_usersBucket).uploadBinary(
+      await _supabase.storage.from(targetBucket).uploadBinary(
             path,
             bytes,
             fileOptions: const FileOptions(
@@ -381,15 +395,29 @@ class ImageStorageService {
             ),
           );
 
+      print('✅ [ImageStorage] Upload Supabase réussi sur $targetBucket');
+
       if (fileToUpload.path != imageFile.path) {
-        await fileToUpload.delete();
+        try {
+          await fileToUpload.delete();
+          print('🧹 [ImageStorage] Fichier temporaire supprimé');
+        } catch (e) {
+          print('⚠️ [ImageStorage] Impossible de supprimer le fichier temp: $e');
+        }
       }
 
-      return _supabase.storage.from(_usersBucket).getPublicUrl(path);
+      final publicUrl = _supabase.storage.from(targetBucket).getPublicUrl(path);
+      print('✅ [ImageStorage] URL publique: $publicUrl');
+      
+      return publicUrl;
     } on StorageException catch (e) {
-      throw Exception("Erreur upload photo enfant: ${e.message}");
-    } catch (e) {
-      throw Exception("Erreur upload: $e");
+      print('❌ [ImageStorage] StorageException: ${e.message}');
+      print('❌ [ImageStorage] StatusCode: ${e.statusCode}');
+      throw Exception("Erreur Storage: ${e.message}");
+    } catch (e, stackTrace) {
+      print('❌ [ImageStorage] Erreur upload enfant: $e');
+      print('❌ [ImageStorage] StackTrace: $stackTrace');
+      throw Exception("Erreur upload photo enfant: $e");
     }
   }
 }
