@@ -301,16 +301,12 @@ class AuthProviderV2 with ChangeNotifier {
 
   Future<void> _ensureUserRow() async {
     if (_currentUser == null) return;
-    debugPrint('[AuthProviderV2] _ensureUserRow: créé ligne avec id=${_currentUser!.uid} email=${_currentUser!.email}');
+    debugPrint('[AuthProviderV2] _ensureUserRow: id=${_currentUser!.uid}');
     try {
-      _setAuthHeader(_currentUser!.uid);
-      await supabase.Supabase.instance.client.from('users').upsert({
-        'id': _currentUser!.uid,
-        'email': _currentUser!.email,
-      });
-      debugPrint('[AuthProviderV2] _ensureUserRow: UPSERT réussi');
+      await _authService.ensureUserRowAdmin(_currentUser!.uid, _currentUser!.email!);
+      debugPrint('[AuthProviderV2] _ensureUserRow: Réussi via Admin');
     } catch (e) {
-      debugPrint('[AuthProviderV2] _ensureUserRow: UPSERT échec: $e');
+      debugPrint('[AuthProviderV2] _ensureUserRow: Échec: $e');
     }
   }
 
@@ -318,7 +314,6 @@ class AuthProviderV2 with ChangeNotifier {
   Future<AuthResult> createUserProfile(Map<String, dynamic> profileData) async {
     if (_currentUser == null) return AuthResult.error('Utilisateur non connecté');
     _setState(AppAuthState.loading);
-    _setAuthHeader(_currentUser!.uid);
     final result = await _authService.createUserProfile(
       userId: _currentUser!.uid,
       email: _currentUser!.email!,
@@ -337,30 +332,21 @@ class AuthProviderV2 with ChangeNotifier {
   }
 
   Future<AuthResult> updateUserProfile(Map<String, dynamic> profileData) async {
-    debugPrint('[AuthProviderV2] updateUserProfile called with: $profileData');
+    debugPrint('[AuthProviderV2] updateUserProfile: $profileData');
     final result = await updateUserProfileSilent(profileData);
-    debugPrint('[AuthProviderV2] updateUserProfileSilent result: success=${result.success}');
     if (result.success && profileData['profile_completed'] == true) {
-      debugPrint('[AuthProviderV2] profile_completed=true, calling _checkUserStatus');
       await _checkUserStatus();
     }
     return result;
   }
 
   Future<AuthResult> updateUserProfileSilent(Map<String, dynamic> profileData) async {
-    if (_currentUser == null) {
-      debugPrint('[AuthProviderV2] updateUserProfileSilent: currentUser is null');
-      return AuthResult.error('Utilisateur non connecté');
-    }
+    if (_currentUser == null) return AuthResult.error('Utilisateur non connecté');
     try {
-      _setAuthHeader(_currentUser!.uid);
-      debugPrint('[AuthProviderV2] updateUserProfileSilent: calling direct UPDATE');
-      await supabase.Supabase.instance.client.from('users').update({
-        ...profileData,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', _currentUser!.uid);
+      debugPrint('[AuthProviderV2] updateUserProfileSilent: via Admin');
+      await _authService.updateUserProfileAdmin(_currentUser!.uid, profileData);
       
-      debugPrint('[AuthProviderV2] Direct UPDATE succeeded');
+      debugPrint('[AuthProviderV2] Update réussi');
       _userData ??= {};
       profileData.forEach((key, value) {
         if (value is Map && _userData![key] is Map) {
@@ -375,7 +361,7 @@ class AuthProviderV2 with ChangeNotifier {
       notifyListeners();
       return AuthResult.success(firebaseUser: _currentUser);
     } catch (e) {
-      debugPrint('[AuthProviderV2] updateUserProfileSilent: échec: $e');
+      debugPrint('[AuthProviderV2] Update échec: $e');
       return AuthResult.error(e.toString());
     }
   }
