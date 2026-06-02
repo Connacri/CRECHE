@@ -93,6 +93,19 @@ class _AutreDashboardState extends State<AutreDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ ÉCOUTE RÉACTIVE DU PROFIL
+    final authProvider = context.watch<AuthProviderV2>();
+    final userData = authProvider.userData;
+
+    if (userData != null) {
+      // Synchroniser le modèle local si on n'est pas en train d'éditer
+      final newUser = UserModel.fromSupabase(userData);
+      if (_user == null || (!_isAnyFieldEditing() && _user!.updatedAt != newUser.updatedAt)) {
+        _user = newUser;
+        _initializeControllers();
+      }
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth > 900;
@@ -106,16 +119,25 @@ class _AutreDashboardState extends State<AutreDashboard> {
                 onPressed: _loadData,
                 tooltip: 'Actualiser',
               ),
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () => authProvider.logout(),
+                tooltip: 'Déconnexion',
+              ),
             ],
           ),
-          body: _buildBody(isDesktop),
+          body: _buildBody(isDesktop, authProvider.isLoading),
         );
       },
     );
   }
 
-  Widget _buildBody(bool isDesktop) {
-    if (_isLoading) {
+  bool _isAnyFieldEditing() {
+    return _editingFields.values.any((editing) => editing);
+  }
+
+  Widget _buildBody(bool isDesktop, bool isAuthLoading) {
+    if (_isLoading || isAuthLoading) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -94,13 +94,15 @@ class AuthProviderV2 with ChangeNotifier {
       _needsEmailConfirmation = result.needsEmailConfirmation;
       if (_needsEmailConfirmation) {
         _setState(AppAuthState.needsEmailConfirmation);
+      } else {
+        // Si pas de confirmation requise, on vérifie le statut (profil etc.)
+        await _checkUserStatus();
       }
     } else {
       _errorMessage = result.message;
       _setState(AppAuthState.error);
     }
 
-    notifyListeners();
     return result;
   }
 
@@ -134,7 +136,6 @@ class AuthProviderV2 with ChangeNotifier {
       _setState(AppAuthState.error);
     }
 
-    notifyListeners();
     return result;
   }
 
@@ -317,6 +318,90 @@ class AuthProviderV2 with ChangeNotifier {
   }
 
   String? get userRole => _userData?['role'];
+  Future<AuthResult> sendPasswordReset(String email) async {
+    _setState(AppAuthState.loading);
+    _errorMessage = null;
+
+    final result = await _authService.sendPasswordResetEmail(email);
+
+    if (!result.success) {
+      _errorMessage = result.message;
+      _setState(AppAuthState.error);
+    } else {
+      _setState(AppAuthState.unauthenticated);
+    }
+
+    notifyListeners();
+    return result;
+  }
+
+  Future<void> logout() async {
+    print('[AuthProviderV2] 🔄 Début de la déconnexion optimiste...');
+
+    // 1. Mise à jour IMMÉDIATE de l'état local pour débloquer l'UI
+    _currentUser = null;
+    _userData = null;
+    _needsEmailConfirmation = false;
+    _needsProfileCompletion = false;
+    _errorMessage = null;
+    
+    // On passe directement à unauthenticated au lieu de loading
+    _setState(AppAuthState.unauthenticated);
+    
+    print('[AuthProviderV2] 🏠 État local réinitialisé, UI devrait basculer');
+
+    // 2. Déconnexion serveur en arrière-plan
+    try {
+      // On ne 'await' pas obligatoirement ici pour ne pas bloquer l'UI
+      // mais on le fait pour s'assurer que la session est bien fermée côté Supabase
+      await _authService.signOut().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => print('[AuthProviderV2] ⚠️ Timeout signOut serveur (2s)'),
+      );
+      print('[AuthProviderV2] ✅ Déconnexion serveur réussie');
+    } catch (e) {
+      print('[AuthProviderV2] ❌ Erreur déconnexion serveur (non bloquant): $e');
+    }
+  }
+
+  // ============================================================================
+  // VÉRIFICATION MANUELLE DE LA CONFIRMATION EMAIL
+  // ============================================================================
+
+  Future<bool> checkEmailConfirmationStatus() async {
+    try {
+      print('[AuthProviderV2] 🔄 Vérification manuelle confirmation email...');
+
+      final refreshResponse =
+          await Supabase.instance.client.auth.refreshSession();
+
+      if (refreshResponse.session == null) {
+        print('[AuthProviderV2] ❌ Pas de session après refresh');
+        return false;
+      }
+
+      _currentUser = refreshResponse.session!.user;
+
+      final isConfirmed = _currentUser!.emailConfirmedAt != null;
+      print('[AuthProviderV2] Email confirmé: $isConfirmed');
+
+      if (isConfirmed) {
+        _needsEmailConfirmation = false;
+        await _checkUserStatus();
+        return true;
+      }
+
+      return false;
+    } catch (e, stackTrace) {
+      print('[AuthProviderV2] ❌ Erreur checkEmailConfirmationStatus: $e');
+      print(stackTrace);
+      return false;
+    }
+  }
+
+  // ============================================================================
+  // GESTION D'ÉTAT
+  // ============================================================================
 
   void _setState(AppAuthState newState) {
     _state = newState;

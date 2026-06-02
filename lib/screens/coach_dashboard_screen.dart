@@ -6,6 +6,7 @@ import '../models/course_model_complete.dart';
 import '../models/user_model.dart';
 import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
+import 'create_course_screen.dart';
 
 class CoachDashboard extends StatefulWidget {
   const CoachDashboard({super.key});
@@ -16,27 +17,45 @@ class CoachDashboard extends StatefulWidget {
 
 class _CoachDashboardState extends State<CoachDashboard> {
   int _selectedIndex = 0;
-  bool _isLoading = true;
-  UserModel? _user;
+  bool _isLoadingData = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialData());
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoadingData = true);
     final auth = context.read<AuthProviderV2>();
-    if (auth.userData != null) {
-      _user = UserModel.fromSupabase(auth.userData!);
+    final courseProvider = context.read<CourseProvider>();
+    if (auth.currentUser != null) {
+      await courseProvider.loadUserCourses(auth.currentUser!.id);
     }
-    setState(() => _isLoading = false);
+    setState(() => _isLoadingData = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ ÉCOUTE RÉACTIVE DU PROFIL
+    final auth = context.watch<AuthProviderV2>();
+    final userData = auth.userData;
+    final user = userData != null ? UserModel.fromSupabase(userData) : null;
+
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard Coach'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => auth.logout(),
+            tooltip: 'Déconnexion',
+          ),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         children: [
           Positioned.fill(
@@ -46,9 +65,9 @@ class _CoachDashboardState extends State<CoachDashboard> {
             ),
           ),
           SafeArea(
-            child: _isLoading
+            child: auth.isLoading || _isLoadingData
               ? const Center(child: CircularProgressIndicator())
-              : _buildContent(),
+              : _buildContent(user),
           ),
         ],
       ),
@@ -56,7 +75,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(UserModel? user) {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -67,7 +86,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Coach ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                Text('Coach ${user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const Text('Prêt pour la séance ?'),
               ],
             ),
@@ -110,21 +129,66 @@ class _CoachDashboardState extends State<CoachDashboard> {
   Widget _buildCourseList() {
     return Consumer<CourseProvider>(
       builder: (context, provider, _) {
-        if (provider.courses.isEmpty) return const Text('Aucun cours programmé');
+        final userCourses = provider.userCourses;
+        if (userCourses.isEmpty) return const Text('Aucun cours programmé');
         return Column(
-          children: provider.courses.map((course) => Padding(
+          children: userCourses.map((course) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: GlassCard(
               padding: const EdgeInsets.all(16),
               child: ListTile(
                 title: Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${course.category.name}'),
-                trailing: const Icon(Icons.chevron_right),
+                subtitle: Text(course.category.displayName),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => CreateCourseScreen(courseToEdit: course)),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      onPressed: () => _confirmDelete(context, course),
+                    ),
+                  ],
+                ),
               ),
             ),
           )).toList(),
         );
       },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, CourseModel course) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Supprimer le cours'),
+        content: Text('Voulez-vous vraiment supprimer "${course.title}" ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () async {
+              final success = await context.read<CourseProvider>().deleteCourse(course.id);
+              if (mounted) {
+                Navigator.pop(dialogContext);
+                if (!success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Erreur lors de la suppression')),
+                  );
+                }
+              }
+            },
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -139,7 +203,16 @@ class _CoachDashboardState extends State<CoachDashboard> {
           elevation: 0,
           backgroundColor: Colors.transparent,
           currentIndex: _selectedIndex,
-          onTap: (i) => setState(() => _selectedIndex = i),
+          onTap: (i) {
+            if (i == 1) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CreateCourseScreen()),
+              );
+            } else {
+              setState(() => _selectedIndex = i);
+            }
+          },
           selectedItemColor: colorScheme.primary,
           unselectedItemColor: colorScheme.onSurfaceVariant,
           items: const [
