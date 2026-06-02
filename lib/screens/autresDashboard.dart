@@ -126,7 +126,7 @@ class _AutreDashboardState extends State<AutreDashboard> {
               ),
             ],
           ),
-          body: _buildBody(isDesktop, authProvider.isLoading),
+          body: SafeArea(child: _buildBody(isDesktop, authProvider.isLoading)),
         );
       },
     );

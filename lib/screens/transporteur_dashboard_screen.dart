@@ -18,7 +18,7 @@ class TransporteurDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: const Center(child: Text('Bienvenue dans votre espace logistique')),
+      body: const SafeArea(child: Center(child: Text('Bienvenue dans votre espace logistique'))),
     );
   }
 }

@@ -18,7 +18,7 @@ class UserDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: const Center(child: Text('Explorez les services de Crèche')),
+      body: const SafeArea(child: Center(child: Text('Explorez les services de Crèche'))),
     );
   }
 }

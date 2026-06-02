@@ -219,6 +219,28 @@ class SupabaseChildService extends AdminSupabaseService {
     return response.map((data) => EnrollmentModel.fromSupabase(data)).toList();
   }
 
+  Future<List<EnrollmentModel>> getEnrollmentsForOwner(String ownerId) async {
+    // Récupérer d'abord les IDs des cours créés par cet utilisateur
+    final coursesResponse = await adminClient.from('courses').select('id').eq('created_by', ownerId);
+    final courseIds = (coursesResponse as List).map((c) => c['id'] as String).toList();
+    
+    if (courseIds.isEmpty) return [];
+    
+    // Récupérer les inscriptions pour ces cours
+    final response = await adminClient.from('enrollments').select().inFilter('course_id', courseIds);
+    return response.map((data) => EnrollmentModel.fromSupabase(data)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getOwnerEnrollmentsWithDetails(String ownerId) async {
+    try {
+      final response = await adminClient.rpc('get_owner_enrollments_with_details', params: {'owner_id': ownerId});
+      return List<Map<String, dynamic>>.from(response ?? []);
+    } catch (e) {
+      print('❌ Erreur getOwnerEnrollmentsWithDetails: $e');
+      return [];
+    }
+  }
+
   Future<String> createEnrollment(EnrollmentModel enrollment) async {
     // ✅ Inscription via Admin
     final response = await adminClient.from('enrollments').insert(enrollment.toSupabase()).select().single();

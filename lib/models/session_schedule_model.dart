@@ -13,6 +13,8 @@ class SessionSchedule {
   final int currentEnrollment;
   final int maxCapacity;
   final String? location;
+  final String? coachId;
+  final String? roomName;
   final Map<String, dynamic>? metadata;
 
   SessionSchedule({
@@ -28,6 +30,8 @@ class SessionSchedule {
     required this.currentEnrollment,
     required this.maxCapacity,
     this.location,
+    this.coachId,
+    this.roomName,
     this.metadata,
   });
 
@@ -63,6 +67,8 @@ class SessionSchedule {
       currentEnrollment: data['current_enrollment'] ?? 0,
       maxCapacity: data['max_capacity'] ?? 30,
       location: data['location'],
+      coachId: data['coach_id'],
+      roomName: data['room_name'],
       metadata: data['metadata'],
     );
   }
@@ -81,6 +87,8 @@ class SessionSchedule {
       'current_enrollment': currentEnrollment,
       'max_capacity': maxCapacity,
       'location': location,
+      'coach_id': coachId,
+      'room_name': roomName,
       'metadata': metadata,
     };
   }
@@ -98,6 +106,8 @@ class SessionSchedule {
     int? currentEnrollment,
     int? maxCapacity,
     String? location,
+    String? coachId,
+    String? roomName,
     Map<String, dynamic>? metadata,
   }) {
     return SessionSchedule(
@@ -113,6 +123,8 @@ class SessionSchedule {
       currentEnrollment: currentEnrollment ?? this.currentEnrollment,
       maxCapacity: maxCapacity ?? this.maxCapacity,
       location: location ?? this.location,
+      coachId: coachId ?? this.coachId,
+      roomName: roomName ?? this.roomName,
       metadata: metadata ?? this.metadata,
     );
   }

@@ -1,11 +1,11 @@
 import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../core/config/supabase_config.dart';
 
-/// 🔐 Service d'authentification utilisant Firebase Auth
+/// 🔐 Service d'authentification utilisant Firebase Auth et Supabase
 class AuthService {
   final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
   final supabase.SupabaseClient _supabase = supabase.Supabase.instance.client;
@@ -16,6 +16,10 @@ class AuthService {
   bool _initialized = false;
   bool _googleSignInAvailable = true;
 
+  // ✅ ID Client Web (IMPÉRATIF pour Windows/Desktop)
+  static const String _webClientId = '1074625929550-e7d40mt384j3cduc6202hujmbn22b7t6.apps.googleusercontent.com';
+
+  /// ✅ Instance de GoogleSignIn (Singleton v7.x)
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   AuthService() {
@@ -23,6 +27,39 @@ class AuthService {
       SupabaseConfig.url,
       SupabaseConfig.serviceRoleKey,
     );
+  }
+
+  /// ✅ Initialisation obligatoire pour google_sign_in v7.x
+  Future<void> init({
+    String? clientId,
+    String? serverClientId,
+  }) async {
+    if (_initialized) return;
+    
+    // Le package officiel ne supporte pas Windows. 
+    // On garde la logique de config au cas où une implémentation custom desktop est présente,
+    // mais on prévient les crashs potentiels.
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+      debugPrint('[AuthService] Google Sign-In non supporté nativement sur cette plateforme.');
+      _googleSignInAvailable = false;
+      _initialized = true;
+      return;
+    }
+
+    try {
+      debugPrint('[AuthService] Initialisation Google Sign-In...');
+
+      // Dans v7.2.0, initialize ne prend plus de paramètre 'scopes' direct
+      await _googleSignIn.initialize(
+        clientId: (clientId ?? (Platform.isWindows ? _webClientId : null)),
+        serverClientId: (serverClientId ?? (Platform.isWindows ? _webClientId : null)),
+      );
+      _initialized = true;
+      debugPrint('[AuthService] Google Sign-In initialisé.');
+    } catch (e) {
+      debugPrint('[AuthService] Error initializing GoogleSignIn: $e');
+      _googleSignInAvailable = false;
+    }
   }
 
   firebase_auth.User? get currentUser => _firebaseAuth.currentUser;
@@ -62,10 +99,9 @@ class AuthService {
       final user = credential.user!;
       await user.sendEmailVerification();
       
-      // ✅ Création via ADMIN (RLS Bypass)
+      // ✅ Création via ADMIN
       await ensureUserRowAdmin(user.uid, email, role: role);
 
-      // On prépare quand même le header pour les futurs appels standard
       _setAuthHeader(user.uid);
 
       return AuthResult.success(
@@ -83,59 +119,81 @@ class AuthService {
   /// 🛡️ Force la création/vérification de la ligne utilisateur via Service Role
   Future<void> ensureUserRowAdmin(String uid, String email, {String role = 'parent'}) async {
     debugPrint('[AuthService] ensureUserRowAdmin: id=$uid email=$email');
-    await _adminClient.from('users').upsert({
-      'id': uid,
-      'email': email,
-      'role': role,
-      'is_active': true,
-      'profile_completed': false,
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    });
+    try {
+      await _adminClient.from('users').upsert({
+        'id': uid,
+        'email': email,
+        'role': role,
+        'is_active': true,
+        'profile_completed': false,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('[AuthService] ensureUserRowAdmin error: $e');
+    }
   }
 
   Future<AuthResult> signInWithGoogle() async {
     if (!_googleSignInAvailable) {
-      return AuthResult.error('Google Sign-In n\'est pas disponible sur cette plateforme');
+      return AuthResult.error('Google Sign-In indisponible sur cette plateforme');
     }
-    try {
-      debugPrint('[AuthService] Starting Google Sign-In...');
-      
-      // 1. Déclencher le flux d'authentification
-      // Note: authenticate() est utilisé pour la compatibilité desktop dans v7.2.0
-      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-      
-      // 2. Récupérer l'authentification
-      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
+    
+    if (!_initialized) {
+      await init();
+    }
 
-      if (idToken == null) {
-        debugPrint('[AuthService] Error: Google ID Token is null');
-        return AuthResult.error('Échec de récupération de l\'ID Token Google');
+    try {
+      debugPrint('[AuthService] Début Google Sign-In (authenticate)...');
+      
+      // Dans v7.2.0, on utilise authenticate() à la place de signIn()
+      final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
+      
+      if (googleUser == null) {
+        return AuthResult.error('Connexion annulée par l\'utilisateur');
       }
 
-      // 3. Se connecter à Firebase
+      debugPrint('[AuthService] Récupération tokens...');
+      // googleUser.authentication est un Future dans v7.x
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      final String? idToken = googleAuth.idToken;
+      
+      // L'accessToken est désormais récupéré via authorizationClient dans v7.x
+      String? accessToken;
+      try {
+        final tokenData = await googleUser.authorizationClient.authorizeScopes(['email', 'openid', 'profile']);
+        accessToken = tokenData.accessToken;
+      } catch (e) {
+        debugPrint('[AuthService] Note: Erreur lors de la récupération de l\'accessToken: $e');
+      }
+
+      if (idToken == null) {
+        debugPrint('[AuthService] Erreur: idToken est null');
+        return AuthResult.error('Échec de récupération du jeton d\'identité Google');
+      }
+
+      debugPrint('[AuthService] Connexion Firebase avec ID Token...');
       final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
         idToken: idToken,
+        accessToken: accessToken,
       );
 
       final userCredential = await _firebaseAuth.signInWithCredential(credential);
       final user = userCredential.user;
 
-      if (user == null) {
-        debugPrint('[AuthService] Error: Firebase user is null after Google sign-in');
-        return AuthResult.error('Échec de la connexion Firebase avec Google');
-      }
+      if (user == null) return AuthResult.error('Échec de l\'authentification Firebase');
 
-      debugPrint('[AuthService] Firebase Google login success: ${user.email}');
+      debugPrint('[AuthService] Utilisateur connecté: ${user.uid}');
 
-      // 4. ✅ Synchronisation avec Supabase via ADMIN (Comme le signup)
+      // Synchronisation avec Supabase
       final userData = await getUserData(user.uid);
       if (userData == null) {
-         debugPrint('[AuthService] Google user not found in Supabase, creating via Admin');
+         debugPrint('[AuthService] Création du profil utilisateur dans Supabase...');
          await ensureUserRowAdmin(user.uid, user.email ?? '', role: 'parent');
       }
 
+      // Configuration du header RLS
       _setAuthHeader(user.uid);
 
       return AuthResult.success(
@@ -143,40 +201,53 @@ class AuthService {
         needsProfileCompletion: userData == null || !(userData['profile_completed'] ?? false),
       );
     } catch (e) {
-      debugPrint('[AuthService] CRITICAL Google Sign-In Error: $e');
-      if (e.toString().contains('canceled')) {
-        return AuthResult.error('Connexion annulée');
-      }
-      return AuthResult.error('Erreur Google: $e');
+      debugPrint('[AuthService] Google Error: $e');
+      return AuthResult.error('Erreur lors de la connexion Google: $e');
     }
   }
 
-  Future<void> init({
-    String? clientId,
-    String? serverClientId,
-  }) async {
-    if (_initialized) return;
+  /// 🔄 Tente une connexion silencieuse (au démarrage de l'app)
+  Future<firebase_auth.User?> signInSilently() async {
+    if (!_googleSignInAvailable) return _firebaseAuth.currentUser;
+    
+    if (!_initialized) {
+      await init();
+    }
+
     try {
-      // ✅ Configuration par défaut pour Windows si non fournie
-      final effectiveClientId = clientId ?? (Platform.isWindows 
-          ? '1074625929550-c00lqf0h458frddg0b504bqgdhao1j4k.apps.googleusercontent.com' 
-          : null);
-
-      await _googleSignIn.initialize(
-        clientId: effectiveClientId,
-        serverClientId: serverClientId,
-      );
+      debugPrint('[AuthService] Tentative de connexion silencieuse...');
+      // Dans v7.2.0, on utilise attemptLightweightAuthentication()
+      final GoogleSignInAccount? googleUser = await _googleSignIn.attemptLightweightAuthentication();
       
-      debugPrint('[AuthService] Google Sign-In initialized');
+      if (googleUser != null) {
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        
+        String? accessToken;
+        try {
+          final tokenData = await googleUser.authorizationClient.authorizeScopes(['email', 'openid', 'profile']);
+          accessToken = tokenData.accessToken;
+        } catch (_) {}
 
-      if (_firebaseAuth.currentUser != null) {
-        _setAuthHeader(_firebaseAuth.currentUser!.uid);
+        final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+          accessToken: accessToken,
+        );
+        final userCredential = await _firebaseAuth.signInWithCredential(credential);
+        final user = userCredential.user;
+        
+        if (user != null) {
+          debugPrint('[AuthService] Connexion silencieuse réussie.');
+          _setAuthHeader(user.uid);
+          return user;
+        }
       }
     } catch (e) {
-      debugPrint('[AuthService] Google Sign-In initialization failed: $e');
-      _googleSignInAvailable = false;
+      debugPrint('[AuthService] Silent Sign-In Error: $e');
     }
-    _initialized = true;
+    
+    final user = _firebaseAuth.currentUser;
+    if (user != null) _setAuthHeader(user.uid);
+    return user;
   }
 
   Future<AuthResult> login({
@@ -218,7 +289,6 @@ class AuthService {
     required Map<String, dynamic> profileData,
   }) async {
     try {
-      // ✅ Mise à jour via ADMIN
       await _adminClient.from('users').upsert({
         'id': userId,
         'email': email,
@@ -234,12 +304,15 @@ class AuthService {
     }
   }
 
-  /// 🛡️ Met à jour le profil silencieusement via Admin
   Future<void> updateUserProfileAdmin(String userId, Map<String, dynamic> data) async {
-    await _adminClient.from('users').update({
-      ...data,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', userId);
+    try {
+      await _adminClient.from('users').update({
+        ...data,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', userId);
+    } catch (e) {
+      debugPrint('[AuthService] updateUserProfileAdmin error: $e');
+    }
   }
 
   Future<Map<String, dynamic>?> getUserData(String userId) async {
@@ -251,14 +324,16 @@ class AuthService {
           .maybeSingle();
       return response;
     } catch (e) {
-      debugPrint('[AuthService] getUserData CRITICAL error: $e');
+      debugPrint('[AuthService] getUserData error: $e');
       return null;
     }
   }
 
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
-    if (_googleSignInAvailable) await _googleSignIn.signOut();
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
   }
 
   Future<AuthResult> sendPasswordResetEmail(String email) async {

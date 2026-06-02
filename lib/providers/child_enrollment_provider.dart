@@ -17,6 +17,7 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
   List<ChildModel> _children = [];
   List<EnrollmentModel> _enrollments = [];
+  List<Map<String, dynamic>> _ownerEnrollmentsDetailed = [];
   List<SessionSchedule> _schedules = [];
   List<DailyActivity> _dailyActivities = [];
 
@@ -25,6 +26,7 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
   List<ChildModel> get children => _children;
   List<EnrollmentModel> get enrollments => _enrollments;
+  List<Map<String, dynamic>> get ownerEnrollmentsDetailed => _ownerEnrollmentsDetailed;
   List<SessionSchedule> get schedules => _schedules;
   List<DailyActivity> get dailyActivities => _dailyActivities;
 
@@ -52,7 +54,38 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     return _dailyActivities.where((a) => a.childId == childId).toList();
   }
 
-  // === CHARGEMENT DES ENFANTS ===
+  // === ✅ CHARGEMENT DES INSCRIPTIONS POUR UN PROPRIÉTAIRE (ÉCOLE/COACH) ===
+  Future<void> loadEnrollmentsForOwner(String ownerId) async {
+    if (ownerId.isEmpty) return;
+    try {
+      _setLoading(true);
+      _clearError();
+      _enrollments = await _supabaseChildService.getEnrollmentsForOwner(ownerId);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      print('❌ Erreur loadEnrollmentsForOwner: $e');
+      _setError('Impossible de charger les inscriptions');
+      _setLoading(false);
+    }
+  }
+
+  Future<void> loadOwnerEnrollmentsDetailed(String ownerId) async {
+    if (ownerId.isEmpty) return;
+    try {
+      _setLoading(true);
+      _clearError();
+      _ownerEnrollmentsDetailed = await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      print('❌ Erreur loadOwnerEnrollmentsDetailed: $e');
+      _setError('Impossible de charger les détails des inscriptions');
+      _setLoading(false);
+    }
+  }
+
+  // === ✅ CHARGEMENT DES ENFANTS ===
   Future<void> loadChildren(String parentId) async {
     if (parentId.isEmpty) {
       _children = [];
@@ -370,6 +403,14 @@ class ChildEnrollmentProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     }
+  }
+
+  /// ✅ Annuler une inscription par le parent
+  Future<bool> cancelEnrollment(String enrollmentId) async {
+    return updateEnrollment(
+      enrollmentId: enrollmentId,
+      status: EnrollmentStatus.cancelled,
+    );
   }
 
   // === ✅ CHARGEMENT DES HORAIRES ===

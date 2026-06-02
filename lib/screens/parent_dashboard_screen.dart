@@ -770,13 +770,29 @@ class _ChildProfileDialog extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 8),
                                           Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Icon(Icons.calendar_today, size: 14, color: colorScheme.onSurfaceVariant),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Inscrit le ${_formatDate(enrollment.enrolledAt)}',
-                                                style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.calendar_today, size: 14, color: colorScheme.onSurfaceVariant),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'Inscrit le ${_formatDate(enrollment.enrolledAt)}',
+                                                    style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                                                  ),
+                                                ],
                                               ),
+                                              if (enrollment.status == EnrollmentStatus.pending || enrollment.status == EnrollmentStatus.approved)
+                                                TextButton(
+                                                  onPressed: () => _confirmCancelEnrollment(context, enrollment.id, course.title),
+                                                  style: TextButton.styleFrom(
+                                                    foregroundColor: Colors.red,
+                                                    padding: EdgeInsets.zero,
+                                                    minimumSize: const Size(0, 30),
+                                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  ),
+                                                  child: const Text('Annuler', style: TextStyle(fontSize: 12)),
+                                                ),
                                             ],
                                           ),
                                         ],
@@ -798,6 +814,33 @@ class _ChildProfileDialog extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  void _confirmCancelEnrollment(BuildContext context, String enrollmentId, String courseTitle) {
+    showDialog(
+      context: context,
+      builder: (confirmContext) => AlertDialog(
+        title: const Text('Annuler l\'inscription'),
+        content: Text('Voulez-vous vraiment annuler l\'inscription au cours "$courseTitle" ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(confirmContext), child: const Text('Non')),
+          TextButton(
+            onPressed: () async {
+              final success = await context.read<ChildEnrollmentProvider>().cancelEnrollment(enrollmentId);
+              if (confirmContext.mounted) {
+                Navigator.pop(confirmContext);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Inscription annulée avec succès')),
+                  );
+                }
+              }
+            },
+            child: const Text('Oui, annuler', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -892,17 +935,34 @@ class _CoursesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<CourseProvider>(
-      builder: (context, provider, _) {
+    return Consumer2<CourseProvider, ChildEnrollmentProvider>(
+      builder: (context, courseProvider, childProvider, _) {
+        final courses = courseProvider.courses;
+        final children = childProvider.children;
+
         return GridView.builder(
           padding: const EdgeInsets.all(24),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.8
+            crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.75
           ),
-          itemCount: provider.courses.length,
-          itemBuilder: (context, i) => CourseCard(course: provider.courses[i], onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(course: provider.courses[i])));
-          }),
+          itemCount: courses.length,
+          itemBuilder: (context, i) {
+            final course = courses[i];
+            
+            // Trouver quels enfants du parent sont inscrits à ce cours
+            final enrolledChildrenNames = children
+                .where((child) => childProvider.isChildEnrolledInCourse(child.id, course.id))
+                .map((child) => child.firstName)
+                .toList();
+
+            return CourseCard(
+              course: course,
+              enrolledChildren: enrolledChildrenNames,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(course: course)));
+              },
+            );
+          },
         );
       },
     );

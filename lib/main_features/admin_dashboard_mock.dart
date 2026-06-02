@@ -24,7 +24,7 @@ class AdminDashboard extends StatelessWidget {
           crossAxisSpacing: 20,
           children: [
             _buildAdminCard(context, 'Présences', Icons.people, AppColors.adminPrimary, '12 enfants'),
-            _buildAdminCard(context, 'Factures', Icons.euro, AppColors.softGreen, '4 impayées'),
+            _buildAdminCard(context, 'Factures', Icons.payments, AppColors.softGreen, '4 impayées'),
             _buildAdminCard(context, 'Menus', Icons.restaurant, AppColors.softOrange, 'Semaine 22'),
             _buildAdminCard(context, 'Personnel', Icons.badge, AppColors.adminSecondary, '8 actifs'),
             _buildAdminCard(context, 'Histoires', Icons.auto_stories, AppColors.softPurple, 'Bibliothèque'),

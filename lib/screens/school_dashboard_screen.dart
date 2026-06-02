@@ -1,10 +1,14 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider_v2.dart';
 import '../models/course_model_complete.dart';
 import '../models/user_model.dart';
+import '../models/enrollment_model_complete.dart';
+import '../models/child_model_complete.dart';
 import '../providers/course_provider_complete.dart';
+import '../providers/child_enrollment_provider.dart';
 import '../widgets/glass_card.dart';
 import 'create_course_screen.dart';
 
@@ -30,28 +34,38 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
     setState(() => _isLoadingData = true);
     final auth = context.read<AuthProviderV2>();
     final courseProvider = context.read<CourseProvider>();
+    final childProvider = context.read<ChildEnrollmentProvider>();
+
     if (auth.userData != null) {
       _user = UserModel.fromSupabase(auth.userData!);
     }
     if (auth.currentUser != null) {
-      await courseProvider.loadUserCourses(auth.currentUser!.uid);
+      await Future.wait([
+        courseProvider.loadUserCourses(auth.currentUser!.uid),
+        childProvider.loadOwnerEnrollmentsDetailed(auth.currentUser!.uid),
+      ]);
     }
     setState(() => _isLoadingData = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ ÉCOUTE RÉACTIVE DU PROFIL
     final auth = context.watch<AuthProviderV2>();
-    final userData = auth.userData;
-    final user = userData != null ? UserModel.fromSupabase(userData) : null;
+    final childProvider = context.watch<ChildEnrollmentProvider>();
+    
+    final isGlobalLoading = auth.isLoading || _isLoadingData || childProvider.isLoading;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard École'),
+        title: Text(_selectedIndex == 0 ? 'Dashboard École' : _selectedIndex == 1 ? 'Gestion des Élèves' : _selectedIndex == 2 ? 'Planning & Horaires' : 'Paramètres'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadInitialData,
+            tooltip: 'Actualiser',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => auth.logout(),
@@ -68,15 +82,18 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
               fit: BoxFit.cover,
             ),
           ),
+          Positioned.fill(
+            child: Container(color: Colors.white.withValues(alpha: 0.1)),
+          ),
           SafeArea(
-            child: auth.isLoading || _isLoadingData
+            child: isGlobalLoading && _selectedIndex != 1 // Don't show full screen loader on tab 1 if already loaded once
               ? const Center(child: CircularProgressIndicator())
-              : _buildContent(user),
+              : _getSelectedPage(),
           ),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,
@@ -85,11 +102,21 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
         },
         backgroundColor: Theme.of(context).colorScheme.primary,
         child: const Icon(Icons.add, color: Colors.white),
-      ),
+      ) : null,
     );
   }
 
-  Widget _buildContent(UserModel? user) {
+  Widget _getSelectedPage() {
+    switch (_selectedIndex) {
+      case 0: return _buildDashboard();
+      case 1: return const _EnrollmentsPage();
+      case 2: return const _PlanningManagementPage();
+      case 3: return _buildSettings();
+      default: return _buildDashboard();
+    }
+  }
+
+  Widget _buildDashboard() {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -100,7 +127,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('École ${user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                Text('École ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const Text('Gestion de l\'établissement'),
               ],
             ),
@@ -112,16 +139,23 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
         const Text('Vos cours et activités', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         _buildCourseGrid(),
+        const SizedBox(height: 100),
       ],
     );
   }
 
   Widget _buildStats() {
+    final childProvider = context.read<ChildEnrollmentProvider>();
+    final activeStudents = childProvider.ownerEnrollmentsDetailed
+        .where((e) => e['enrollment']['status'] == 'approved').length;
+    final pendingEnrollments = childProvider.ownerEnrollmentsDetailed
+        .where((e) => e['enrollment']['status'] == 'pending').length;
+
     return Row(
       children: [
-        Expanded(child: _buildStatItem('Élèves', '120', Icons.group_rounded, Colors.teal)),
+        Expanded(child: _buildStatItem('Élèves Actifs', '$activeStudents', Icons.group_rounded, Colors.teal)),
         const SizedBox(width: 16),
-        Expanded(child: _buildStatItem('Profs', '8', Icons.person_search_rounded, Colors.indigo)),
+        Expanded(child: _buildStatItem('En Attente', '$pendingEnrollments', Icons.pending_actions_rounded, Colors.orange)),
       ],
     );
   }
@@ -167,6 +201,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
                       Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 4),
                       Text(course.category.displayName, style: const TextStyle(fontSize: 10)),
+                      Text('${course.currentStudents}/${course.maxStudents} élèves', style: const TextStyle(fontSize: 9, color: Colors.black54)),
                     ],
                   ),
                   Positioned(
@@ -226,8 +261,43 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
     );
   }
 
+  Widget _buildSettings() {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        GlassCard(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Profil de l\'école'),
+                onTap: () {},
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.notifications_none),
+                title: const Text('Notifications'),
+                onTap: () {},
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.lock_outline),
+                title: const Text('Sécurité'),
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBottomNav() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final childProvider = context.watch<ChildEnrollmentProvider>();
+    final pendingCount = childProvider.ownerEnrollmentsDetailed
+        .where((e) => e['enrollment']['status'] == 'pending').length;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: GlassCard(
@@ -238,15 +308,243 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
           backgroundColor: Colors.transparent,
           currentIndex: _selectedIndex,
           onTap: (i) => setState(() => _selectedIndex = i),
-          selectedItemColor: colorScheme.primary,
-          unselectedItemColor: colorScheme.onSurfaceVariant,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Gérer'),
-            BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Élèves'),
-            BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), label: 'Paramètres'),
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          type: BottomNavigationBarType.fixed,
+          items: [
+            const BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Gérer'),
+            BottomNavigationBarItem(
+              icon: Badge(
+                label: Text('$pendingCount'),
+                isLabelVisible: pendingCount > 0,
+                child: const Icon(Icons.people_alt_rounded),
+              ), 
+              label: 'Élèves',
+            ),
+            const BottomNavigationBarItem(icon: Icon(Icons.calendar_month_rounded), label: 'Planning'),
+            const BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), label: 'Paramètres'),
           ],
         ),
       ),
     );
+  }
+}
+
+class _PlanningManagementPage extends StatefulWidget {
+  const _PlanningManagementPage();
+
+  @override
+  State<_PlanningManagementPage> createState() => _PlanningManagementPageState();
+}
+
+class _PlanningManagementPageState extends State<_PlanningManagementPage> {
+  @override
+  Widget build(BuildContext context) {
+    final childProvider = context.watch<ChildEnrollmentProvider>();
+    final schedules = childProvider.schedules;
+    final courses = context.read<CourseProvider>().userCourses;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Planning & Horaires', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: () => _showAddScheduleDialog(context, courses),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (schedules.isEmpty)
+          const Center(child: Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: Text('Aucun créneau planifié.'),
+          ))
+        else
+          ...schedules.map((schedule) {
+            final course = courses.firstWhere((c) => c.id == schedule.courseId, orElse: () => CourseModel.mock());
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GlassCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(schedule.dayOfWeek.displayName, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(schedule.timeSlot.displayTime),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.meeting_room_outlined, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(schedule.roomName ?? 'Salle non définie'),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(schedule.coachId != null ? 'Coach assigné' : 'Pas de coach assigné'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fonctionnalité d''ajout d''horaire bientôt disponible')));
+  }
+}
+
+class _EnrollmentsPage extends StatelessWidget {
+  const _EnrollmentsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final childProvider = context.watch<ChildEnrollmentProvider>();
+    final enrollments = childProvider.ownerEnrollmentsDetailed;
+
+    if (enrollments.isEmpty) {
+      return const Center(child: Text('Aucune inscription pour le moment.'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+      itemCount: enrollments.length,
+      itemBuilder: (context, index) {
+        final item = enrollments[index];
+        final enrollmentJson = item['enrollment'] as Map<String, dynamic>;
+        final childJson = item['child'] as Map<String, dynamic>;
+        final courseJson = item['course'] as Map<String, dynamic>;
+
+        final enrollment = EnrollmentModel.fromSupabase(enrollmentJson);
+        final child = ChildModel.fromSupabase(childJson);
+        final course = CourseModel.fromSupabase(courseJson);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
+                      child: child.photoUrl == null ? Text(child.firstName[0]) : null,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(child.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text('S\'inscrit à : ${course.title}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary)),
+                        ],
+                      ),
+                    ),
+                    _buildStatusBadge(enrollment.status),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Inscrit le ${_formatDate(enrollment.enrolledAt)}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                    if (enrollment.status == EnrollmentStatus.pending)
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.check_circle, color: Colors.green),
+                            onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.approved),
+                            tooltip: 'Approuver',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.cancel, color: Colors.red),
+                            onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.rejected),
+                            tooltip: 'Refuser',
+                          ),
+                        ],
+                      )
+                    else if (enrollment.status == EnrollmentStatus.approved)
+                       TextButton.icon(
+                        onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.cancelled),
+                        icon: const Icon(Icons.remove_circle_outline, size: 16, color: Colors.grey),
+                        label: const Text('Annuler', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _updateStatus(BuildContext context, String enrollmentId, EnrollmentStatus status) async {
+    final provider = context.read<ChildEnrollmentProvider>();
+    final success = await provider.updateEnrollment(enrollmentId: enrollmentId, status: status);
+    
+    if (success && context.mounted) {
+      // Recharger aussi les cours pour mettre à jour current_students (même si le trigger s'en occupe en base)
+      final auth = context.read<AuthProviderV2>();
+      context.read<CourseProvider>().loadUserCourses(auth.currentUser!.uid);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Statut mis à jour : ${status.displayName}')),
+      );
+    }
+  }
+
+  Widget _buildStatusBadge(EnrollmentStatus status) {
+    Color color;
+    switch (status) {
+      case EnrollmentStatus.approved: color = Colors.green; break;
+      case EnrollmentStatus.pending: color = Colors.orange; break;
+      case EnrollmentStatus.rejected: color = Colors.red; break;
+      case EnrollmentStatus.cancelled: color = Colors.grey; break;
+      case EnrollmentStatus.completed: color = Colors.blue; break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        status.displayName,
+        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

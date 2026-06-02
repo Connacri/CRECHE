@@ -502,7 +502,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
             ? 'Créer un cours'
             : 'Modifier le cours'),
       ),
-      body: _buildForm(),
+      body: SafeArea(child: _buildForm()),
     );
   }
 
@@ -614,7 +614,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Prix (optionnel)',
                   prefixIcon: Icon(Icons.attach_money),
-                  suffixText: 'DZD',
+                  suffixText: 'DA',
                 ),
                 keyboardType: TextInputType.number,
               ),

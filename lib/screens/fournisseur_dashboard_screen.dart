@@ -18,7 +18,7 @@ class FournisseurDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: const Center(child: Text('Bienvenue dans votre espace approvisionnement')),
+      body: const SafeArea(child: Center(child: Text('Bienvenue dans votre espace approvisionnement'))),
     );
   }
 }
