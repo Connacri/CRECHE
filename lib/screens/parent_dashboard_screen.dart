@@ -1047,7 +1047,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
         lastName: _lastNameController.text,
         dateOfBirth: _dateOfBirth!,
         gender: _gender,
-        photo: _photo,
+        photoFile: _photo,
         schoolGrade: _schoolGradeController.text,
       );
     } else {
