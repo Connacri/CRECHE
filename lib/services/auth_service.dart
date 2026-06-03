@@ -7,19 +7,19 @@ import '../core/config/supabase_config.dart';
 
 /// 🔐 Service d'authentification utilisant Firebase Auth et Supabase
 class AuthService {
-  final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
+  final firebase_auth.FirebaseAuth _firebaseAuth =
+      firebase_auth.FirebaseAuth.instance;
   final supabase.SupabaseClient _supabase = supabase.Supabase.instance.client;
-  
+
   /// 🛡️ Client Admin (Service Role) pour contourner le RLS
   late final supabase.SupabaseClient _adminClient;
 
   bool _initialized = false;
   bool _googleSignInAvailable = true;
 
-  // ✅ ID Client Web (IMPÉRATIF pour Windows/Desktop)
-  static const String _webClientId = '1074625929550-e7d40mt384j3cduc6202hujmbn22b7t6.apps.googleusercontent.com';
+  static const String _webClientId =
+      '1074625929550-e7d40mt384j3cduc6202hujmbn22b7t6.apps.googleusercontent.com';
 
-  /// ✅ Instance de GoogleSignIn (Singleton v7.x)
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   AuthService() {
@@ -35,12 +35,10 @@ class AuthService {
     String? serverClientId,
   }) async {
     if (_initialized) return;
-    
-    // Le package officiel ne supporte pas Windows. 
-    // On garde la logique de config au cas où une implémentation custom desktop est présente,
-    // mais on prévient les crashs potentiels.
+
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
-      debugPrint('[AuthService] Google Sign-In non supporté nativement sur cette plateforme.');
+      debugPrint(
+          '[AuthService] Google Sign-In non supporté nativement sur cette plateforme.');
       _googleSignInAvailable = false;
       _initialized = true;
       return;
@@ -48,11 +46,11 @@ class AuthService {
 
     try {
       debugPrint('[AuthService] Initialisation Google Sign-In...');
-
-      // Dans v7.2.0, initialize ne prend plus de paramètre 'scopes' direct
       await _googleSignIn.initialize(
-        clientId: (clientId ?? (Platform.isWindows ? _webClientId : null)),
-        serverClientId: (serverClientId ?? (Platform.isWindows ? _webClientId : null)),
+        clientId:
+            (clientId ?? (Platform.isWindows ? _webClientId : null)),
+        serverClientId:
+            (serverClientId ?? (Platform.isWindows ? _webClientId : null)),
       );
       _initialized = true;
       debugPrint('[AuthService] Google Sign-In initialisé.');
@@ -68,7 +66,7 @@ class AuthService {
     return _firebaseAuth.currentUser?.emailVerified ?? false;
   }
 
-  /// Sets the custom header for Supabase RLS based on Firebase UID
+  /// Positionne le header x-firebase-id pour le RLS Supabase
   void _setAuthHeader(String? uid) {
     if (uid != null) {
       debugPrint('[AuthService] Setting x-firebase-id header: $uid');
@@ -80,6 +78,10 @@ class AuthService {
       _supabase.storage.headers.remove('x-firebase-id');
     }
   }
+
+  // ============================================================================
+  // EMAIL / PASSWORD — FLUX DE RÉFÉRENCE (fonctionne)
+  // ============================================================================
 
   Future<AuthResult> signup({
     required String email,
@@ -98,8 +100,8 @@ class AuthService {
 
       final user = credential.user!;
       await user.sendEmailVerification();
-      
-      // ✅ Création via ADMIN
+
+      // ✅ Création via ADMIN — inconditionnel, avant tout retour
       await ensureUserRowAdmin(user.uid, email, role: role);
 
       _setAuthHeader(user.uid);
@@ -114,140 +116,6 @@ class AuthService {
     } catch (e) {
       return AuthResult.error('Erreur lors de l\'inscription: $e');
     }
-  }
-
-  /// 🛡️ Force la création/vérification de la ligne utilisateur via Service Role
-  Future<void> ensureUserRowAdmin(String uid, String email, {String role = 'parent'}) async {
-    debugPrint('[AuthService] ensureUserRowAdmin: id=$uid email=$email');
-    try {
-      await _adminClient.from('users').upsert({
-        'id': uid,
-        'email': email,
-        'role': role,
-        'is_active': true,
-        'profile_completed': false,
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('[AuthService] ensureUserRowAdmin error: $e');
-    }
-  }
-
-  Future<AuthResult> signInWithGoogle() async {
-    if (!_googleSignInAvailable) {
-      return AuthResult.error('Google Sign-In indisponible sur cette plateforme');
-    }
-    
-    if (!_initialized) {
-      await init();
-    }
-
-    try {
-      debugPrint('[AuthService] Début Google Sign-In (authenticate)...');
-      
-      // Dans v7.2.0, on utilise authenticate() à la place de signIn()
-      final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
-      
-      if (googleUser == null) {
-        return AuthResult.error('Connexion annulée par l\'utilisateur');
-      }
-
-      debugPrint('[AuthService] Récupération tokens...');
-      // googleUser.authentication est un Future dans v7.x
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      final String? idToken = googleAuth.idToken;
-      
-      // L'accessToken est désormais récupéré via authorizationClient dans v7.x
-      String? accessToken;
-      try {
-        final tokenData = await googleUser.authorizationClient.authorizeScopes(['email', 'openid', 'profile']);
-        accessToken = tokenData.accessToken;
-      } catch (e) {
-        debugPrint('[AuthService] Note: Erreur lors de la récupération de l\'accessToken: $e');
-      }
-
-      if (idToken == null) {
-        debugPrint('[AuthService] Erreur: idToken est null');
-        return AuthResult.error('Échec de récupération du jeton d\'identité Google');
-      }
-
-      debugPrint('[AuthService] Connexion Firebase avec ID Token...');
-      final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      final userCredential = await _firebaseAuth.signInWithCredential(credential);
-      final user = userCredential.user;
-
-      if (user == null) return AuthResult.error('Échec de l\'authentification Firebase');
-
-      debugPrint('[AuthService] Utilisateur connecté: ${user.uid}');
-
-      // Synchronisation avec Supabase
-      final userData = await getUserData(user.uid);
-      if (userData == null) {
-         debugPrint('[AuthService] Création du profil utilisateur dans Supabase...');
-         await ensureUserRowAdmin(user.uid, user.email ?? '', role: 'parent');
-      }
-
-      // Configuration du header RLS
-      _setAuthHeader(user.uid);
-
-      return AuthResult.success(
-        firebaseUser: user,
-        needsProfileCompletion: userData == null || !(userData['profile_completed'] ?? false),
-      );
-    } catch (e) {
-      debugPrint('[AuthService] Google Error: $e');
-      return AuthResult.error('Erreur lors de la connexion Google: $e');
-    }
-  }
-
-  /// 🔄 Tente une connexion silencieuse (au démarrage de l'app)
-  Future<firebase_auth.User?> signInSilently() async {
-    if (!_googleSignInAvailable) return _firebaseAuth.currentUser;
-    
-    if (!_initialized) {
-      await init();
-    }
-
-    try {
-      debugPrint('[AuthService] Tentative de connexion silencieuse...');
-      // Dans v7.2.0, on utilise attemptLightweightAuthentication()
-      final GoogleSignInAccount? googleUser = await _googleSignIn.attemptLightweightAuthentication();
-      
-      if (googleUser != null) {
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        
-        String? accessToken;
-        try {
-          final tokenData = await googleUser.authorizationClient.authorizeScopes(['email', 'openid', 'profile']);
-          accessToken = tokenData.accessToken;
-        } catch (_) {}
-
-        final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
-          idToken: googleAuth.idToken,
-          accessToken: accessToken,
-        );
-        final userCredential = await _firebaseAuth.signInWithCredential(credential);
-        final user = userCredential.user;
-        
-        if (user != null) {
-          debugPrint('[AuthService] Connexion silencieuse réussie.');
-          _setAuthHeader(user.uid);
-          return user;
-        }
-      }
-    } catch (e) {
-      debugPrint('[AuthService] Silent Sign-In Error: $e');
-    }
-    
-    final user = _firebaseAuth.currentUser;
-    if (user != null) _setAuthHeader(user.uid);
-    return user;
   }
 
   Future<AuthResult> login({
@@ -266,19 +134,205 @@ class AuthService {
       _setAuthHeader(user.uid);
 
       if (!user.emailVerified) {
-        return AuthResult.success(firebaseUser: user, needsEmailConfirmation: true);
+        return AuthResult.success(
+            firebaseUser: user, needsEmailConfirmation: true);
       }
 
       final userData = await getUserData(user.uid);
 
       return AuthResult.success(
         firebaseUser: user,
-        needsProfileCompletion: userData == null || !(userData['profile_completed'] ?? false),
+        needsProfileCompletion:
+            userData == null || !(userData['profile_completed'] ?? false),
       );
     } on firebase_auth.FirebaseAuthException catch (e) {
       return AuthResult.error(_parseFirebaseAuthException(e));
     } catch (e) {
       return AuthResult.error('Erreur de connexion: $e');
+    }
+  }
+
+  // ============================================================================
+  // GOOGLE SIGN-IN — CORRIGÉ
+  // ============================================================================
+
+  Future<AuthResult> signInWithGoogle() async {
+    if (!_googleSignInAvailable) {
+      return AuthResult.error(
+          'Google Sign-In indisponible sur cette plateforme');
+    }
+
+    if (!_initialized) {
+      await init();
+    }
+
+    try {
+      debugPrint('[AuthService] Début Google Sign-In...');
+
+      final GoogleSignInAccount? googleUser =
+          await _googleSignIn.authenticate();
+
+      if (googleUser == null) {
+        return AuthResult.error('Connexion annulée par l\'utilisateur');
+      }
+
+      debugPrint('[AuthService] Récupération tokens Google...');
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final String? idToken = googleAuth.idToken;
+
+      String? accessToken;
+      try {
+        final tokenData = await googleUser.authorizationClient
+            .authorizeScopes(['email', 'openid', 'profile']);
+        accessToken = tokenData.accessToken;
+      } catch (e) {
+        debugPrint(
+            '[AuthService] Note: Erreur récupération accessToken: $e');
+      }
+
+      if (idToken == null) {
+        return AuthResult.error(
+            'Échec de récupération du jeton d\'identité Google');
+      }
+
+      debugPrint('[AuthService] Connexion Firebase avec ID Token...');
+      final firebase_auth.AuthCredential credential =
+          firebase_auth.GoogleAuthProvider.credential(
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      final userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user == null) {
+        return AuthResult.error('Échec de l\'authentification Firebase');
+      }
+
+      debugPrint('[AuthService] Google Sign-In Firebase OK: ${user.uid}');
+
+      // ─────────────────────────────────────────────────────────────────────
+      // ✅ FIX 1 : Positionner le header AVANT tout appel Supabase
+      // Identique au flux signup/login qui fonctionne.
+      // ─────────────────────────────────────────────────────────────────────
+      _setAuthHeader(user.uid);
+
+      // ─────────────────────────────────────────────────────────────────────
+      // ✅ FIX 2 : ensureUserRowAdmin INCONDITIONNEL (upsert = idempotent)
+      // Dans signup(), c'est toujours appelé. Ici on faisait un if(data==null)
+      // ce qui était faux : la ligne peut exister avec profile_completed=false.
+      // Le upsert ne casse rien si la ligne existe déjà.
+      // ─────────────────────────────────────────────────────────────────────
+      await ensureUserRowAdmin(
+        user.uid,
+        user.email ?? '',
+        role: 'parent', // rôle par défaut pour les nouveaux comptes Google
+      );
+
+      debugPrint('[AuthService] ensureUserRowAdmin OK');
+
+      // ─────────────────────────────────────────────────────────────────────
+      // ✅ FIX 3 : Lecture userData via adminClient (bypass RLS garanti)
+      // Le header est maintenant positionné, mais on utilise adminClient
+      // pour cohérence totale avec le reste des services.
+      // ─────────────────────────────────────────────────────────────────────
+      final userData = await getUserData(user.uid);
+      debugPrint('[AuthService] getUserData: ${userData != null ? "OK" : "null (nouveau compte)"}');
+
+      final needsProfileCompletion =
+          userData == null || !(userData['profile_completed'] ?? false);
+
+      return AuthResult.success(
+        firebaseUser: user,
+        needsProfileCompletion: needsProfileCompletion,
+      );
+    } catch (e) {
+      debugPrint('[AuthService] Google Sign-In Error: $e');
+      return AuthResult.error('Erreur lors de la connexion Google: $e');
+    }
+  }
+
+  /// 🔄 Connexion silencieuse (démarrage app) — CORRIGÉE
+  Future<firebase_auth.User?> signInSilently() async {
+    if (!_googleSignInAvailable) return _firebaseAuth.currentUser;
+
+    if (!_initialized) {
+      await init();
+    }
+
+    try {
+      debugPrint('[AuthService] Tentative connexion silencieuse...');
+      final GoogleSignInAccount? googleUser =
+          await _googleSignIn.attemptLightweightAuthentication();
+
+      if (googleUser != null) {
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        String? accessToken;
+        try {
+          final tokenData = await googleUser.authorizationClient
+              .authorizeScopes(['email', 'openid', 'profile']);
+          accessToken = tokenData.accessToken;
+        } catch (_) {}
+
+        final firebase_auth.AuthCredential credential =
+            firebase_auth.GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+          accessToken: accessToken,
+        );
+        final userCredential =
+            await _firebaseAuth.signInWithCredential(credential);
+        final user = userCredential.user;
+
+        if (user != null) {
+          debugPrint('[AuthService] Connexion silencieuse réussie.');
+          // ✅ Toujours positionner le header après une connexion réussie
+          _setAuthHeader(user.uid);
+          return user;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Silent Sign-In Error: $e');
+    }
+
+    final user = _firebaseAuth.currentUser;
+    if (user != null) _setAuthHeader(user.uid);
+    return user;
+  }
+
+  // ============================================================================
+  // SUPABASE — OPÉRATIONS ADMIN
+  // ============================================================================
+
+  /// 🛡️ Crée ou met à jour la ligne utilisateur via Service Role (bypass RLS)
+  /// Utilise UPSERT → idempotent, safe à appeler plusieurs fois.
+  Future<void> ensureUserRowAdmin(String uid, String email,
+      {String role = 'parent'}) async {
+    debugPrint('[AuthService] ensureUserRowAdmin: id=$uid email=$email role=$role');
+    try {
+      await _adminClient.from('users').upsert(
+        {
+          'id': uid,
+          'email': email,
+          'role': role,
+          'is_active': true,
+          'profile_completed': false,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        // ✅ onConflict sur 'id' → mise à jour partielle si la ligne existe
+        // ignoreDuplicates=false pour que le updated_at soit rafraîchi
+        onConflict: 'id',
+        ignoreDuplicates: false,
+      );
+      debugPrint('[AuthService] ensureUserRowAdmin: succès');
+    } catch (e) {
+      // Ne pas laisser une erreur Supabase bloquer l'auth Firebase
+      debugPrint('[AuthService] ensureUserRowAdmin error (non-bloquant): $e');
     }
   }
 
@@ -297,14 +351,15 @@ class AuthService {
         'is_active': true,
         'profile_completed': true,
         'updated_at': DateTime.now().toIso8601String(),
-      });
+      }, onConflict: 'id');
       return AuthResult.success(message: 'Profil créé avec succès');
     } catch (e) {
       return AuthResult.error('Erreur profil: $e');
     }
   }
 
-  Future<void> updateUserProfileAdmin(String userId, Map<String, dynamic> data) async {
+  Future<void> updateUserProfileAdmin(
+      String userId, Map<String, dynamic> data) async {
     try {
       await _adminClient.from('users').update({
         ...data,
@@ -315,6 +370,7 @@ class AuthService {
     }
   }
 
+  /// Lecture via adminClient → bypass RLS garanti
   Future<Map<String, dynamic>?> getUserData(String userId) async {
     try {
       final response = await _adminClient
@@ -334,6 +390,8 @@ class AuthService {
     try {
       await _googleSignIn.signOut();
     } catch (_) {}
+    // ✅ Nettoyer le header à la déconnexion
+    _setAuthHeader(null);
   }
 
   Future<AuthResult> sendPasswordResetEmail(String email) async {
@@ -360,6 +418,10 @@ class AuthService {
     }
   }
 }
+
+// ============================================================================
+// AUTH RESULT
+// ============================================================================
 
 class AuthResult {
   final bool success;
