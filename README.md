@@ -139,23 +139,32 @@
 | 👤 | **Utilisateur** | Accès visiteur ou profil en attente d'attribution de rôle. |
 | 💠 | **Autres** | Personnel de maintenance, psychologues ou intervenants extérieurs. |
 
-### 🛠 Guide d'utilisation : Comment démarrer ?
+## 📖 Guide d'utilisation & Fonctionnalités
 
-1.  **Installation** :
-    - Téléchargez et installez l'application via les boutons en haut de page.
-2.  **Création de Compte** :
-    - Inscrivez-vous avec votre email.
-    - Sélectionnez votre **Rôle** (très important car l'interface s'adaptera à vos besoins).
-3.  **Configuration du Profil** :
-    - Ajoutez vos informations personnelles et une photo.
-    - *Parents* : Ajoutez vos enfants dans l'onglet "Famille" avec leurs informations médicales.
-4.  **Utilisation Quotidienne** :
-    - **Timeline** : Consultez le flux pour voir les activités postées par l'école.
-    - **Cours** : Inscrivez vos enfants à des activités extrascolaires proposées par les Coachs.
-    - **Messages** : Échangez avec les professionnels de santé ou les enseignants.
+### 🛠 Démarrage Rapide
+1.  **Installation** : Téléchargez l'APK (Android) ou l'Exécutable (Windows) via les liens en haut.
+2.  **Rôles** : À l'inscription, choisissez bien votre rôle (Parent, École, Coach). L'interface s'adapte totalement à votre fonction.
+3.  **Profil** : Complétez vos informations pour débloquer toutes les fonctionnalités.
+
+### 👶 Système d'Inscription (Nouveauté)
+Le flux d'inscription est désormais sécurisé et validé par les responsables :
+1.  **Parent** : Choisit un cours, sélectionne l'enfant (identifié par des **Chips** de couleur) et envoie la demande.
+2.  **Statut "En Attente"** : L'inscription n'est pas immédiate. Elle doit être validée par le club ou le coach.
+3.  **Notification Responsable** : Le propriétaire du cours reçoit une alerte et un badge rouge sur son dashboard.
+4.  **Validation** : Le responsable approuve ou refuse. Si approuvé, la place est décomptée en temps réel.
+5.  **Annulation** : Les parents peuvent annuler une inscription à tout moment depuis le profil de l'enfant.
+
+### 📅 Gestion du Planning & Ressources
+Les écoles et coachs disposent d'un outil complet :
+- **Planning Hebdomadaire** : Visualisation claire des créneaux.
+- **Assignation** : Possibilité d'attribuer un **Coach** et une **Salle/Lieu** spécifique à chaque séance.
+- **Disponibilités** : Mise à jour instantanée des places restantes affichées en **DA (Dinars Algériens)**.
+
+### ⚡ Technologie Temps Réel
+Grâce à l'intégration de **Supabase Realtime**, les nouveaux cours ajoutés apparaissent instantanément sur les téléphones des parents sans rafraîchissement manuel.
 
 ### ✨ Design & Expérience
-L'application utilise des **Animations Lottie** pour une navigation fluide et des **Glass Cards** pour un effet de transparence futuriste. Chaque interaction est pensée pour être douce et rassurante, rappelant l'univers de l'enfance.
+L'application utilise des **Animations Lottie** et un design **Glassmorphism** pour une expérience futuriste et rassurante.
 
 ---
 
