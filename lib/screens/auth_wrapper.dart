@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 
 import '../screens/autresDashboard.dart';
@@ -29,6 +30,7 @@ class AuthWrapper extends StatelessWidget {
 
         // 2. Non authentifié → AuthScreen
         if (authProvider.state == AppAuthState.unauthenticated) {
+          FlutterNativeSplash.remove();
           return const AuthScreen();
         }
 
@@ -66,6 +68,7 @@ class AuthWrapper extends StatelessWidget {
 
           // Router vers le dashboard approprié selon le rôle
           final role = userData['role'] as String?;
+          FlutterNativeSplash.remove();
           switch (role) {
             case 'parent':
               return const ParentDashboard();
