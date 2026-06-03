@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Modèle pour représenter une session de cours planifiée
 /// Utilisé pour la timeline hebdomadaire dans le ParentDashboard
 class SessionSchedule {
@@ -15,6 +17,7 @@ class SessionSchedule {
   final String? location;
   final String? coachId;
   final String? roomName;
+  final String? schoolId;
   final Map<String, dynamic>? metadata;
 
   SessionSchedule({
@@ -32,6 +35,7 @@ class SessionSchedule {
     this.location,
     this.coachId,
     this.roomName,
+    this.schoolId,
     this.metadata,
   });
 
@@ -69,6 +73,7 @@ class SessionSchedule {
       location: data['location'],
       coachId: data['coach_id'],
       roomName: data['room_name'],
+      schoolId: data['school_id'],
       metadata: data['metadata'],
     );
   }
@@ -89,6 +94,7 @@ class SessionSchedule {
       'location': location,
       'coach_id': coachId,
       'room_name': roomName,
+      'school_id': schoolId,
       'metadata': metadata,
     };
   }
@@ -108,6 +114,7 @@ class SessionSchedule {
     String? location,
     String? coachId,
     String? roomName,
+    String? schoolId,
     Map<String, dynamic>? metadata,
   }) {
     return SessionSchedule(
@@ -125,6 +132,7 @@ class SessionSchedule {
       location: location ?? this.location,
       coachId: coachId ?? this.coachId,
       roomName: roomName ?? this.roomName,
+      schoolId: schoolId ?? this.schoolId,
       metadata: metadata ?? this.metadata,
     );
   }
@@ -199,11 +207,11 @@ class TimeSlot {
   Duration get duration => endTime.difference(startTime);
 
   String get displayTime {
-    return '${_formatTime(startTime)} - ${_formatTime(endTime)}';
+    return "${_formatTime(startTime)} - ${_formatTime(endTime)}";
   }
 
   String _formatTime(DateTime time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
   }
 
   bool overlaps(TimeSlot other) {

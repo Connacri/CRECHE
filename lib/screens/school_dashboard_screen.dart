@@ -2,15 +2,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/auth_provider_v2.dart';
-import '../models/course_model_complete.dart';
-import '../models/user_model.dart';
-import '../models/enrollment_model_complete.dart';
 import '../models/child_model_complete.dart';
-import '../providers/course_provider_complete.dart';
+import '../models/course_model_complete.dart';
+import '../models/enrollment_model_complete.dart';
+import '../models/user_model.dart';
+import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
+import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
-import 'create_course_screen.dart';
+import '../widgets/weekly_timeline_widget.dart';
+import 'school_slots_management_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
   const SchoolDashboard({super.key});
@@ -39,257 +40,128 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
     if (auth.userData != null) {
       _user = UserModel.fromSupabase(auth.userData!);
     }
-    if (auth.currentUser != null) {
+
+    final userId = auth.currentUser?.uid;
+    if (userId != null) {
       await Future.wait([
-        courseProvider.loadUserCourses(auth.currentUser!.uid),
-        childProvider.loadOwnerEnrollmentsDetailed(auth.currentUser!.uid),
+        courseProvider.loadUserCourses(userId),
+        childProvider.loadOwnerEnrollmentsDetailed(userId),
+        childProvider.loadSchedulesForSchool(userId),
       ]);
     }
-    setState(() => _isLoadingData = false);
+
+    if (mounted) setState(() => _isLoadingData = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProviderV2>();
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    
-    final isGlobalLoading = auth.isLoading || _isLoadingData || childProvider.isLoading;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(_selectedIndex == 0 ? 'Dashboard École' : _selectedIndex == 1 ? 'Gestion des Élèves' : _selectedIndex == 2 ? 'Planning & Horaires' : 'Paramètres'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadInitialData,
-            tooltip: 'Actualiser',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => auth.logout(),
-            tooltip: 'Déconnexion',
+            onPressed: _isLoadingData ? null : _loadInitialData,
           ),
         ],
       ),
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/meditation_bg.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          SafeArea(
-            child: isGlobalLoading && _selectedIndex != 1 // Don't show full screen loader on tab 1 if already loaded once
-              ? const Center(child: CircularProgressIndicator())
-              : _getSelectedPage(),
-          ),
-        ],
-      ),
+      body: _isLoadingData
+          ? const Center(child: CircularProgressIndicator())
+          : _buildBody(),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CreateCourseScreen()),
-          );
-        },
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ) : null,
     );
   }
 
-  Widget _getSelectedPage() {
+  Widget _buildBody() {
     switch (_selectedIndex) {
-      case 0: return _buildDashboard();
+      case 0: return _buildMainDashboard();
       case 1: return const _EnrollmentsPage();
       case 2: return const _PlanningManagementPage();
-      case 3: return _buildSettings();
-      default: return _buildDashboard();
+      default: return const Center(child: Text('Paramètres bientôt disponibles'));
     }
   }
 
-  Widget _buildDashboard() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Row(
-          children: [
-            const CircleAvatar(radius: 30, child: Icon(Icons.school_rounded)),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('École ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                const Text('Gestion de l\'établissement'),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        _buildStats(),
-        const SizedBox(height: 32),
-        const Text('Vos cours et activités', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _buildCourseGrid(),
-        const SizedBox(height: 100),
-      ],
-    );
-  }
+  Widget _buildMainDashboard() {
+    final courses = context.watch<CourseProvider>().userCourses;
+    final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
+    final activeEnrollments = enrollments.where((e) => e['enrollment']['status'] == 'approved').length;
 
-  Widget _buildStats() {
-    final childProvider = context.read<ChildEnrollmentProvider>();
-    final activeStudents = childProvider.ownerEnrollmentsDetailed
-        .where((e) => e['enrollment']['status'] == 'approved').length;
-    final pendingEnrollments = childProvider.ownerEnrollmentsDetailed
-        .where((e) => e['enrollment']['status'] == 'pending').length;
-
-    return Row(
-      children: [
-        Expanded(child: _buildStatItem('Élèves Actifs', '$activeStudents', Icons.group_rounded, Colors.teal)),
-        const SizedBox(width: 16),
-        Expanded(child: _buildStatItem('En Attente', '$pendingEnrollments', Icons.pending_actions_rounded, Colors.orange)),
-      ],
-    );
-  }
-
-  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 30),
-          const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCourseGrid() {
-    return Consumer<CourseProvider>(
-      builder: (context, provider, _) {
-        final userCourses = provider.userCourses;
-        if (userCourses.isEmpty) return const Text('Aucune activité créée');
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.1,
-          ),
-          itemCount: userCourses.length,
-          itemBuilder: (context, index) {
-            final course = userCourses[index];
-            return GlassCard(
-              padding: const EdgeInsets.all(12),
-              child: Stack(
-                children: [
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 4),
-                      Text(course.category.displayName, style: const TextStyle(fontSize: 10)),
-                      Text('${course.currentStudents}/${course.maxStudents} élèves', style: const TextStyle(fontSize: 9, color: Colors.black54)),
-                    ],
-                  ),
-                  Positioned(
-                    top: -10,
-                    right: -10,
-                    child: PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, size: 18),
-                      onSelected: (val) {
-                        if (val == 'edit') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => CreateCourseScreen(courseToEdit: course)),
-                          );
-                        } else if (val == 'delete') {
-                          _confirmDelete(context, course);
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Modifier')),
-                        const PopupMenuItem(value: 'delete', child: Text('Supprimer')),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _confirmDelete(BuildContext context, CourseModel course) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Supprimer le cours'),
-        content: Text('Voulez-vous vraiment supprimer "${course.title}" ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () async {
-              final success = await context.read<CourseProvider>().deleteCourse(course.id);
-              if (mounted) {
-                Navigator.pop(dialogContext);
-                if (!success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Erreur lors de la suppression')),
-                  );
-                }
-              }
-            },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettings() {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
         GlassCard(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: const Text('Profil de l\'école'),
-                onTap: () {},
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.notifications_none),
-                title: const Text('Notifications'),
-                onTap: () {},
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.lock_outline),
-                title: const Text('Sécurité'),
-                onTap: () {},
-              ),
+              const CircleAvatar(radius: 30, child: Icon(Icons.school_rounded)),
+              const SizedBox(height: 16),
+              Text('École ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('${_user?.email ?? ""}', style: const TextStyle(color: Colors.grey)),
             ],
           ),
         ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(child: _buildStatCard('Cours', '${courses.length}', Icons.book, Colors.blue)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildStatCard('Inscriptions', '$activeEnrollments', Icons.people, Colors.green)),
+          ],
+        ),
+        const SizedBox(height: 32),
+        const Text('Actions Rapides', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        _buildActionTile(Icons.add_box_outlined, 'Créer un cours', 'Ajouter une nouvelle activité', () {
+          // Navigator.push...
+        }),
+        _buildActionTile(Icons.calendar_month_outlined, 'Gérer le planning', 'Voir et modifier les horaires', () {
+          setState(() => _selectedIndex = 2);
+        }),
+        _buildActionTile(Icons.person_search_outlined, 'Profil de l\'école', 'Mettre à jour les informations', () {
+          // Navigator.push...
+        }),
       ],
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(height: 8),
+          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+          ],
+        ),
+      ),
     );
   }
 
@@ -414,7 +286,7 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
   }
 
   void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fonctionnalité d''ajout d''horaire bientôt disponible')));
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const SchoolSlotsManagementScreen()));
   }
 }
 

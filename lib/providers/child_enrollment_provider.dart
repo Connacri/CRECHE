@@ -1,48 +1,45 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
-
 import '../models/child_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/session_schedule_model.dart';
-import '../services/image_storage_service.dart';
-import '../services/supabase_service.dart';
-
 import '../models/daily_activity_model.dart';
+import '../services/supabase_service.dart';
+import '../services/image_storage_service.dart';
 
-/// ✅ VERSION CORRIGÉE ET COMPLÉTÉE du ChildEnrollmentProvider
 class ChildEnrollmentProvider extends ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
   final ImageStorageService _imageService = ImageStorageService();
 
   List<ChildModel> _children = [];
-  List<EnrollmentModel> _enrollments = [];
-  List<Map<String, dynamic>> _ownerEnrollmentsDetailed = [];
-  List<SessionSchedule> _schedules = [];
-  List<DailyActivity> _dailyActivities = [];
-
-  bool _isLoading = false;
-  String? _error;
-
   List<ChildModel> get children => _children;
+
+  List<EnrollmentModel> _enrollments = [];
   List<EnrollmentModel> get enrollments => _enrollments;
-  List<Map<String, dynamic>> get ownerEnrollmentsDetailed => _ownerEnrollmentsDetailed;
+
+  List<SessionSchedule> _schedules = [];
   List<SessionSchedule> get schedules => _schedules;
+
+  List<Map<String, dynamic>> _ownerEnrollmentsDetailed = [];
+  List<Map<String, dynamic>> get ownerEnrollmentsDetailed =>
+      _ownerEnrollmentsDetailed;
+
+  List<DailyActivity> _dailyActivities = [];
   List<DailyActivity> get dailyActivities => _dailyActivities;
 
+  bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  String? _error;
   String? get error => _error;
 
-  // ... (existing code)
-
-  // === ✅ CHARGEMENT DES ACTIVITÉS QUOTIDIENNES ===
+  // === GESTION DES ACTIVITÉS QUOTIDIENNES ===
   Future<void> loadDailyActivities(String parentId, DateTime date) async {
-    if (parentId.isEmpty) return;
     try {
       _setLoading(true);
-      _dailyActivities = await _supabaseChildService.getDailyActivities(parentId, date);
+      _dailyActivities =
+          await _supabaseChildService.getDailyActivities(parentId, date);
       _setLoading(false);
-      notifyListeners();
     } catch (e) {
       print('❌ Erreur loadDailyActivities: $e');
       _setError('Impossible de charger les activités');
@@ -50,19 +47,12 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  List<DailyActivity> getActivitiesForChild(String childId) {
-    return _dailyActivities.where((a) => a.childId == childId).toList();
-  }
-
-  // === ✅ CHARGEMENT DES INSCRIPTIONS POUR UN PROPRIÉTAIRE (ÉCOLE/COACH) ===
+  // === CHARGEMENT DES INSCRIPTIONS POUR UN PROPRIÉTAIRE (ÉCOLE/COACH) ===
   Future<void> loadEnrollmentsForOwner(String ownerId) async {
-    if (ownerId.isEmpty) return;
     try {
       _setLoading(true);
-      _clearError();
       _enrollments = await _supabaseChildService.getEnrollmentsForOwner(ownerId);
       _setLoading(false);
-      notifyListeners();
     } catch (e) {
       print('❌ Erreur loadEnrollmentsForOwner: $e');
       _setError('Impossible de charger les inscriptions');
@@ -71,13 +61,11 @@ class ChildEnrollmentProvider extends ChangeNotifier {
   }
 
   Future<void> loadOwnerEnrollmentsDetailed(String ownerId) async {
-    if (ownerId.isEmpty) return;
     try {
       _setLoading(true);
-      _clearError();
-      _ownerEnrollmentsDetailed = await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
+      _ownerEnrollmentsDetailed =
+          await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
       _setLoading(false);
-      notifyListeners();
     } catch (e) {
       print('❌ Erreur loadOwnerEnrollmentsDetailed: $e');
       _setError('Impossible de charger les détails des inscriptions');
@@ -85,7 +73,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === ✅ CHARGEMENT DES ENFANTS ===
   Future<void> loadChildren(String parentId) async {
     if (parentId.isEmpty) {
       _children = [];
@@ -98,9 +85,7 @@ class ChildEnrollmentProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      final childrenList = await _supabaseChildService.getChildren(parentId);
-
-      _children = List.from(childrenList); // Nouveau instance de liste
+      _children = await _supabaseChildService.getChildren(parentId);
 
       _isLoading = false;
       notifyListeners();
@@ -112,53 +97,40 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === AJOUT D'UN ENFANT ===
   Future<bool> addChild({
     required String parentId,
     required String firstName,
     required String lastName,
     required DateTime dateOfBirth,
     required ChildGender gender,
-    File? photo,
+    File? photoFile,
     String? schoolGrade,
     MedicalInfo? medicalInfo,
-    String? photoUrl,
   }) async {
     try {
-      print('🆕 [ChildProvider] Début addChild pour $firstName $lastName');
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      String? finalPhotoUrl = photoUrl;
-
-      if (photo != null) {
+      String? finalPhotoUrl;
+      if (photoFile != null) {
         try {
           print('📸 [ChildProvider] Tentative upload photo...');
-          // ✅ Utilisation d'un UUID unique pour l'upload racine du bucket
-          final storageId = 'child_${DateTime.now().millisecondsSinceEpoch}';
           finalPhotoUrl = await _imageService.uploadChildPhoto(
-            imageFile: photo,
+            imageFile: photoFile,
             userId: parentId,
-            childId: storageId,
+            childId: 'temp_${DateTime.now().millisecondsSinceEpoch}',
           );
-          
           if (finalPhotoUrl != null) {
             print('✅ [ChildProvider] Photo uploadée avec succès: $finalPhotoUrl');
-            finalPhotoUrl = '$finalPhotoUrl?t=${DateTime.now().millisecondsSinceEpoch}';
           }
         } catch (e) {
           print('❌ [ChildProvider] Erreur upload photo: $e');
-          _error = 'Échec de l\'envoi de la photo : $e';
-          _isLoading = false;
-          notifyListeners();
-          return false;
         }
       }
 
-      print('📝 [ChildProvider] Préparation du modèle ChildModel...');
       final child = ChildModel(
-        id: '', // Supabase va générer l'UUID
+        id: '',
         parentId: parentId,
         firstName: firstName,
         lastName: lastName,
@@ -169,37 +141,32 @@ class ChildEnrollmentProvider extends ChangeNotifier {
         medicalInfo: medicalInfo ?? MedicalInfo(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        isActive: true,
       );
 
-      print('🚀 [ChildProvider] Envoi vers Supabase Database...');
-      try {
-        final newId = await _supabaseChildService.createChild(child);
-        print('✅ [ChildProvider] Enfant créé en base avec ID: $newId');
-        
-        final childWithId = child.copyWith(id: newId);
-        _children = [..._children, childWithId];
-        
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      } catch (dbError) {
-        print('❌ [ChildProvider] Erreur CRITIQUE insertion base: $dbError');
-        _error = 'Erreur base de données : $dbError';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+      final newId = await _supabaseChildService.createChild(child);
+
+      if (finalPhotoUrl != null && photoFile != null) {
+        final permanentUrl = await _imageService.uploadChildPhoto(
+          imageFile: photoFile,
+          userId: parentId,
+          childId: newId,
+        );
+        if (permanentUrl != null) {
+          await _supabaseChildService.updateChild(newId, {'photo_url': permanentUrl});
+        }
       }
+
+      await loadChildren(parentId);
+      return true;
     } catch (e) {
-      print('❌ [ChildProvider] Erreur inattendue: $e');
-      _error = 'Une erreur inattendue est survenue : $e';
+      print('❌ Erreur addChild: $e');
+      _error = 'Erreur lors de l\'ajout';
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  // === ✅ MISE À JOUR D'UN ENFANT - VERSION OPTIMISÉE ===
   Future<bool> updateChild({
     required String childId,
     String? firstName,
@@ -248,7 +215,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
       await _supabaseChildService.updateChild(childId, updates);
 
-      // ✅ Mise à jour locale instantanée avec NOUVELLE LISTE
       final updatedChild = currentChild.copyWith(
         firstName: firstName,
         lastName: lastName,
@@ -276,7 +242,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === SUPPRESSION DOUCE D'UN ENFANT ===
   Future<bool> deleteChild(String childId) async {
     try {
       _isLoading = true;
@@ -285,7 +250,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
       await _supabaseChildService.softDeleteChild(childId);
 
-      // ✅ NOUVELLE LISTE
       _children = _children.where((c) => c.id != childId).toList();
       _enrollments = _enrollments.where((e) => e.childId != childId).toList();
 
@@ -301,7 +265,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === ✅ CRÉATION D'UNE INSCRIPTION ===
   Future<bool> createEnrollment({
     required String courseId,
     required String childId,
@@ -314,7 +277,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
       final enrollment = EnrollmentModel(
         id: '',
-        // Supabase génère l'UUID
         courseId: courseId,
         childId: childId,
         parentId: parentId,
@@ -327,8 +289,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
       );
 
       await _supabaseChildService.createEnrollment(enrollment);
-
-      // Recharger les inscriptions
       await loadEnrollments(parentId);
 
       _setLoading(false);
@@ -341,7 +301,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === ✅ CHARGEMENT DES INSCRIPTIONS ===
   Future<void> loadEnrollments(String parentId) async {
     if (parentId.isEmpty) {
       _enrollments = [];
@@ -364,7 +323,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === ✅ MISE À JOUR D'UNE INSCRIPTION ===
   Future<bool> updateEnrollment({
     required String enrollmentId,
     EnrollmentStatus? status,
@@ -384,7 +342,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
       await _supabaseChildService.updateEnrollment(enrollmentId, updates);
 
-      // Mettre à jour localement
       final index = _enrollments.indexWhere((e) => e.id == enrollmentId);
       if (index != -1) {
         _enrollments[index] = _enrollments[index].copyWith(
@@ -405,7 +362,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  /// ✅ Annuler une inscription par le parent
   Future<bool> cancelEnrollment(String enrollmentId) async {
     return updateEnrollment(
       enrollmentId: enrollmentId,
@@ -413,7 +369,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     );
   }
 
-  // === ✅ CHARGEMENT DES HORAIRES ===
   Future<void> loadAllSchedulesForParent(String parentId) async {
     if (parentId.isEmpty) {
       _schedules = [];
@@ -436,13 +391,32 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     }
   }
 
-  // === GROUPER LES HORAIRES PAR DATE ===
+  /// ✅ Charger les horaires pour une école
+  Future<void> loadSchedulesForSchool(String schoolId) async {
+    if (schoolId.isEmpty) {
+      _schedules = [];
+      notifyListeners();
+      return;
+    }
+    try {
+      _setLoading(true);
+      _clearError();
+      final response = await _supabaseChildService.adminClient.from('session_schedules').select().eq('school_id', schoolId);
+      _schedules = (response as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      print('❌ Erreur loadSchedulesForSchool: $e');
+      _setError('Impossible de charger les horaires de l\'école');
+      _setLoading(false);
+    }
+  }
+
   Map<DateTime, List<SessionSchedule>> groupSchedulesByDate(
     DateTime startDate,
     DateTime endDate,
   ) {
     final grouped = <DateTime, List<SessionSchedule>>{};
-
     var currentDate = DateTime(startDate.year, startDate.month, startDate.day);
 
     while (!currentDate.isAfter(endDate)) {
@@ -451,14 +425,12 @@ class ChildEnrollmentProvider extends ChangeNotifier {
       }).toList();
 
       grouped[currentDate] = schedulesForDay;
-
       currentDate = currentDate.add(const Duration(days: 1));
     }
 
     return grouped;
   }
 
-  // === MÉTHODES UTILITAIRES ===
   List<SessionSchedule> getSchedulesForDate(DateTime date) {
     final normalizedDate = DateTime(date.year, date.month, date.day);
     return _schedules
@@ -466,12 +438,10 @@ class ChildEnrollmentProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// ✅ Obtenir toutes les inscriptions d'un enfant spécifique
   List<EnrollmentModel> getEnrollmentsForChild(String childId) {
     return _enrollments.where((e) => e.childId == childId).toList();
   }
 
-  /// ✅ Obtenir l'inscription d'un enfant pour un cours spécifique
   EnrollmentModel? getEnrollmentForChildAndCourse(
     String childId,
     String courseId,
@@ -481,7 +451,6 @@ class ChildEnrollmentProvider extends ChangeNotifier {
         .firstOrNull;
   }
 
-  /// ✅ Vérifier si un enfant est déjà inscrit à un cours
   bool isChildEnrolledInCourse(String childId, String courseId) {
     return _enrollments.any(
       (e) =>
@@ -516,16 +485,9 @@ class ChildEnrollmentProvider extends ChangeNotifier {
   }
 }
 
-// === ✅ EXTENSIONS POUR FACILITER L'UTILISATION ===
-
 extension ChildModelExtensions on ChildModel {
-  /// Obtient l'initiale du prénom pour l'avatar
   String get initial => firstName.isNotEmpty ? firstName[0].toUpperCase() : '?';
-
-  /// Formatte le nom complet
   String get displayName => '$firstName $lastName';
-
-  /// Obtient une description de l'âge
   String get ageDescription {
     if (age == 0) return 'Moins d\'un an';
     if (age == 1) return '1 an';
@@ -534,11 +496,9 @@ extension ChildModelExtensions on ChildModel {
 }
 
 extension EnrollmentModelExtensions on EnrollmentModel {
-  /// Vérifie si l'inscription est active
   bool get isActive =>
       status == EnrollmentStatus.approved || status == EnrollmentStatus.pending;
 
-  /// Obtient une description du statut de paiement
   String get paymentDescription {
     if (totalAmount == null) return 'Gratuit';
     if (isFullyPaid) return 'Payé';
@@ -548,7 +508,6 @@ extension EnrollmentModelExtensions on EnrollmentModel {
     return 'En attente (${totalAmount!.toStringAsFixed(0)} DA)';
   }
 
-  /// Obtient le pourcentage de paiement
   double get paymentPercentage {
     if (totalAmount == null || totalAmount == 0) return 100.0;
     return ((paidAmount ?? 0) / totalAmount!) * 100;

@@ -2,16 +2,18 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/auth_provider_v2.dart';
-import '../models/course_model_complete.dart';
-import '../models/user_model.dart';
-import '../models/enrollment_model_complete.dart';
 import '../models/child_model_complete.dart';
-import '../providers/course_provider_complete.dart';
+import '../models/course_model_complete.dart';
+import '../models/enrollment_model_complete.dart';
+import '../models/user_model.dart';
+import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
+import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
+import 'course_details_screen.dart';
 import 'create_course_screen.dart';
 import 'profile_screen.dart';
+import 'associate_to_school_screen.dart';
 
 class CoachDashboard extends StatefulWidget {
   const CoachDashboard({super.key});
@@ -22,137 +24,123 @@ class CoachDashboard extends StatefulWidget {
 
 class _CoachDashboardState extends State<CoachDashboard> {
   int _selectedIndex = 0;
-  bool _isLoadingData = false;
-  UserModel? _user;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialData());
-  }
-
-  Future<void> _loadInitialData() async {
-    setState(() => _isLoadingData = true);
-    final auth = context.read<AuthProviderV2>();
-    final courseProvider = context.read<CourseProvider>();
-    final childProvider = context.read<ChildEnrollmentProvider>();
-
-    if (auth.userData != null) {
-      _user = UserModel.fromSupabase(auth.userData!);
-    }
-    if (auth.currentUser != null) {
-      await Future.wait([
-        courseProvider.loadUserCourses(auth.currentUser!.uid),
-        childProvider.loadOwnerEnrollmentsDetailed(auth.currentUser!.uid),
-      ]);
-    }
-    setState(() => _isLoadingData = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<AuthProviderV2>().currentUser;
+      if (user != null) {
+        context.read<CourseProvider>().loadUserCourses(user.uid);
+        context.read<ChildEnrollmentProvider>().loadOwnerEnrollmentsDetailed(user.uid);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProviderV2>();
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    
-    final isGlobalLoading = auth.isLoading || _isLoadingData || childProvider.isLoading;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_selectedIndex == 0 ? 'Dashboard Coach' : _selectedIndex == 1 ? 'Inscriptions' : 'Profil'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInitialData,
-            tooltip: 'Actualiser',
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.05),
+              Theme.of(context).colorScheme.surface,
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => auth.logout(),
-            tooltip: 'Déconnexion',
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: _selectedIndex == 0 ? _buildMainDashboard() : _selectedIndex == 1 ? const _EnrollmentsPage() : const ProfileScreen(),
+              ),
+            ],
           ),
-        ],
-      ),
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/meditation_bg.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          SafeArea(
-            child: isGlobalLoading && _selectedIndex != 1
-              ? const Center(child: CircularProgressIndicator())
-              : _getSelectedPage(),
-          ),
-        ],
+        ),
       ),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CreateCourseScreen()),
-          );
-        },
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ) : null,
     );
   }
 
-  Widget _getSelectedPage() {
-    switch (_selectedIndex) {
-      case 0: return _buildDashboard();
-      case 1: return const _EnrollmentsPage();
-      case 2: return const ProfileScreen();
-      default: return _buildDashboard();
-    }
-  }
+  Widget _buildHeader() {
+    final auth = context.read<AuthProviderV2>();
+    final userData = auth.userData;
+    final userName = userData != null ? userData['name'] : 'Chargement...';
+    final profileImage = userData != null && userData['profile_images'] != null
+        ? userData['profile_images']['profileImageSupabase']
+        : null;
 
-  Widget _buildDashboard() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Row(
-          children: [
-            const CircleAvatar(radius: 30, child: Icon(Icons.sports)),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Coach ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                const Text('Prêt pour la séance ?'),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        _buildStats(),
-        const SizedBox(height: 32),
-        const Text('Vos cours et activités', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _buildCourseList(),
-        const SizedBox(height: 100),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Bonjour Coach,', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              Text(userName, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          CircleAvatar(
+            radius: 25,
+            backgroundImage: profileImage != null ? CachedNetworkImageProvider(profileImage) : null,
+            child: profileImage == null ? const Icon(Icons.person) : null,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStats() {
-    final childProvider = context.read<ChildEnrollmentProvider>();
-    final activeStudents = childProvider.ownerEnrollmentsDetailed
-        .where((e) => e['enrollment']['status'] == 'approved').length;
-    final courseCount = context.read<CourseProvider>().userCourses.length;
+  Widget _buildMainDashboard() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        final user = context.read<AuthProviderV2>().currentUser;
+        if (user != null) {
+          await context.read<CourseProvider>().loadUserCourses(user.uid);
+          await context.read<ChildEnrollmentProvider>().loadOwnerEnrollmentsDetailed(user.uid);
+        }
+      },
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        children: [
+          _buildStatsRow(),
+          const SizedBox(height: 32),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Mes Cours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CreateCourseScreen()),
+                  );
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Nouveau'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildCourseList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsRow() {
+    final courseProvider = context.watch<CourseProvider>();
+    final activeCourses = courseProvider.userCourses.where((c) => c.isActive).length;
+    final activeStudents = courseProvider.userCourses.fold<int>(0, (sum, c) => sum + c.currentStudents);
 
     return Row(
       children: [
-        Expanded(child: _buildStatItem('Cours', '$courseCount', Icons.event, Colors.green)),
+        Expanded(child: _buildStatItem('Cours Actifs', '$activeCourses', Icons.class_, Colors.blue)),
         const SizedBox(width: 16),
         Expanded(child: _buildStatItem('Élèves', '$activeStudents', Icons.people, Colors.orange)),
       ],
@@ -189,6 +177,16 @@ class _CoachDashboardState extends State<CoachDashboard> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.business, color: Colors.green, size: 20),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => AssociateToSchoolScreen(course: course)),
+                        );
+                      },
+                      tooltip: 'Associer à un club',
+                    ),
                     IconButton(
                       icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
                       onPressed: () {
