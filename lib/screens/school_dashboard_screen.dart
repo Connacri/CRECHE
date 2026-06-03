@@ -1,20 +1,22 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import '../providers/auth_provider_v2.dart';
-import '../models/course_model_complete.dart';
-import '../models/user_model.dart';
-import '../models/enrollment_model_complete.dart';
 import '../models/child_model_complete.dart';
-import '../providers/course_provider_complete.dart';
+import '../models/course_model_complete.dart';
+import '../models/enrollment_model_complete.dart';
+import '../models/user_model.dart';
+import '../models/session_schedule_model.dart';
+import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
+import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
+import "../widgets/interactive_weekly_timetable.dart";
+import "../widgets/add_session_dialog.dart";
+import "../models/session_schedule_model.dart";
 import 'create_course_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
   const SchoolDashboard({super.key});
-
   @override
   State<SchoolDashboard> createState() => _SchoolDashboardState();
 }
@@ -33,16 +35,15 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingData = true);
     final auth = context.read<AuthProviderV2>();
-    final courseProvider = context.read<CourseProvider>();
-    final childProvider = context.read<ChildEnrollmentProvider>();
-
-    if (auth.userData != null) {
-      _user = UserModel.fromSupabase(auth.userData!);
-    }
-    if (auth.currentUser != null) {
+    final userId = auth.currentUser?.uid;
+    if (userId != null) {
+      if (auth.userData != null) {
+        _user = UserModel.fromSupabase(auth.userData!);
+      }
       await Future.wait([
-        courseProvider.loadUserCourses(auth.currentUser!.uid),
-        childProvider.loadOwnerEnrollmentsDetailed(auth.currentUser!.uid),
+        context.read<CourseProvider>().loadUserCourses(userId),
+        context.read<ChildEnrollmentProvider>().loadOwnerEnrollmentsDetailed(userId),
+        context.read<ChildEnrollmentProvider>().loadSchedulesForSchool(userId),
       ]);
     }
     setState(() => _isLoadingData = false);
@@ -50,501 +51,181 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProviderV2>();
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    
-    final isGlobalLoading = auth.isLoading || _isLoadingData || childProvider.isLoading;
-
+    if (_isLoadingData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_selectedIndex == 0 ? 'Dashboard École' : _selectedIndex == 1 ? 'Gestion des Élèves' : _selectedIndex == 2 ? 'Planning & Horaires' : 'Paramètres'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInitialData,
-            tooltip: 'Actualiser',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => auth.logout(),
-            tooltip: 'Déconnexion',
-          ),
+      body: SafeArea(child: Column(children: [_buildHeader(), Expanded(child: _getPage(_selectedIndex))])),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (i) => setState(() => _selectedIndex = i),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Aperçu'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Inscriptions'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Planning'),
         ],
       ),
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/meditation_bg.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          SafeArea(
-            child: isGlobalLoading && _selectedIndex != 1 // Don't show full screen loader on tab 1 if already loaded once
-              ? const Center(child: CircularProgressIndicator())
-              : _getSelectedPage(),
-          ),
-        ],
-      ),
-      bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CreateCourseScreen()),
-          );
-        },
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ) : null,
     );
   }
 
-  Widget _getSelectedPage() {
-    switch (_selectedIndex) {
-      case 0: return _buildDashboard();
+  Widget _buildHeader() {
+    final avatarUrl = _user?.profileImages.profileImageSupabase;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Row(children: [
+        CircleAvatar(radius: 25, backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null, child: avatarUrl == null ? const Icon(Icons.person) : null),
+        const SizedBox(width: 16),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Bonjour,', style: TextStyle(color: Colors.grey[600])),
+          Text(_user?.name ?? 'Utilisateur', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _getPage(int index) {
+    switch (index) {
+      case 0: return const Center(child: Text('Statistiques'));
       case 1: return const _EnrollmentsPage();
       case 2: return const _PlanningManagementPage();
-      case 3: return _buildSettings();
-      default: return _buildDashboard();
+      default: return const Center(child: Text('Statistiques'));
     }
-  }
-
-  Widget _buildDashboard() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Row(
-          children: [
-            const CircleAvatar(radius: 30, child: Icon(Icons.school_rounded)),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('École ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                const Text('Gestion de l\'établissement'),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        _buildStats(),
-        const SizedBox(height: 32),
-        const Text('Vos cours et activités', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _buildCourseGrid(),
-        const SizedBox(height: 100),
-      ],
-    );
-  }
-
-  Widget _buildStats() {
-    final childProvider = context.read<ChildEnrollmentProvider>();
-    final activeStudents = childProvider.ownerEnrollmentsDetailed
-        .where((e) => e['enrollment']['status'] == 'approved').length;
-    final pendingEnrollments = childProvider.ownerEnrollmentsDetailed
-        .where((e) => e['enrollment']['status'] == 'pending').length;
-
-    return Row(
-      children: [
-        Expanded(child: _buildStatItem('Élèves Actifs', '$activeStudents', Icons.group_rounded, Colors.teal)),
-        const SizedBox(width: 16),
-        Expanded(child: _buildStatItem('En Attente', '$pendingEnrollments', Icons.pending_actions_rounded, Colors.orange)),
-      ],
-    );
-  }
-
-  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 30),
-          const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCourseGrid() {
-    return Consumer<CourseProvider>(
-      builder: (context, provider, _) {
-        final userCourses = provider.userCourses;
-        if (userCourses.isEmpty) return const Text('Aucune activité créée');
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.1,
-          ),
-          itemCount: userCourses.length,
-          itemBuilder: (context, index) {
-            final course = userCourses[index];
-            return GlassCard(
-              padding: const EdgeInsets.all(12),
-              child: Stack(
-                children: [
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 4),
-                      Text(course.category.displayName, style: const TextStyle(fontSize: 10)),
-                      Text('${course.currentStudents}/${course.maxStudents} élèves', style: const TextStyle(fontSize: 9, color: Colors.black54)),
-                    ],
-                  ),
-                  Positioned(
-                    top: -10,
-                    right: -10,
-                    child: PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, size: 18),
-                      onSelected: (val) {
-                        if (val == 'edit') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => CreateCourseScreen(courseToEdit: course)),
-                          );
-                        } else if (val == 'delete') {
-                          _confirmDelete(context, course);
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Modifier')),
-                        const PopupMenuItem(value: 'delete', child: Text('Supprimer')),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _confirmDelete(BuildContext context, CourseModel course) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Supprimer le cours'),
-        content: Text('Voulez-vous vraiment supprimer "${course.title}" ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () async {
-              final success = await context.read<CourseProvider>().deleteCourse(course.id);
-              if (mounted) {
-                Navigator.pop(dialogContext);
-                if (!success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Erreur lors de la suppression')),
-                  );
-                }
-              }
-            },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettings() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        GlassCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: const Text('Profil de l\'école'),
-                onTap: () {},
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.notifications_none),
-                title: const Text('Notifications'),
-                onTap: () {},
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.lock_outline),
-                title: const Text('Sécurité'),
-                onTap: () {},
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomNav() {
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    final pendingCount = childProvider.ownerEnrollmentsDetailed
-        .where((e) => e['enrollment']['status'] == 'pending').length;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: GlassCard(
-        opacity: 0.8,
-        borderRadius: BorderRadius.circular(30),
-        child: BottomNavigationBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          currentIndex: _selectedIndex,
-          onTap: (i) => setState(() => _selectedIndex = i),
-          selectedItemColor: Theme.of(context).colorScheme.primary,
-          unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          type: BottomNavigationBarType.fixed,
-          items: [
-            const BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Gérer'),
-            BottomNavigationBarItem(
-              icon: Badge(
-                label: Text('$pendingCount'),
-                isLabelVisible: pendingCount > 0,
-                child: const Icon(Icons.people_alt_rounded),
-              ), 
-              label: 'Élèves',
-            ),
-            const BottomNavigationBarItem(icon: Icon(Icons.calendar_month_rounded), label: 'Planning'),
-            const BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), label: 'Paramètres'),
-          ],
-        ),
-      ),
-    );
   }
 }
 
 class _PlanningManagementPage extends StatefulWidget {
   const _PlanningManagementPage();
-
   @override
   State<_PlanningManagementPage> createState() => _PlanningManagementPageState();
 }
-
 class _PlanningManagementPageState extends State<_PlanningManagementPage> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final auth = context.read<AuthProviderV2>();
+        final provider = context.read<CourseProvider>();
+        provider.loadOwnerSchedules(auth.currentUser!.uid);
+        provider.loadCoaches();
+      }
+    });
+  }
+  @override
   Widget build(BuildContext context) {
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    final schedules = childProvider.schedules;
-    final courses = context.read<CourseProvider>().userCourses;
+    final provider = context.watch<CourseProvider>();
+    final schedules = provider.schedules;
+    final courses = provider.userCourses;
+    final coaches = provider.coaches;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+    final Map<String, String> coachesNames = {
+      for (var c in coaches) c['id'] as String: c['name'] as String? ?? 'Sans nom'
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Planning & Horaires', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline),
-              onPressed: () => _showAddScheduleDialog(context, courses),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (schedules.isEmpty)
-          const Center(child: Padding(
-            padding: EdgeInsets.only(top: 40),
-            child: Text('Aucun créneau planifié.'),
-          ))
-        else
-          ...schedules.map((schedule) {
-            final course = courses.firstWhere((c) => c.id == schedule.courseId, orElse: () => CourseModel.mock());
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text(schedule.dayOfWeek.displayName, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(schedule.timeSlot.displayTime),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.meeting_room_outlined, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(schedule.roomName ?? 'Salle non définie'),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.person_outline, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(schedule.coachId != null ? 'Coach assigné' : 'Pas de coach assigné'),
-                      ],
-                    ),
-                  ],
-                ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Planning & Horaires', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () => _showAddScheduleDialog(context, courses, coaches),
               ),
-            );
-          }),
+            ],
+          ),
+        ),
+        if (provider.isLoading)
+          const Expanded(child: Center(child: CircularProgressIndicator()))
+        else if (courses.isEmpty)
+          const Expanded(child: Center(child: Text('Créez d\'abord un cours pour pouvoir planifier des horaires.')))
+        else
+          Expanded(
+            child: InteractiveWeeklyTimetable(
+              schedules: schedules,
+              courses: courses,
+              coachesNames: coachesNames,
+              onEmptySlotTap: (day, slot) => _showAddScheduleDialog(context, courses, coaches, initialDay: day, initialTimeSlot: slot),
+              onSessionTap: (session) => _showAddScheduleDialog(context, courses, coaches, sessionToEdit: session),
+            ),
+          ),
       ],
     );
   }
 
-  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fonctionnalité d''ajout d''horaire bientôt disponible')));
+  void _showAddScheduleDialog(
+    BuildContext context,
+    List<CourseModel> courses,
+    List<Map<String, dynamic>> coaches,
+    {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}
+  ) async {
+    final provider = context.read<CourseProvider>();
+    final result = await showDialog(
+      context: context,
+      builder: (context) => AddSessionDialog(
+        courses: courses,
+        coaches: coaches,
+        initialDay: initialDay,
+        initialTimeSlot: initialTimeSlot,
+        sessionToEdit: sessionToEdit,
+      ),
+    );
+
+    if (result != null) {
+      if (result == 'delete' && sessionToEdit != null) {
+        await provider.deleteSchedule(sessionToEdit.id);
+      } else if (result is SessionSchedule) {
+        if (sessionToEdit != null) {
+          await provider.updateSchedule(sessionToEdit.id, result.toSupabase());
+          // Rafraîchir
+          final auth = context.read<AuthProviderV2>();
+          provider.loadOwnerSchedules(auth.currentUser!.uid);
+        } else {
+          await provider.createSchedule(result);
+        }
+      }
+    }
   }
 }
 
 class _EnrollmentsPage extends StatelessWidget {
   const _EnrollmentsPage();
-
   @override
   Widget build(BuildContext context) {
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    final enrollments = childProvider.ownerEnrollmentsDetailed;
-
-    if (enrollments.isEmpty) {
-      return const Center(child: Text('Aucune inscription pour le moment.'));
-    }
-
+    final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
+    if (enrollments.isEmpty) return const Center(child: Text('Aucune inscription.'));
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+      padding: const EdgeInsets.all(24),
       itemCount: enrollments.length,
       itemBuilder: (context, index) {
         final item = enrollments[index];
-        final enrollmentJson = item['enrollment'] as Map<String, dynamic>;
-        final childJson = item['child'] as Map<String, dynamic>;
-        final courseJson = item['course'] as Map<String, dynamic>;
-
-        final enrollment = EnrollmentModel.fromSupabase(enrollmentJson);
-        final child = ChildModel.fromSupabase(childJson);
-        final course = CourseModel.fromSupabase(courseJson);
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: GlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                      child: child.photoUrl == null ? Text(child.firstName[0]) : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(child.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text('S\'inscrit à : ${course.title}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary)),
-                        ],
-                      ),
-                    ),
-                    _buildStatusBadge(enrollment.status),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Inscrit le ${_formatDate(enrollment.enrolledAt)}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                    if (enrollment.status == EnrollmentStatus.pending)
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.check_circle, color: Colors.green),
-                            onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.approved),
-                            tooltip: 'Approuver',
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.rejected),
-                            tooltip: 'Refuser',
-                          ),
-                        ],
-                      )
-                    else if (enrollment.status == EnrollmentStatus.approved)
-                       TextButton.icon(
-                        onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.cancelled),
-                        icon: const Icon(Icons.remove_circle_outline, size: 16, color: Colors.grey),
-                        label: const Text('Annuler', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
+        final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
+        final child = ChildModel.fromSupabase(item['child']);
+        final course = CourseModel.fromSupabase(item['course']);
+        return Padding(padding: const EdgeInsets.only(bottom: 16), child: GlassCard(padding: const EdgeInsets.all(16), child: Row(children: [
+          CircleAvatar(backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null, child: child.photoUrl == null ? const Icon(Icons.person) : null),
+          const SizedBox(width: 16),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(course.title, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+          ])),
+          _buildStatusChip(enrollment.status),
+        ])));
       },
     );
   }
 
-  void _updateStatus(BuildContext context, String enrollmentId, EnrollmentStatus status) async {
-    final provider = context.read<ChildEnrollmentProvider>();
-    final success = await provider.updateEnrollment(enrollmentId: enrollmentId, status: status);
-    
-    if (success && context.mounted) {
-      // Recharger aussi les cours pour mettre à jour current_students (même si le trigger s'en occupe en base)
-      final auth = context.read<AuthProviderV2>();
-      context.read<CourseProvider>().loadUserCourses(auth.currentUser!.uid);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Statut mis à jour : ${status.displayName}')),
-      );
-    }
-  }
-
-  Widget _buildStatusBadge(EnrollmentStatus status) {
+  Widget _buildStatusChip(EnrollmentStatus status) {
     Color color;
+    String text;
     switch (status) {
-      case EnrollmentStatus.approved: color = Colors.green; break;
-      case EnrollmentStatus.pending: color = Colors.orange; break;
-      case EnrollmentStatus.rejected: color = Colors.red; break;
-      case EnrollmentStatus.cancelled: color = Colors.grey; break;
-      case EnrollmentStatus.completed: color = Colors.blue; break;
+      case EnrollmentStatus.approved: color = Colors.green; text = 'Approuvé'; break;
+      case EnrollmentStatus.pending: color = Colors.orange; text = 'En attente'; break;
+      case EnrollmentStatus.rejected: color = Colors.red; text = 'Refusé'; break;
+      case EnrollmentStatus.cancelled: color = Colors.grey; text = 'Annulé'; break;
+      case EnrollmentStatus.completed: color = Colors.blue; text = 'Terminé'; break;
     }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Text(
-        status.displayName,
-        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color)), child: Text(text, style: TextStyle(color: color, fontSize: 10)));
   }
 }
