@@ -417,6 +417,21 @@ class AuthService {
         return e.message ?? 'Une erreur est survenue';
     }
   }
+
+  /// Récupère tous les utilisateurs ayant le rôle "coach"
+  Future<List<Map<String, dynamic>>> getCoaches() async {
+    try {
+      final response = await _adminClient
+          .from("users")
+          .select()
+          .eq("role", "coach")
+          .eq("is_active", true);
+      return List<Map<String, dynamic>>.from(response ?? []);
+    } catch (e) {
+      debugPrint("[AuthService] getCoaches error: $e");
+      return [];
+    }
+  }
 }
 
 // ============================================================================
