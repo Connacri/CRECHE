@@ -114,4 +114,41 @@ class ImageStorageService {
     await _adminClient.storage.from(_profileBucket).uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
     return _adminClient.storage.from(_profileBucket).getPublicUrl(path);
   }
+
+  Future<void> deleteAllUserStorageData(String userId, List<String> courseIds) async {
+    try {
+      // 1. Delete profiles (avatar + children)
+      final profileFiles = await _adminClient.storage.from(_profileBucket).list(path: userId);
+      if (profileFiles.isNotEmpty) {
+        final paths = profileFiles.map((f) => '$userId/${f.name}').toList();
+        await _adminClient.storage.from(_profileBucket).remove(paths);
+      }
+
+      // Also check children subfolder in profiles
+      final childrenFiles = await _adminClient.storage.from(_profileBucket).list(path: '$userId/children');
+      if (childrenFiles.isNotEmpty) {
+        final paths = childrenFiles.map((f) => '$userId/children/${f.name}').toList();
+        await _adminClient.storage.from(_profileBucket).remove(paths);
+      }
+
+      // 2. Delete covers
+      final coverFiles = await _adminClient.storage.from(_coverBucket).list(path: userId);
+      if (coverFiles.isNotEmpty) {
+        final paths = coverFiles.map((f) => '$userId/${f.name}').toList();
+        await _adminClient.storage.from(_coverBucket).remove(paths);
+      }
+
+      // 3. Delete course images
+      for (final courseId in courseIds) {
+        final courseFiles = await _adminClient.storage.from(_coursesBucket).list(path: courseId);
+        if (courseFiles.isNotEmpty) {
+          final paths = courseFiles.map((f) => '$courseId/${f.name}').toList();
+          await _adminClient.storage.from(_coursesBucket).remove(paths);
+        }
+      }
+    } catch (e) {
+      print('Error deleting storage data: $e');
+      // We don't rethrow to avoid blocking account deletion if some files are already gone
+    }
+  }
 }

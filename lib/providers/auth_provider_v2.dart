@@ -436,6 +436,34 @@ class AuthProviderV2 with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  Future<AuthResult> deleteAccount() async {
+    if (_currentUser == null) {
+      return AuthResult.error('Utilisateur non connecté');
+    }
+
+    _setState(AppAuthState.loading);
+    try {
+      final userId = _currentUser!.uid;
+      final result = await _authService.deleteUserAccount(userId);
+
+      if (result.success) {
+        _currentUser = null;
+        _userData = null;
+        _needsEmailConfirmation = false;
+        _needsProfileCompletion = false;
+        _setState(AppAuthState.unauthenticated);
+      } else {
+        _errorMessage = result.message;
+        _setState(AppAuthState.authenticated); // Back to authenticated if failed
+      }
+      return result;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _setState(AppAuthState.authenticated);
+      return AuthResult.error(e.toString());
+    }
+  }
 }
 
 enum AppAuthState {
