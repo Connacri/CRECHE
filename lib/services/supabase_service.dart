@@ -271,3 +271,31 @@ class SupabaseChildService extends AdminSupabaseService {
     return (activitiesResponse as List).map((data) => DailyActivity.fromSupabase(data)).toList();
   }
 }
+
+extension SupabaseChildServiceSchedules on SupabaseChildService {
+  Future<List<SessionSchedule>> getSchedulesByOwner(String ownerId) async {
+    // Récupérer d'abord les IDs des cours créés par cet utilisateur
+    final coursesResponse = await adminClient.from('courses').select('id').eq('created_by', ownerId);
+    final courseIds = (coursesResponse as List).map((c) => c['id'] as String).toList();
+
+    if (courseIds.isEmpty) return [];
+
+    final response = await adminClient.from('session_schedules').select().inFilter('course_id', courseIds);
+    return (response as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
+  }
+
+  Future<String> createSchedule(SessionSchedule schedule) async {
+    final data = schedule.toSupabase();
+    data.remove('id');
+    final response = await adminClient.from('session_schedules').insert(data).select().single();
+    return response['id'] as String;
+  }
+
+  Future<void> updateSchedule(String scheduleId, Map<String, dynamic> updates) async {
+    await adminClient.from('session_schedules').update(updates).eq('id', scheduleId);
+  }
+
+  Future<void> deleteSchedule(String scheduleId) async {
+    await adminClient.from('session_schedules').delete().eq('id', scheduleId);
+  }
+}

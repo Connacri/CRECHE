@@ -10,6 +10,9 @@ import '../models/child_model_complete.dart';
 import '../providers/course_provider_complete.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../widgets/glass_card.dart';
+import "../widgets/interactive_weekly_timetable.dart";
+import "../widgets/add_session_dialog.dart";
+import "../models/session_schedule_model.dart";
 import 'create_course_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
@@ -336,85 +339,96 @@ class _PlanningManagementPage extends StatefulWidget {
   @override
   State<_PlanningManagementPage> createState() => _PlanningManagementPageState();
 }
-
 class _PlanningManagementPageState extends State<_PlanningManagementPage> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final auth = context.read<AuthProviderV2>();
+        final provider = context.read<CourseProvider>();
+        provider.loadOwnerSchedules(auth.currentUser!.uid);
+        provider.loadCoaches();
+      }
+    });
+  }
+  @override
   Widget build(BuildContext context) {
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    final schedules = childProvider.schedules;
-    final courses = context.read<CourseProvider>().userCourses;
+    final provider = context.watch<CourseProvider>();
+    final schedules = provider.schedules;
+    final courses = provider.userCourses;
+    final coaches = provider.coaches;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+    final Map<String, String> coachesNames = {
+      for (var c in coaches) c['id'] as String: c['name'] as String? ?? 'Sans nom'
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Planning & Horaires', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline),
-              onPressed: () => _showAddScheduleDialog(context, courses),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (schedules.isEmpty)
-          const Center(child: Padding(
-            padding: EdgeInsets.only(top: 40),
-            child: Text('Aucun créneau planifié.'),
-          ))
-        else
-          ...schedules.map((schedule) {
-            final course = courses.firstWhere((c) => c.id == schedule.courseId, orElse: () => CourseModel.mock());
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(course.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text(schedule.dayOfWeek.displayName, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(schedule.timeSlot.displayTime),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.meeting_room_outlined, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(schedule.roomName ?? 'Salle non définie'),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.person_outline, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(schedule.coachId != null ? 'Coach assigné' : 'Pas de coach assigné'),
-                      ],
-                    ),
-                  ],
-                ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Planning & Horaires', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () => _showAddScheduleDialog(context, courses, coaches),
               ),
-            );
-          }),
+            ],
+          ),
+        ),
+        if (provider.isLoading)
+          const Expanded(child: Center(child: CircularProgressIndicator()))
+        else if (courses.isEmpty)
+          const Expanded(child: Center(child: Text('Créez d\'abord un cours pour pouvoir planifier des horaires.')))
+        else
+          Expanded(
+            child: InteractiveWeeklyTimetable(
+              schedules: schedules,
+              courses: courses,
+              coachesNames: coachesNames,
+              onEmptySlotTap: (day, slot) => _showAddScheduleDialog(context, courses, coaches, initialDay: day, initialTimeSlot: slot),
+              onSessionTap: (session) => _showAddScheduleDialog(context, courses, coaches, sessionToEdit: session),
+            ),
+          ),
       ],
     );
   }
 
-  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fonctionnalité d''ajout d''horaire bientôt disponible')));
+  void _showAddScheduleDialog(
+    BuildContext context,
+    List<CourseModel> courses,
+    List<Map<String, dynamic>> coaches,
+    {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}
+  ) async {
+    final provider = context.read<CourseProvider>();
+    final result = await showDialog(
+      context: context,
+      builder: (context) => AddSessionDialog(
+        courses: courses,
+        coaches: coaches,
+        initialDay: initialDay,
+        initialTimeSlot: initialTimeSlot,
+        sessionToEdit: sessionToEdit,
+      ),
+    );
+
+    if (result != null) {
+      if (result == 'delete' && sessionToEdit != null) {
+        await provider.deleteSchedule(sessionToEdit.id);
+      } else if (result is SessionSchedule) {
+        if (sessionToEdit != null) {
+          await provider.updateSchedule(sessionToEdit.id, result.toSupabase());
+          // Rafraîchir
+          final auth = context.read<AuthProviderV2>();
+          provider.loadOwnerSchedules(auth.currentUser!.uid);
+        } else {
+          await provider.createSchedule(result);
+        }
+      }
+    }
   }
 }
 
