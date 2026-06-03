@@ -9,6 +9,7 @@ class GlassCard extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final Border? border;
   final VoidCallback? onTap;
+  final Color? color;
 
   const GlassCard({
     super.key,
@@ -19,6 +20,7 @@ class GlassCard extends StatelessWidget {
     this.padding,
     this.border,
     this.onTap,
+    this.color,
   });
 
   @override
@@ -28,7 +30,7 @@ class GlassCard extends StatelessWidget {
     Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: opacity),
+        color: (color ?? Theme.of(context).colorScheme.surface).withValues(alpha: opacity),
         borderRadius: effectiveBorderRadius,
         border: border ?? Border.all(
           color: Colors.white.withValues(alpha: 0.2),
