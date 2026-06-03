@@ -1,21 +1,20 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/user_model.dart';
+import '../models/session_schedule_model.dart';
 import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/weekly_timeline_widget.dart';
+import '../widgets/interactive_weekly_timetable.dart';
 import 'school_slots_management_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
   const SchoolDashboard({super.key});
-
   @override
   State<SchoolDashboard> createState() => _SchoolDashboardState();
 }
@@ -34,370 +33,144 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingData = true);
     final auth = context.read<AuthProviderV2>();
-    final courseProvider = context.read<CourseProvider>();
-    final childProvider = context.read<ChildEnrollmentProvider>();
-
-    if (auth.userData != null) {
-      _user = UserModel.fromSupabase(auth.userData!);
-    }
-
     final userId = auth.currentUser?.uid;
     if (userId != null) {
+      if (auth.userData != null) {
+        _user = UserModel.fromSupabase(auth.userData!);
+      }
       await Future.wait([
-        courseProvider.loadUserCourses(userId),
-        childProvider.loadOwnerEnrollmentsDetailed(userId),
-        childProvider.loadSchedulesForSchool(userId),
+        context.read<CourseProvider>().loadUserCourses(userId),
+        context.read<ChildEnrollmentProvider>().loadOwnerEnrollmentsDetailed(userId),
+        context.read<ChildEnrollmentProvider>().loadSchedulesForSchool(userId),
       ]);
     }
-
-    if (mounted) setState(() => _isLoadingData = false);
+    setState(() => _isLoadingData = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_selectedIndex == 0 ? 'Dashboard École' : _selectedIndex == 1 ? 'Gestion des Élèves' : _selectedIndex == 2 ? 'Planning & Horaires' : 'Paramètres'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoadingData ? null : _loadInitialData,
-          ),
+      body: SafeArea(child: Column(children: [_buildHeader(), Expanded(child: _getPage(_selectedIndex))])),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (i) => setState(() => _selectedIndex = i),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Aperçu'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Inscriptions'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Planning'),
         ],
       ),
-      body: _isLoadingData
-          ? const Center(child: CircularProgressIndicator())
-          : _buildBody(),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  Widget _buildBody() {
-    switch (_selectedIndex) {
-      case 0: return _buildMainDashboard();
+  Widget _buildHeader() {
+    final avatarUrl = _user?.profileImages.profileImageSupabase;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Row(children: [
+        CircleAvatar(radius: 25, backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null, child: avatarUrl == null ? const Icon(Icons.person) : null),
+        const SizedBox(width: 16),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Bonjour,', style: TextStyle(color: Colors.grey[600])),
+          Text(_user?.name ?? 'Utilisateur', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _getPage(int index) {
+    switch (index) {
+      case 0: return const Center(child: Text('Statistiques'));
       case 1: return const _EnrollmentsPage();
       case 2: return const _PlanningManagementPage();
-      default: return const Center(child: Text('Paramètres bientôt disponibles'));
+      default: return const Center(child: Text('Statistiques'));
     }
-  }
-
-  Widget _buildMainDashboard() {
-    final courses = context.watch<CourseProvider>().userCourses;
-    final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
-    final activeEnrollments = enrollments.where((e) => e['enrollment']['status'] == 'approved').length;
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        GlassCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const CircleAvatar(radius: 30, child: Icon(Icons.school_rounded)),
-              const SizedBox(height: 16),
-              Text('École ${_user?.name ?? ""}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('${_user?.email ?? ""}', style: const TextStyle(color: Colors.grey)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(child: _buildStatCard('Cours', '${courses.length}', Icons.book, Colors.blue)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildStatCard('Inscriptions', '$activeEnrollments', Icons.people, Colors.green)),
-          ],
-        ),
-        const SizedBox(height: 32),
-        const Text('Actions Rapides', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _buildActionTile(Icons.add_box_outlined, 'Créer un cours', 'Ajouter une nouvelle activité', () {
-          // Navigator.push...
-        }),
-        _buildActionTile(Icons.calendar_month_outlined, 'Gérer le planning', 'Voir et modifier les horaires', () {
-          setState(() => _selectedIndex = 2);
-        }),
-        _buildActionTile(Icons.person_search_outlined, 'Profil de l\'école', 'Mettre à jour les informations', () {
-          // Navigator.push...
-        }),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    final pendingCount = childProvider.ownerEnrollmentsDetailed
-        .where((e) => e['enrollment']['status'] == 'pending').length;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: GlassCard(
-        opacity: 0.8,
-        borderRadius: BorderRadius.circular(30),
-        child: BottomNavigationBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          currentIndex: _selectedIndex,
-          onTap: (i) => setState(() => _selectedIndex = i),
-          selectedItemColor: Theme.of(context).colorScheme.primary,
-          unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          type: BottomNavigationBarType.fixed,
-          items: [
-            const BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Gérer'),
-            BottomNavigationBarItem(
-              icon: Badge(
-                label: Text('$pendingCount'),
-                isLabelVisible: pendingCount > 0,
-                child: const Icon(Icons.people_alt_rounded),
-              ), 
-              label: 'Élèves',
-            ),
-            const BottomNavigationBarItem(icon: Icon(Icons.calendar_month_rounded), label: 'Planning'),
-            const BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), label: 'Paramètres'),
-          ],
-        ),
-      ),
-    );
   }
 }
 
 class _PlanningManagementPage extends StatefulWidget {
   const _PlanningManagementPage();
-
   @override
   State<_PlanningManagementPage> createState() => _PlanningManagementPageState();
 }
+
 class _PlanningManagementPageState extends State<_PlanningManagementPage> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final auth = context.read<AuthProviderV2>();
-        final provider = context.read<CourseProvider>();
-        provider.loadOwnerSchedules(auth.currentUser!.uid);
-        provider.loadCoaches();
+      final auth = context.read<AuthProviderV2>();
+      if (auth.currentUser != null) {
+        context.read<CourseProvider>().loadOwnerSchedules(auth.currentUser!.uid);
+        context.read<CourseProvider>().loadCoaches();
       }
     });
   }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CourseProvider>();
-    final schedules = provider.schedules;
-    final courses = provider.userCourses;
-    final coaches = provider.coaches;
-
-    final Map<String, String> coachesNames = {
-      for (var c in coaches) c['id'] as String: c['name'] as String? ?? 'Sans nom'
-    };
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Planning & Horaires', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline),
-                onPressed: () => _showAddScheduleDialog(context, courses, coaches),
-              ),
-            ],
-          ),
-        ),
-        if (provider.isLoading)
-          const Expanded(child: Center(child: CircularProgressIndicator()))
-        else if (courses.isEmpty)
-          const Expanded(child: Center(child: Text('Créez d\'abord un cours pour pouvoir planifier des horaires.')))
-        else
-          Expanded(
-            child: InteractiveWeeklyTimetable(
-              schedules: schedules,
-              courses: courses,
-              coachesNames: coachesNames,
-              onEmptySlotTap: (day, slot) => _showAddScheduleDialog(context, courses, coaches, initialDay: day, initialTimeSlot: slot),
-              onSessionTap: (session) => _showAddScheduleDialog(context, courses, coaches, sessionToEdit: session),
-            ),
-          ),
-      ],
-    );
+    final Map<String, String> coachesNames = { for (var c in provider.coaches) c['id'] as String: c['name'] as String? ?? 'Sans nom' };
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.fromLTRB(24, 24, 24, 8), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('Planning', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => _showAddScheduleDialog(context, provider.userCourses, provider.coaches)),
+      ])),
+      if (provider.isLoading) const Expanded(child: Center(child: CircularProgressIndicator()))
+      else if (provider.userCourses.isEmpty) const Expanded(child: Center(child: Text('Aucun cours trouvé.')))
+      else Expanded(child: InteractiveWeeklyTimetable(
+        schedules: provider.schedules,
+        courses: provider.userCourses,
+        coachesNames: coachesNames,
+        onEmptySlotTap: (day, slot) => _showAddScheduleDialog(context, provider.userCourses, provider.coaches, initialDay: day, initialTimeSlot: slot),
+        onSessionTap: (session) => _showAddScheduleDialog(context, provider.userCourses, provider.coaches, sessionToEdit: session),
+      )),
+    ]);
   }
 
-  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses) {
+  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses, List<Map<String, dynamic>> coaches, {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => const SchoolSlotsManagementScreen()));
   }
 }
 
 class _EnrollmentsPage extends StatelessWidget {
   const _EnrollmentsPage();
-
   @override
   Widget build(BuildContext context) {
-    final childProvider = context.watch<ChildEnrollmentProvider>();
-    final enrollments = childProvider.ownerEnrollmentsDetailed;
-
-    if (enrollments.isEmpty) {
-      return const Center(child: Text('Aucune inscription pour le moment.'));
-    }
-
+    final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
+    if (enrollments.isEmpty) return const Center(child: Text('Aucune inscription.'));
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+      padding: const EdgeInsets.all(24),
       itemCount: enrollments.length,
       itemBuilder: (context, index) {
         final item = enrollments[index];
-        final enrollmentJson = item['enrollment'] as Map<String, dynamic>;
-        final childJson = item['child'] as Map<String, dynamic>;
-        final courseJson = item['course'] as Map<String, dynamic>;
-
-        final enrollment = EnrollmentModel.fromSupabase(enrollmentJson);
-        final child = ChildModel.fromSupabase(childJson);
-        final course = CourseModel.fromSupabase(courseJson);
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: GlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                      child: child.photoUrl == null ? Text(child.firstName[0]) : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(child.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text('S\'inscrit à : ${course.title}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary)),
-                        ],
-                      ),
-                    ),
-                    _buildStatusBadge(enrollment.status),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Inscrit le ${_formatDate(enrollment.enrolledAt)}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                    if (enrollment.status == EnrollmentStatus.pending)
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.check_circle, color: Colors.green),
-                            onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.approved),
-                            tooltip: 'Approuver',
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.rejected),
-                            tooltip: 'Refuser',
-                          ),
-                        ],
-                      )
-                    else if (enrollment.status == EnrollmentStatus.approved)
-                       TextButton.icon(
-                        onPressed: () => _updateStatus(context, enrollment.id, EnrollmentStatus.cancelled),
-                        icon: const Icon(Icons.remove_circle_outline, size: 16, color: Colors.grey),
-                        label: const Text('Annuler', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
+        final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
+        final child = ChildModel.fromSupabase(item['child']);
+        final course = CourseModel.fromSupabase(item['course']);
+        return Padding(padding: const EdgeInsets.only(bottom: 16), child: GlassCard(padding: const EdgeInsets.all(16), child: Row(children: [
+          CircleAvatar(backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null, child: child.photoUrl == null ? const Icon(Icons.person) : null),
+          const SizedBox(width: 16),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(course.title, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+          ])),
+          _buildStatusChip(enrollment.status),
+        ])));
       },
     );
   }
 
-  void _updateStatus(BuildContext context, String enrollmentId, EnrollmentStatus status) async {
-    final provider = context.read<ChildEnrollmentProvider>();
-    final success = await provider.updateEnrollment(enrollmentId: enrollmentId, status: status);
-    
-    if (success && context.mounted) {
-      // Recharger aussi les cours pour mettre à jour current_students (même si le trigger s'en occupe en base)
-      final auth = context.read<AuthProviderV2>();
-      context.read<CourseProvider>().loadUserCourses(auth.currentUser!.uid);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Statut mis à jour : ${status.displayName}')),
-      );
-    }
-  }
-
-  Widget _buildStatusBadge(EnrollmentStatus status) {
+  Widget _buildStatusChip(EnrollmentStatus status) {
     Color color;
+    String text;
     switch (status) {
-      case EnrollmentStatus.approved: color = Colors.green; break;
-      case EnrollmentStatus.pending: color = Colors.orange; break;
-      case EnrollmentStatus.rejected: color = Colors.red; break;
-      case EnrollmentStatus.cancelled: color = Colors.grey; break;
-      case EnrollmentStatus.completed: color = Colors.blue; break;
+      case EnrollmentStatus.approved: color = Colors.green; text = 'Approuvé'; break;
+      case EnrollmentStatus.pending: color = Colors.orange; text = 'En attente'; break;
+      case EnrollmentStatus.rejected: color = Colors.red; text = 'Refusé'; break;
+      case EnrollmentStatus.cancelled: color = Colors.grey; text = 'Annulé'; break;
+      case EnrollmentStatus.completed: color = Colors.blue; text = 'Terminé'; break;
     }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Text(
-        status.displayName,
-        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color)), child: Text(text, style: TextStyle(color: color, fontSize: 10)));
   }
 }
