@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -107,6 +108,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
             _buildNavItem(1, Icons.calendar_today_rounded, 'Planning'),
             _buildNavItem(2, Icons.child_care_rounded, 'Enfants'),
             _buildNavItem(3, Icons.search_rounded, 'Cours'),
+            _buildNavItem(4, Icons.receipt_long_rounded, 'Factures'),
           ],
         ),
       ),
@@ -146,6 +148,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
       case 1: return const _PlanningPage();
       case 2: return const _ChildrenPage();
       case 3: return const _CoursesPage();
+      case 4: return const _BillingPage();
       default: return const _HomePage();
     }
   }
@@ -164,6 +167,10 @@ class _HomePage extends StatelessWidget {
         const _QuickChildren(),
         const SizedBox(height: 32),
         const _StatCards(),
+        const SizedBox(height: 32),
+        const _GeofencingSection(),
+        const SizedBox(height: 32),
+        const _ChildrenTimelines(),
         const SizedBox(height: 32),
         const _CalendarSection(),
         const SizedBox(height: 100),
@@ -699,7 +706,20 @@ class _ChildProfileDialog extends StatelessWidget {
                         ],
 
                         const SizedBox(height: 32),
-                        Text('Timeline des cours', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Timeline des cours', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                            TextButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showCourseSelectionDialog(context, child);
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Ajouter un cours'),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 16),
                       ],
                     ),
@@ -1127,5 +1147,406 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
         ),
       ],
     );
+  }
+}
+
+class _BillingPage extends StatelessWidget {
+  const _BillingPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ChildEnrollmentProvider>(
+      builder: (context, provider, _) {
+        final children = provider.children;
+        final totalDue = provider.getTotalDueAllChildren();
+
+        return ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text(
+              'Mes Factures',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Suivez vos paiements et renouvellements',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 24),
+
+            // Résumé global
+            GlassCard(
+              color: Theme.of(context).colorScheme.primary,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Total dû (tous enfants)',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${totalDue.toStringAsFixed(0)} DA',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            if (children.isEmpty)
+              const Center(child: Text('Aucun enfant enregistré.'))
+            else
+              ...children.map((child) => _buildChildBillingCard(context, provider, child)),
+
+            const SizedBox(height: 100),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildChildBillingCard(BuildContext context, ChildEnrollmentProvider provider, ChildModel child) {
+    final enrollments = provider.getEnrollmentsForChild(child.id);
+    final totalDue = provider.getTotalDueForChild(child.id);
+    final nextRenewal = provider.getNextRenewalDateForChild(child.id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
+                child: child.photoUrl == null ? Text(child.firstName[0]) : null,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                child.fullName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const Spacer(),
+              if (totalDue > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${totalDue.toStringAsFixed(0)} DA dû',
+                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                )
+              else
+                const Icon(Icons.check_circle, color: Colors.green, size: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                if (enrollments.isEmpty)
+                  const Text('Aucune inscription active.')
+                else
+                  ...enrollments.map((e) => _buildEnrollmentRow(context, e)),
+
+                if (nextRenewal != null) ...[
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Prochain renouvellement', style: TextStyle(fontSize: 13)),
+                      Text(
+                        DateFormat('dd/MM/yyyy').format(nextRenewal),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnrollmentRow(BuildContext context, EnrollmentModel enrollment) {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Cours #${enrollment.courseId.substring(0, 5)}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                Text(
+                  'Statut: ${enrollment.paymentStatus.displayName}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (enrollment.remainingAmount > 0)
+                Text(
+                  '-${enrollment.paidAmount?.toStringAsFixed(0) ?? "0"} payé',
+                  style: const TextStyle(fontSize: 11, color: Colors.green),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GeofencingSection extends StatelessWidget {
+  const _GeofencingSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ChildEnrollmentProvider>(
+      builder: (context, provider, _) {
+        final children = provider.children;
+        if (children.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Transport & Geofencing', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+            ...children.map((child) {
+              final loc = provider.getChildLocation(child.id);
+              if (loc == null || loc['is_in_transport'] != true) return const SizedBox.shrink();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.directions_bus, color: Colors.orange),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${child.firstName} est dans le transport', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('Vitesse: ${loc['speed']?.toStringAsFixed(1)} km/h • Zone: Centre-Ville', style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text('Sécurisé', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ChildrenTimelines extends StatelessWidget {
+  const _ChildrenTimelines();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ChildEnrollmentProvider>(
+      builder: (context, provider, _) {
+        final children = provider.children;
+        if (children.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Activités du jour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: children.length,
+                itemBuilder: (context, index) {
+                  final child = children[index];
+                  final activities = provider.getActivitiesForChild(child.id);
+
+                  return Container(
+                    width: 280,
+                    margin: const EdgeInsets.only(right: 16),
+                    child: GlassCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
+                                child: child.photoUrl == null ? Text(child.firstName[0]) : null,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(child.firstName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const Divider(),
+                          Expanded(
+                            child: activities.isEmpty
+                              ? const Center(child: Text('Aucune activité notée', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)))
+                              : ListView.builder(
+                                  itemCount: activities.length,
+                                  itemBuilder: (context, i) {
+                                    final act = activities[i];
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.circle, size: 8, color: Theme.of(context).colorScheme.primary),
+                                          const SizedBox(width: 8),
+                                          Expanded(child: Text(act.title, style: const TextStyle(fontSize: 12))),
+                                          Text(act.status ?? '', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+void _showCourseSelectionDialog(BuildContext context, ChildModel child) {
+  showDialog(
+    context: context,
+    builder: (context) => _CourseSelectionDialog(child: child),
+  );
+}
+
+class _CourseSelectionDialog extends StatefulWidget {
+  final ChildModel child;
+  const _CourseSelectionDialog({required this.child});
+
+  @override
+  State<_CourseSelectionDialog> createState() => _CourseSelectionDialogState();
+}
+
+class _CourseSelectionDialogState extends State<_CourseSelectionDialog> {
+  final List<String> _selectedCourseIds = [];
+  bool _isSubmitting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final courseProvider = context.watch<CourseProvider>();
+    final childProvider = context.watch<ChildEnrollmentProvider>();
+    final courses = courseProvider.courses;
+
+    return AlertDialog(
+      title: Text('Inscrire ${widget.child.firstName}'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: courses.length,
+          itemBuilder: (context, i) {
+            final course = courses[i];
+            final isEnrolled = childProvider.isChildEnrolledInCourse(widget.child.id, course.id);
+            final isSelected = _selectedCourseIds.contains(course.id);
+
+            return CheckboxListTile(
+              title: Text(course.title),
+              subtitle: Text('${course.price?.toStringAsFixed(0) ?? "0"} DA'),
+              value: isEnrolled || isSelected,
+              onChanged: isEnrolled ? null : (val) {
+                setState(() {
+                  if (val == true) {
+                    _selectedCourseIds.add(course.id);
+                  } else {
+                    _selectedCourseIds.remove(course.id);
+                  }
+                });
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+        ElevatedButton(
+          onPressed: (_selectedCourseIds.isEmpty || _isSubmitting) ? null : _submit,
+          child: _isSubmitting
+            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Text('Confirmer'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    setState(() => _isSubmitting = true);
+    final provider = context.read<ChildEnrollmentProvider>();
+    final courseProvider = context.read<CourseProvider>();
+
+    final authProvider = context.read<AuthProviderV2>();
+    final parentId = authProvider.userData?['id'] ?? '';
+
+    bool allSuccess = true;
+    for (final courseId in _selectedCourseIds) {
+      final course = courseProvider.courses.firstWhere((c) => c.id == courseId);
+      final success = await provider.createEnrollment(
+        courseId: courseId,
+        childId: widget.child.id,
+        parentId: parentId,
+        totalAmount: course.price,
+      );
+      if (!success) allSuccess = false;
+    }
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(allSuccess ? 'Inscriptions réussies' : 'Certaines inscriptions ont échoué')),
+      );
+    }
   }
 }

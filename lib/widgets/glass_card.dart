@@ -10,6 +10,7 @@ class GlassCard extends StatelessWidget {
   final Border? border;
   final Color? color;
   final VoidCallback? onTap;
+  final Color? color;
 
   const GlassCard({
     super.key,
@@ -21,6 +22,7 @@ class GlassCard extends StatelessWidget {
     this.border,
     this.color,
     this.onTap,
+    this.color,
   });
 
   @override
