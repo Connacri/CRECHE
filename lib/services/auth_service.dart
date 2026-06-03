@@ -1,3 +1,4 @@
+import 'image_storage_service.dart';
 import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/foundation.dart';
@@ -430,6 +431,82 @@ class AuthService {
     } catch (e) {
       debugPrint("[AuthService] getCoaches error: $e");
       return [];
+    }
+  }
+  /// 🗑️ Supprime définitivement le compte utilisateur et toutes les données associées
+  Future<AuthResult> deleteUserAccount(String userId) async {
+    try {
+      debugPrint('[AuthService] Début suppression compte pour: $userId');
+
+      // 1. Récupérer les IDs des cours créés par l'utilisateur
+      final coursesResponse = await _adminClient
+          .from('courses')
+          .select('id')
+          .eq('created_by', userId);
+      final courseIds = (coursesResponse as List)
+          .map((c) => c['id'] as String)
+          .toList();
+
+      // 2. Récupérer les IDs des enfants de l'utilisateur
+      final childrenResponse = await _adminClient
+          .from('children')
+          .select('id')
+          .eq('parent_id', userId);
+      final childIds = (childrenResponse as List)
+          .map((c) => c['id'] as String)
+          .toList();
+
+      // 3. Supprimer les fichiers de stockage (photos de profil, enfants, cours)
+      await ImageStorageService().deleteAllUserStorageData(userId, courseIds);
+
+      // 4. Supprimer les données dans les tables Supabase (ordre respectant les FK)
+
+      // Activités quotidiennes des enfants
+      if (childIds.isNotEmpty) {
+        await _adminClient.from('daily_activities').delete().inFilter('child_id', childIds);
+      }
+
+      // Inscriptions (liées à l'utilisateur ou aux cours)
+
+      if (courseIds.isNotEmpty) {
+        await _adminClient.from('enrollments').delete().or('parent_id.eq.${userId},course_id.in.(${courseIds.join(",")})');
+      } else {
+        await _adminClient.from('enrollments').delete().eq('parent_id', userId);
+      }
+
+
+      // Horaires de sessions (liés aux cours ou à l'école)
+
+      if (courseIds.isNotEmpty) {
+        await _adminClient.from('session_schedules').delete().or('school_id.eq.${userId},course_id.in.(${courseIds.join(",")})');
+      } else {
+        await _adminClient.from('session_schedules').delete().eq('school_id', userId);
+      }
+
+
+      // Créneaux de disponibilité (écoles)
+      await _adminClient.from('school_available_slots').delete().eq('school_id', userId);
+
+      // Enfants
+      await _adminClient.from('children').delete().eq('parent_id', userId);
+
+      // Cours
+      await _adminClient.from('courses').delete().eq('created_by', userId);
+
+      // Enfin, l'utilisateur lui-même
+      await _adminClient.from('users').delete().eq('id', userId);
+
+      // 5. Supprimer l'utilisateur Firebase
+      final user = _firebaseAuth.currentUser;
+      if (user != null && user.uid == userId) {
+        await user.delete();
+      }
+
+      debugPrint('[AuthService] Suppression compte réussie pour: $userId');
+      return AuthResult.success(message: 'Compte supprimé définitivement');
+    } catch (e) {
+      debugPrint('[AuthService] Erreur suppression compte: $e');
+      return AuthResult.error('Erreur lors de la suppression: $e');
     }
   }
 }

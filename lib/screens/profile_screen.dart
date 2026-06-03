@@ -124,7 +124,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildAvatarSection(BuildContext context, UserModel user, AuthProviderV2 auth) {
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer définitivement le compte ?'),
+        content: const Text(
+          'Cette action est irréversible. Toutes vos données (profil, enfants, cours, inscriptions, photos) seront définitivement supprimées.',
+          style: TextStyle(color: Colors.red),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Supprimer définitivement'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final auth = context.read<AuthProviderV2>();
+      final result = await auth.deleteAccount();
+      if (result.success && mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${result.message}')),
+        );
+      }
+    }
+  }
+Widget _buildAvatarSection(BuildContext context, UserModel user, AuthProviderV2 auth) {
     final photoUrl = user.profileImages.profileImage;
 
     return Column(
@@ -279,6 +315,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.logout, color: Colors.red),
           label: const Text('Se déconnecter', style: TextStyle(color: Colors.red)),
           style: TextButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: _confirmDeleteAccount,
+          icon: const Icon(Icons.delete_forever, color: Colors.red),
+          label: const Text('Supprimer mon compte définitivement', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          style: TextButton.styleFrom(
+            minimumSize: const Size(double.infinity, 50),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
         ),
       ],
     );

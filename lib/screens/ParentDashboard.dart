@@ -846,7 +846,7 @@ class _ChildEnrollmentDialogState extends State<ChildEnrollmentDialog> {
           lastName: _lastNameCtrl.text.trim(),
           dateOfBirth: _birthDate!,
           gender: _gender!,
-          photo: _pickedImage,
+          photoFile: _pickedImage,
           schoolGrade:
               _gradeCtrl.text.trim().isEmpty ? null : _gradeCtrl.text.trim(),
         );
