@@ -288,14 +288,26 @@ class _StatCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<ChildEnrollmentProvider, int>(
-      selector: (_, provider) => provider.enrollments.length,
-      builder: (context, enrollmentCount, _) {
+    return Consumer<ChildEnrollmentProvider>(
+      builder: (context, provider, _) {
+        final enrollments = provider.enrollments;
+        final activeEnrollments = enrollments.where((e) => e.status == EnrollmentStatus.approved).length;
+
+        int totalSessions = 0;
+        int attendedSessions = 0;
+
+        for (var e in enrollments) {
+          totalSessions += e.attendanceHistory.length;
+          attendedSessions += e.attendanceCount;
+        }
+
+        final attendanceStr = totalSessions > 0 ? '$attendedSessions/$totalSessions' : '0/0';
+
         return Row(
           children: [
-            Expanded(child: _buildStatCard(context, 'Présences', '18/20', Icons.check_circle_outline, Colors.green)),
+            Expanded(child: _buildStatCard(context, 'Présences', attendanceStr, Icons.check_circle_outline, Colors.green)),
             const SizedBox(width: 16),
-            Expanded(child: _buildStatCard(context, 'Cours Actifs', '$enrollmentCount', Icons.book_outlined, Colors.blue)),
+            Expanded(child: _buildStatCard(context, 'Cours Actifs', '$activeEnrollments', Icons.book_outlined, Colors.blue)),
           ],
         );
       },

@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_native_splash: ^2.4.4
   flutter_localizations:
     sdk: flutter
 
@@ -71,3 +72,12 @@ flutter:
     - assets/logos/
     - assets/seasons/
     - assets/qrcode/
+
+flutter_native_splash:
+  color: "#ffffff"
+  background_image: "assets/images/splash_bg.jpg"
+  fullscreen: true
+  android_12:
+    color: "#ffffff"
+    background_image: "assets/images/splash_bg.jpg"
+    fullscreen: true

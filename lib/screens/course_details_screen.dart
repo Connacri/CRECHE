@@ -279,7 +279,7 @@ class _EnrollmentBottomSheet extends StatefulWidget {
 }
 
 class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
-  String? _selectedChildId;
+  final List<String> _selectedChildIds = [];
   bool _isSubmitting = false;
 
   @override
@@ -318,7 +318,7 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
           ),
           const SizedBox(height: 24),
           const Text(
-            'Sélectionnez l\'enfant à inscrire :',
+            'Sélectionnez les enfants à inscrire :',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
@@ -350,13 +350,19 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
                 itemBuilder: (context, index) {
                   final child = children[index];
                   final isEnrolled = childProvider.isChildEnrolledInCourse(child.id, widget.course.id);
-                  final isSelected = _selectedChildId == child.id;
+                  final isSelected = _selectedChildIds.contains(child.id);
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: InkWell(
                       onTap: isEnrolled ? null : () {
-                        setState(() => _selectedChildId = child.id);
+                        setState(() {
+                          if (isSelected) {
+                            _selectedChildIds.remove(child.id);
+                          } else {
+                            _selectedChildIds.add(child.id);
+                          }
+                        });
                       },
                       child: Container(
                         padding: const EdgeInsets.all(12),
@@ -389,9 +395,9 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
                             if (isEnrolled)
                               const Icon(Icons.check_circle, color: Colors.green)
                             else if (isSelected)
-                              Icon(Icons.radio_button_checked, color: Theme.of(context).colorScheme.primary)
+                              Icon(Icons.check_box, color: Theme.of(context).colorScheme.primary)
                             else
-                              const Icon(Icons.radio_button_off, color: Colors.grey),
+                              const Icon(Icons.check_box_outline_blank, color: Colors.grey),
                           ],
                         ),
                       ),
@@ -404,7 +410,7 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: (_selectedChildId == null || _isSubmitting) ? null : _submitEnrollment,
+              onPressed: (_selectedChildIds.isEmpty || _isSubmitting) ? null : _submitEnrollment,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -424,21 +430,26 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
     setState(() => _isSubmitting = true);
     
     final childProvider = context.read<ChildEnrollmentProvider>();
-    final success = await childProvider.createEnrollment(
-      courseId: widget.course.id,
-      childId: _selectedChildId!,
-      parentId: widget.parentId,
-      totalAmount: widget.course.price,
-    );
+    bool allSuccess = true;
+
+    for (final childId in _selectedChildIds) {
+      final success = await childProvider.createEnrollment(
+        courseId: widget.course.id,
+        childId: childId,
+        parentId: widget.parentId,
+        totalAmount: widget.course.price,
+      );
+      if (!success) allSuccess = false;
+    }
 
     if (mounted) {
       setState(() => _isSubmitting = false);
-      if (success) {
+      if (allSuccess) {
         Navigator.pop(context);
         _showSuccessDialog();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(childProvider.error ?? 'Une erreur est survenue')),
+          SnackBar(content: Text(childProvider.error ?? 'Une ou plusieurs inscriptions ont échoué')),
         );
       }
     }

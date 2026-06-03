@@ -17,8 +17,11 @@ class ChildEnrollmentProvider extends ChangeNotifier {
   List<EnrollmentModel> _enrollments = [];
   List<EnrollmentModel> get enrollments => _enrollments;
 
-  List<SessionSchedule> _schedules = [];
-  List<SessionSchedule> get schedules => _schedules;
+  // Geofencing simulé (position actuelle des enfants)
+  final Map<String, Map<String, dynamic>> _childrenLocations = {};
+
+  bool _isLoading = false;
+  String? _error;
 
   List<Map<String, dynamic>> _ownerEnrollmentsDetailed = [];
   List<Map<String, dynamic>> get ownerEnrollmentsDetailed => _ownerEnrollmentsDetailed;
@@ -248,6 +251,56 @@ class ChildEnrollmentProvider extends ChangeNotifier {
     if (active.isEmpty) return null;
     return active.map((e) => (e.approvedAt ?? e.enrolledAt).add(const Duration(days: 30))).reduce((a, b) => a.isBefore(b) ? a : b);
   }
+
+  // === ✅ CALCULS DE FACTURATION ===
+
+  double getTotalDueForChild(String childId) {
+    return getEnrollmentsForChild(childId)
+        .fold(0.0, (sum, e) => sum + e.remainingAmount);
+  }
+
+  double getTotalPaidForChild(String childId) {
+    return getEnrollmentsForChild(childId)
+        .fold(0.0, (sum, e) => sum + (e.paidAmount ?? 0));
+  }
+
+  double getTotalDueAllChildren() {
+    return _enrollments.fold(0.0, (sum, e) => sum + e.remainingAmount);
+  }
+
+  DateTime? getNextRenewalDateForChild(String childId) {
+    final enrollments = getEnrollmentsForChild(childId)
+        .where((e) => e.status == EnrollmentStatus.approved)
+        .toList();
+    if (enrollments.isEmpty) return null;
+
+    // Simulation : 1 mois après la date d'inscription ou d'approbation
+    final earliest = enrollments.fold<DateTime?>(null, (min, e) {
+      final renewal = (e.approvedAt ?? e.enrolledAt).add(const Duration(days: 30));
+      if (min == null || renewal.isBefore(min)) return renewal;
+      return min;
+    });
+
+    return earliest;
+  }
+
+  // === ✅ ACTIVITÉS ET GEOFENCING ===
+
+  Map<String, dynamic>? getChildLocation(String childId) {
+    // Simuler une position si non existante pour la démo
+    if (!_childrenLocations.containsKey(childId)) {
+      _childrenLocations[childId] = {
+        'lat': 36.7538 + (childId.hashCode % 100) * 0.0001,
+        'lng': 3.0588 + (childId.hashCode % 100) * 0.0001,
+        'speed': 15.0 + (childId.hashCode % 10),
+        'is_in_transport': true,
+      };
+    }
+    return _childrenLocations[childId];
+  }
+}
+
+// === ✅ EXTENSIONS POUR FACILITER L'UTILISATION ===
 
   void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
   void _setError(String error) { _error = error; notifyListeners(); }
