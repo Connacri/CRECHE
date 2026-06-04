@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -8,11 +7,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/course_model_complete.dart';
-import '../core/config/supabase_config.dart';
+import 'supabase_service.dart';
 
-class ImageStorageService {
-  final SupabaseClient _supabase = Supabase.instance.client;
-  late final SupabaseClient _adminClient;
+class ImageStorageService extends AdminSupabaseService {
   final Uuid _uuid = const Uuid();
 
   static const String _coursesBucket = 'courses';
@@ -21,13 +18,6 @@ class ImageStorageService {
 
   static const int maxImageSizeKB = 500;
   static const int imageQuality = 85;
-
-  ImageStorageService() {
-    _adminClient = SupabaseClient(
-      SupabaseConfig.url,
-      SupabaseConfig.serviceRoleKey,
-    );
-  }
 
   bool get _isWindowsDesktop => !kIsWeb && Platform.isWindows;
 
@@ -56,12 +46,12 @@ class ImageStorageService {
       final String fileName = '${_uuid.v4()}.jpg';
       final String filePath = '$folder/$fileName';
       final bytes = await fileToUpload.readAsBytes();
-      await _adminClient.storage.from(_profileBucket).uploadBinary(
+      await adminClient.storage.from(_profileBucket).uploadBinary(
             filePath,
             bytes,
             fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
           );
-      return _adminClient.storage.from(_profileBucket).getPublicUrl(filePath);
+      return adminClient.storage.from(_profileBucket).getPublicUrl(filePath);
     } catch (e) {
       throw Exception("Erreur upload generic: $e");
     }
@@ -72,8 +62,8 @@ class ImageStorageService {
     final imgId = _uuid.v4();
     final filePath = '$courseId/$imgId.jpg';
     final bytes = await fileToUpload.readAsBytes();
-    await _adminClient.storage.from(_coursesBucket).uploadBinary(filePath, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true));
-    return CourseImage(id: imgId, supabaseUrl: _adminClient.storage.from(_coursesBucket).getPublicUrl(filePath), localPath: imageFile.path, isSynced: true, uploadedAt: DateTime.now());
+    await adminClient.storage.from(_coursesBucket).uploadBinary(filePath, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true));
+    return CourseImage(id: imgId, supabaseUrl: adminClient.storage.from(_coursesBucket).getPublicUrl(filePath), localPath: imageFile.path, isSynced: true, uploadedAt: DateTime.now());
   }
 
   Future<List<CourseImage>> uploadMultipleCourseImages({required List<File> imageFiles, required String courseId, Function(int, int)? onProgress}) async {
@@ -83,19 +73,21 @@ class ImageStorageService {
         final img = await uploadCourseImage(imageFile: imageFiles[i], courseId: courseId);
         results.add(img);
         onProgress?.call(i + 1, imageFiles.length);
-      } catch (e) {}
+      } catch (e) {
+        // Silently ignore individual upload failures to continue with others
+      }
     }
     return results;
   }
 
   Future<void> deleteCourseImage(CourseImage img, String courseId) async {
     if (img.supabaseUrl == null || img.supabaseUrl!.isEmpty) return;
-    await _adminClient.storage.from(_coursesBucket).remove(['$courseId/${img.id}.jpg']);
+    await adminClient.storage.from(_coursesBucket).remove(['$courseId/${img.id}.jpg']);
   }
 
   Future<void> deleteMultipleImages(List<CourseImage> images, String courseId) async {
     final paths = images.where((img) => img.supabaseUrl != null && img.supabaseUrl!.isNotEmpty).map((img) => '$courseId/${img.id}.jpg').toList();
-    if (paths.isNotEmpty) await _adminClient.storage.from(_coursesBucket).remove(paths);
+    if (paths.isNotEmpty) await adminClient.storage.from(_coursesBucket).remove(paths);
   }
 
   Future<String?> uploadUserProfileImage({required File imageFile, required String userId, required bool isProfileImage}) async {
@@ -103,47 +95,47 @@ class ImageStorageService {
     final fileToUpload = await _compressImage(imageFile);
     final String filePath = isProfileImage ? '$userId/avatar.jpg' : '$userId/cover.jpg';
     final bytes = await fileToUpload.readAsBytes();
-    await _adminClient.storage.from(bucketName).uploadBinary(filePath, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
-    return _adminClient.storage.from(bucketName).getPublicUrl(filePath);
+    await adminClient.storage.from(bucketName).uploadBinary(filePath, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
+    return adminClient.storage.from(bucketName).getPublicUrl(filePath);
   }
 
   Future<String?> uploadChildPhoto({required File imageFile, required String userId, required String childId}) async {
     final fileToUpload = await _compressImage(imageFile);
     final path = '$userId/children/$childId.jpg';
     final bytes = await fileToUpload.readAsBytes();
-    await _adminClient.storage.from(_profileBucket).uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
-    return _adminClient.storage.from(_profileBucket).getPublicUrl(path);
+    await adminClient.storage.from(_profileBucket).uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
+    return adminClient.storage.from(_profileBucket).getPublicUrl(path);
   }
 
   Future<void> deleteAllUserStorageData(String userId, List<String> courseIds) async {
     try {
       // 1. Delete profiles (avatar + children)
-      final profileFiles = await _adminClient.storage.from(_profileBucket).list(path: userId);
+      final profileFiles = await adminClient.storage.from(_profileBucket).list(path: userId);
       if (profileFiles.isNotEmpty) {
         final paths = profileFiles.map((f) => '$userId/${f.name}').toList();
-        await _adminClient.storage.from(_profileBucket).remove(paths);
+        await adminClient.storage.from(_profileBucket).remove(paths);
       }
 
       // Also check children subfolder in profiles
-      final childrenFiles = await _adminClient.storage.from(_profileBucket).list(path: '$userId/children');
+      final childrenFiles = await adminClient.storage.from(_profileBucket).list(path: '$userId/children');
       if (childrenFiles.isNotEmpty) {
         final paths = childrenFiles.map((f) => '$userId/children/${f.name}').toList();
-        await _adminClient.storage.from(_profileBucket).remove(paths);
+        await adminClient.storage.from(_profileBucket).remove(paths);
       }
 
       // 2. Delete covers
-      final coverFiles = await _adminClient.storage.from(_coverBucket).list(path: userId);
+      final coverFiles = await adminClient.storage.from(_coverBucket).list(path: userId);
       if (coverFiles.isNotEmpty) {
         final paths = coverFiles.map((f) => '$userId/${f.name}').toList();
-        await _adminClient.storage.from(_coverBucket).remove(paths);
+        await adminClient.storage.from(_coverBucket).remove(paths);
       }
 
       // 3. Delete course images
       for (final courseId in courseIds) {
-        final courseFiles = await _adminClient.storage.from(_coursesBucket).list(path: courseId);
+        final courseFiles = await adminClient.storage.from(_coursesBucket).list(path: courseId);
         if (courseFiles.isNotEmpty) {
           final paths = courseFiles.map((f) => '$courseId/${f.name}').toList();
-          await _adminClient.storage.from(_coursesBucket).remove(paths);
+          await adminClient.storage.from(_coursesBucket).remove(paths);
         }
       }
     } catch (e) {

@@ -51,6 +51,40 @@ enum CourseSeason {
         return 'Toute l\'année';
     }
   }
+
+  /// Retourne les dates par défaut pour une saison donnée pour l'année en cours
+  Map<String, DateTime> getDefaultDateRange() {
+    final now = DateTime.now();
+    final year = now.year;
+
+    switch (this) {
+      case CourseSeason.spring:
+        return {
+          'start': DateTime(year, 3, 21),
+          'end': DateTime(year, 6, 20),
+        };
+      case CourseSeason.summer:
+        return {
+          'start': DateTime(year, 6, 21),
+          'end': DateTime(year, 9, 21),
+        };
+      case CourseSeason.fall:
+        return {
+          'start': DateTime(year, 9, 22),
+          'end': DateTime(year, 12, 20),
+        };
+      case CourseSeason.winter:
+        return {
+          'start': DateTime(year, 12, 21),
+          'end': DateTime(year + 1, 3, 20),
+        };
+      case CourseSeason.yearRound:
+        return {
+          'start': DateTime(year, 1, 1),
+          'end': DateTime(year, 12, 31),
+        };
+    }
+  }
 }
 
 class CourseLocation {

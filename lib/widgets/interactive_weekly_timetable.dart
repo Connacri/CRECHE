@@ -91,7 +91,7 @@ class InteractiveWeeklyTimetable extends StatelessWidget {
               ),
               child: Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.withOpacity(0.2), width: 0.5),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.2), width: 0.5),
                 ),
               ),
             ),

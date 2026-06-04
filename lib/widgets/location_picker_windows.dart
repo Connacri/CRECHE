@@ -34,7 +34,6 @@ class _LocationPickerDialogWindowsState
   List<LocationSearchResult> _searchResults = [];
   bool _isSearching = false;
   bool _isLoadingCurrentLocation = false;
-  bool _initialLocationSet = false;
 
   // Marqueur de sélection
   final List<Marker> _markers = [];
@@ -76,7 +75,6 @@ class _LocationPickerDialogWindowsState
 
     _selectedPosition = LatLng(lat, lon);
     _selectedAddress = addr;
-    _initialLocationSet = true;
     _addMarkerAtPosition(_selectedPosition!);
 
     print('🔵 [LocationPickerWindows] Position initiale: $lat, $lon');

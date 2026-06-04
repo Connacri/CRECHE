@@ -30,7 +30,6 @@ class AppTheme {
         primary: AppColors.primaryPink,
         secondary: AppColors.softBlue,
         surface: AppColors.surface,
-        background: AppColors.background,
       ),
       textTheme: GoogleFonts.quicksandTextTheme().apply(
         bodyColor: AppColors.textMain,

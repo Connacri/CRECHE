@@ -64,7 +64,7 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedCourseId,
+                initialValue: _selectedCourseId,
                 decoration: const InputDecoration(labelText: 'Cours'),
                 items: widget.courses.map((c) => DropdownMenuItem(
                   value: c.id,
@@ -74,7 +74,7 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<DayOfWeek>(
-                value: _selectedDay,
+                initialValue: _selectedDay,
                 decoration: const InputDecoration(labelText: 'Jour'),
                 items: DayOfWeek.values.map((d) => DropdownMenuItem(
                   value: d,
@@ -109,7 +109,7 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String?>(
-                value: _selectedCoachId,
+                initialValue: _selectedCoachId,
                 decoration: const InputDecoration(labelText: 'Coach'),
                 items: [
                   const DropdownMenuItem<String?>(value: null, child: Text('Aucun coach')),

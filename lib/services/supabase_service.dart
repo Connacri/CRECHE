@@ -1,6 +1,5 @@
 import 'dart:math' show sqrt, asin, pi, sin, cos;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart';
 import '../core/config/supabase_config.dart';
 
 import '../models/child_model_complete.dart';

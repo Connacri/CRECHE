@@ -12,7 +12,7 @@ import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
 import "../widgets/interactive_weekly_timetable.dart";
 import "../widgets/add_session_dialog.dart";
-import "../models/session_schedule_model.dart";
+import 'club_menu_screen.dart';
 import 'create_course_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
@@ -61,13 +61,16 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Aperçu'),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Inscriptions'),
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Planning'),
+          BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Menu'),
         ],
       ),
     );
   }
 
   Widget _buildHeader() {
-    final avatarUrl = _user?.profileImages.profileImageSupabase;
+    final auth = context.watch<AuthProviderV2>();
+    final user = auth.userData != null ? UserModel.fromSupabase(auth.userData!) : _user;
+    final avatarUrl = user?.profileImages.profileImageSupabase;
     return Container(
       padding: const EdgeInsets.all(24),
       child: Row(children: [
@@ -75,7 +78,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
         const SizedBox(width: 16),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Bonjour,', style: TextStyle(color: Colors.grey[600])),
-          Text(_user?.name ?? 'Utilisateur', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(user?.name ?? 'Utilisateur', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ]),
       ]),
     );
@@ -83,9 +86,10 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
 
   Widget _getPage(int index) {
     switch (index) {
-      case 0: return const Center(child: Text('Statistiques'));
+      case 0: return const _DashboardOverview();
       case 1: return const _EnrollmentsPage();
       case 2: return const _PlanningManagementPage();
+      case 3: return const ClubMenuScreen();
       default: return const Center(child: Text('Statistiques'));
     }
   }
@@ -189,11 +193,87 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
   }
 }
 
+class _DashboardOverview extends StatelessWidget {
+  const _DashboardOverview();
+
+  @override
+  Widget build(BuildContext context) {
+    final courses = context.watch<CourseProvider>().userCourses;
+    final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
+    final pendingEnrollments = enrollments.where((e) {
+      final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
+      return enrollment.status == EnrollmentStatus.pending;
+    }).length;
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            Expanded(child: _StatCard('Cours actifs', courses.where((c) => c.isActive).length.toString(), Icons.school, Colors.blue)),
+            const SizedBox(width: 12),
+            Expanded(child: _StatCard('Inscriptions', enrollments.length.toString(), Icons.people, Colors.green)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _StatCard('En attente', pendingEnrollments.toString(), Icons.hourglass_empty, Colors.orange)),
+            const SizedBox(width: 12),
+            Expanded(child: _StatCard('Adhérents', '0', Icons.card_membership, Colors.purple)),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Text('Actions rapides', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateCourseScreen())),
+          borderRadius: BorderRadius.circular(16),
+          child: GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.add_circle, color: Colors.blue, size: 28)),
+                const SizedBox(width: 16),
+                const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Créer un cours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), Text('Ajouter un nouveau cours au catalogue', style: TextStyle(fontSize: 13, color: Colors.grey))])),
+                const Icon(Icons.arrow_forward_ios, size: 16),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  const _StatCard(this.label, this.value, this.icon, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [Icon(icon, size: 18, color: color), const Spacer(), Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color))]),
+          const SizedBox(height: 8),
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+        ],
+      ),
+    );
+  }
+}
+
 class _EnrollmentsPage extends StatelessWidget {
   const _EnrollmentsPage();
   @override
   Widget build(BuildContext context) {
     final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
+    final provider = context.read<ChildEnrollmentProvider>();
     if (enrollments.isEmpty) return const Center(child: Text('Aucune inscription.'));
     return ListView.builder(
       padding: const EdgeInsets.all(24),
@@ -203,16 +283,98 @@ class _EnrollmentsPage extends StatelessWidget {
         final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
         final child = ChildModel.fromSupabase(item['child']);
         final course = CourseModel.fromSupabase(item['course']);
-        return Padding(padding: const EdgeInsets.only(bottom: 16), child: GlassCard(padding: const EdgeInsets.all(16), child: Row(children: [
-          CircleAvatar(backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null, child: child.photoUrl == null ? const Icon(Icons.person) : null),
-          const SizedBox(width: 16),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(course.title, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-          ])),
-          _buildStatusChip(enrollment.status),
-        ])));
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  CircleAvatar(backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null, child: child.photoUrl == null ? const Icon(Icons.person) : null),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(course.title, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                  ])),
+                  _buildStatusChip(enrollment.status),
+                ]),
+                if (enrollment.status == EnrollmentStatus.pending) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _updateStatus(context, provider, enrollment.id, 'approved'),
+                            icon: const Icon(Icons.check, size: 18),
+                            label: const Text('Approuver', style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _rejectDialog(context, provider, enrollment.id),
+                            icon: const Icon(Icons.close, size: 18),
+                            label: const Text('Refuser', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
       },
+    );
+  }
+
+  void _updateStatus(BuildContext context, ChildEnrollmentProvider provider, String enrollmentId, String status) async {
+    final enrollmentStatus = status == 'approved'
+        ? EnrollmentStatus.approved
+        : status == 'rejected'
+            ? EnrollmentStatus.rejected
+            : EnrollmentStatus.cancelled;
+    try {
+      await provider.updateEnrollment(enrollmentId: enrollmentId, status: enrollmentStatus);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(status == 'approved' ? 'Inscription approuvée' : 'Inscription mise à jour')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+      }
+    }
+  }
+
+  void _rejectDialog(BuildContext context, ChildEnrollmentProvider provider, String enrollmentId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Refuser l\'inscription'),
+        content: const Text('Êtes-vous sûr de vouloir refuser cette inscription ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _updateStatus(context, provider, enrollmentId, 'rejected');
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Refuser'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -123,7 +123,7 @@ class _AssociateToSchoolScreenState extends State<AssociateToSchoolScreen> {
                         child: GlassCard(
                           padding: const EdgeInsets.all(16),
                           color: isSelected
-                            ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                             : null,
                           border: isSelected
                             ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)

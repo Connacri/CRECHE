@@ -588,7 +588,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<CourseCategory>(
-          value: _selectedCategory,
+          initialValue: _selectedCategory,
           decoration: const InputDecoration(
             labelText: 'Catégorie',
             prefixIcon: Icon(Icons.category),
@@ -644,7 +644,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<CourseSeason>(
-          value: _selectedSeason,
+          initialValue: _selectedSeason,
           decoration: const InputDecoration(
             labelText: 'Saison',
             prefixIcon: Icon(Icons.calendar_today),
@@ -657,7 +657,13 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
               .toList(),
           onChanged: (value) {
             if (value != null) {
-              setState(() => _selectedSeason = value);
+              setState(() {
+                _selectedSeason = value;
+                // Mettre à jour les dates selon la saison
+                final dates = value.getDefaultDateRange();
+                _seasonStartDate = dates['start']!;
+                _seasonEndDate = dates['end']!;
+              });
             }
           },
         ),
@@ -782,7 +788,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   Widget _buildPreviewPanel() {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         border: Border(
           left: BorderSide(color: Theme.of(context).dividerColor),
         ),

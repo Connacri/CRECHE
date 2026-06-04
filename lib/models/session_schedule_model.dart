@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// Modèle pour représenter une session de cours planifiée
 /// Utilisé pour la timeline hebdomadaire dans le ParentDashboard
 class SessionSchedule {

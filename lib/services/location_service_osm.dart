@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
@@ -43,7 +42,9 @@ class LocationService {
     try {
       PermissionStatus status = await Permission.location.status;
 
-      if (status.isGranted) return true;
+      if (status.isGranted) {
+        return true;
+      }
 
       if (status.isDenied) {
         status = await Permission.location.request();
@@ -423,9 +424,9 @@ class LocationService {
 
   Future<List<LocationSearchResult>> searchLocation(String query) async {
     print('🔍 [LocationService] searchLocation: "$query"');
-    if (query
-        .trim()
-        .isEmpty) return [];
+    if (query.trim().isEmpty) {
+      return [];
+    }
 
     try {
       final url = Uri.parse(

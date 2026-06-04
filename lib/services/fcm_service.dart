@@ -1,22 +1,14 @@
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_service.dart';
 
-import '../core/config/supabase_config.dart';
-
-class FCMService {
+class FCMService extends AdminSupabaseService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  late final SupabaseClient _adminClient;
 
   static final FCMService _instance = FCMService._internal();
   factory FCMService() => _instance;
-  FCMService._internal() {
-    _adminClient = SupabaseClient(
-      SupabaseConfig.url,
-      SupabaseConfig.serviceRoleKey,
-    );
-  }
+  FCMService._internal() : super();
 
   Future<void> initialize() async {
     if (!kIsWeb && ![Platform.isAndroid, Platform.isIOS].any((b) => b)) {
@@ -64,7 +56,7 @@ class FCMService {
 
   Future<void> updateUserToken(String userId, String token) async {
     try {
-      await _adminClient.from('users').update({
+      await adminClient.from('users').update({
         'fcm_token': token,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', userId);

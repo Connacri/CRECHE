@@ -228,7 +228,9 @@ Widget _buildAvatarSection(BuildContext context, UserModel user, AuthProviderV2 
           }
         };
         await auth.updateUserProfileSilent(profileImagesUpdate);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo de profil mise à jour !')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo de profil mise à jour !')));
+        }
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));

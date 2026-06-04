@@ -5,12 +5,10 @@ import 'package:provider/provider.dart';
 import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
-import '../models/user_model.dart';
 import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../providers/course_provider_complete.dart';
 import '../widgets/glass_card.dart';
-import 'course_details_screen.dart';
 import 'create_course_screen.dart';
 import 'profile_screen.dart';
 import 'associate_to_school_screen.dart';
@@ -46,7 +44,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.05),
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
               Theme.of(context).colorScheme.surface,
             ],
           ),
@@ -67,7 +65,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
   }
 
   Widget _buildHeader() {
-    final auth = context.read<AuthProviderV2>();
+    final auth = context.watch<AuthProviderV2>();
     final userData = auth.userData;
     final userName = userData != null ? userData['name'] : 'Chargement...';
     final profileImage = userData != null && userData['profile_images'] != null

@@ -3,13 +3,65 @@ name: Multi-Platform Build & Release
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type (patch/minor/major)'
+        required: true
+        default: 'patch'
 
 jobs:
+  version:
+    name: Determine & Update Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+      build_number: ${{ steps.set_version.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag or generate
+        id: set_version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/v}"
+            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+            echo "build_number=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            # Get latest tag, default to v1.2.0
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.2.0")
+            LATEST_VERSION="${LATEST_TAG#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
+            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "build_number=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update pubspec.yaml version
+        run: |
+          VERSION="${{ steps.set_version.outputs.version }}"
+          BUILD="${{ steps.set_version.outputs.build_number }}"
+          sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
+
+      - name: Commit version bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add pubspec.yaml
+          git commit -m "chore: bump version to ${{ steps.set_version.outputs.version }}+${{ steps.set_version.outputs.build_number }}"
+          git push
+
   build-android:
     name: Build Android
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,15 +81,18 @@ jobs:
       - name: Build APK
         run: flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
       - name: Rename APK
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/creche-android.apk
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/creche-android-v${VERSION}.apk"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: build/app/outputs/flutter-apk/creche-android.apk
+          path: build/app/outputs/flutter-apk/creche-android-v*.apk
 
   build-windows:
     name: Build Windows
+    needs: version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +127,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-android, build-windows]
+    needs: [version, build-android, build-windows]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -84,10 +139,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.${{ github.run_number }}
-          name: Release v1.2.${{ github.run_number }}
+          tag_name: v${{ needs.version.outputs.version }}
+          name: Release v${{ needs.version.outputs.version }}
           files: |
-            android-apk/creche-android.apk
+            android-apk/creche-android-v*.apk
             windows-installer/creche-windows-installer.exe
             windows-zip/creche-windows-x64.zip
           token: ${{ secrets.GITHUB_TOKEN }}

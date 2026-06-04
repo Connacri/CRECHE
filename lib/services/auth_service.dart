@@ -170,16 +170,12 @@ class AuthService {
     try {
       debugPrint('[AuthService] Début Google Sign-In...');
 
-      final GoogleSignInAccount? googleUser =
+      final googleUser =
           await _googleSignIn.authenticate();
-
-      if (googleUser == null) {
-        return AuthResult.error('Connexion annulée par l\'utilisateur');
-      }
 
       debugPrint('[AuthService] Récupération tokens Google...');
       final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+          googleUser.authentication;
 
       final String? idToken = googleAuth.idToken;
 
@@ -271,7 +267,7 @@ class AuthService {
 
       if (googleUser != null) {
         final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
+            googleUser.authentication;
 
         String? accessToken;
         try {
@@ -427,7 +423,7 @@ class AuthService {
           .select()
           .eq("role", "coach")
           .eq("is_active", true);
-      return List<Map<String, dynamic>>.from(response ?? []);
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint("[AuthService] getCoaches error: $e");
       return [];
@@ -469,7 +465,7 @@ class AuthService {
       // Inscriptions (liées à l'utilisateur ou aux cours)
 
       if (courseIds.isNotEmpty) {
-        await _adminClient.from('enrollments').delete().or('parent_id.eq.${userId},course_id.in.(${courseIds.join(",")})');
+        await _adminClient.from('enrollments').delete().or('parent_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
       } else {
         await _adminClient.from('enrollments').delete().eq('parent_id', userId);
       }
@@ -478,7 +474,7 @@ class AuthService {
       // Horaires de sessions (liés aux cours ou à l'école)
 
       if (courseIds.isNotEmpty) {
-        await _adminClient.from('session_schedules').delete().or('school_id.eq.${userId},course_id.in.(${courseIds.join(",")})');
+        await _adminClient.from('session_schedules').delete().or('school_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
       } else {
         await _adminClient.from('session_schedules').delete().eq('school_id', userId);
       }

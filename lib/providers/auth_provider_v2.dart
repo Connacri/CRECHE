@@ -269,8 +269,11 @@ class AuthProviderV2 with ChangeNotifier {
     return false;
   }
 
+  bool _checkingUserStatus = false;
+
   Future<void> _checkUserStatus() async {
-    if (_currentUser == null) return;
+    if (_currentUser == null || _checkingUserStatus) return;
+    _checkingUserStatus = true;
 
     debugPrint(
         '[AuthProviderV2] _checkUserStatus for uid=${_currentUser!.uid}');
@@ -309,6 +312,8 @@ class AuthProviderV2 with ChangeNotifier {
       debugPrint('[AuthProviderV2] _checkUserStatus CRITICAL ERROR: $e');
       _errorMessage = e.toString();
       _setState(AppAuthState.error);
+    } finally {
+      _checkingUserStatus = false;
     }
   }
 

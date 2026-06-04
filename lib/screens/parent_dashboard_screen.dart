@@ -9,8 +9,6 @@ import '../../dependences/calendar_timeline/calendar_timeline.dart';
 import '../providers/auth_provider_v2.dart';
 import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
-import '../models/session_schedule_model.dart';
-import '../models/user_model.dart';
 import '../models/child_model_complete.dart';
 import '../models/daily_activity_model.dart';
 import '../providers/child_enrollment_provider.dart';
@@ -471,7 +469,7 @@ class _CalendarSectionState extends State<_CalendarSection> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ],
         );
       },
@@ -1135,7 +1133,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<ChildGender>(
-                value: _gender,
+                initialValue: _gender,
                 decoration: const InputDecoration(labelText: 'Genre'),
                 items: ChildGender.values.map((g) => DropdownMenuItem(
                   value: g,
@@ -1251,7 +1249,7 @@ class _BillingPage extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -1295,7 +1293,6 @@ class _BillingPage extends StatelessWidget {
   }
 
   Widget _buildEnrollmentRow(BuildContext context, EnrollmentModel enrollment) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -1371,7 +1368,7 @@ class _GeofencingSection extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
+                          color: Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text('Sécurisé', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -1446,7 +1443,7 @@ class _ChildrenTimelines extends StatelessWidget {
                                           Icon(Icons.circle, size: 8, color: Theme.of(context).colorScheme.primary),
                                           const SizedBox(width: 8),
                                           Expanded(child: Text(act.title, style: const TextStyle(fontSize: 12))),
-                                          Text(act.status ?? '', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                          Text(act.status, style: const TextStyle(fontSize: 10, color: Colors.grey)),
                                         ],
                                       ),
                                     );

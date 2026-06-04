@@ -186,7 +186,7 @@ class _ErrorScreen extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
                 Theme.of(context).colorScheme.surface,
               ],
             ),
@@ -261,7 +261,7 @@ class DeactivatedAccountScreen extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
                 Theme.of(context).colorScheme.surface,
               ],
             ),

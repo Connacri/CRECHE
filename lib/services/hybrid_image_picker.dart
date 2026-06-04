@@ -102,7 +102,7 @@ class HybridImagePickerService {
       }
 
       return pickedFile;
-    } catch (e, stackTrace) {
+    } catch (e) {
       print('❌ [HybridPicker] Erreur picking: $e');
       rethrow;
     }
@@ -400,17 +400,6 @@ class HybridImagePickerService {
   // ============================================================================
   // UTILITAIRES
   // ============================================================================
-
-  /// 🔍 Retourne le nom de la plateforme actuelle
-  static String _getPlatformName() {
-    if (kIsWeb) return 'Web';
-    if (Platform.isWindows) return 'Windows Desktop';
-    if (Platform.isAndroid) return 'Android';
-    if (Platform.isIOS) return 'iOS';
-    if (Platform.isMacOS) return 'macOS';
-    if (Platform.isLinux) return 'Linux';
-    return 'Unknown';
-  }
 
   /// 📊 Valide si un fichier est une image valide
   static bool isValidImageFile(File file) {

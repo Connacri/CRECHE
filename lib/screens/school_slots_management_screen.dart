@@ -157,7 +157,7 @@ class _SchoolSlotsManagementScreenState extends State<SchoolSlotsManagementScree
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<DayOfWeek>(
-                value: selectedDay,
+                initialValue: selectedDay,
                 items: DayOfWeek.values.map((day) => DropdownMenuItem(
                   value: day,
                   child: Text(day.displayName),
