@@ -44,6 +44,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
         context.read<CourseProvider>().loadUserCourses(userId),
         context.read<ChildEnrollmentProvider>().loadOwnerEnrollmentsDetailed(userId),
         context.read<ChildEnrollmentProvider>().loadSchedulesForSchool(userId),
+        context.read<ChildEnrollmentProvider>().loadDashboardStats(userId),
       ]);
     }
     setState(() => _isLoadingData = false);
@@ -183,8 +184,10 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
         if (sessionToEdit != null) {
           await provider.updateSchedule(sessionToEdit.id, result.toSupabase());
           // Rafraîchir
-          final auth = context.read<AuthProviderV2>();
-          provider.loadOwnerSchedules(auth.currentUser!.uid);
+          if (context.mounted) {
+            final auth = context.read<AuthProviderV2>();
+            provider.loadOwnerSchedules(auth.currentUser!.uid);
+          }
         } else {
           await provider.createSchedule(result);
         }
@@ -196,14 +199,20 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
 class _DashboardOverview extends StatelessWidget {
   const _DashboardOverview();
 
+
   @override
   Widget build(BuildContext context) {
     final courses = context.watch<CourseProvider>().userCourses;
-    final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
+    final enrollmentProvider = context.watch<ChildEnrollmentProvider>();
+    final enrollments = enrollmentProvider.ownerEnrollmentsDetailed;
+    final memberCount = enrollmentProvider.memberCount;
+    final graphData = enrollmentProvider.monthlyEnrollmentStats;
+
     final pendingEnrollments = enrollments.where((e) {
       final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
       return enrollment.status == EnrollmentStatus.pending;
     }).length;
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -219,8 +228,34 @@ class _DashboardOverview extends StatelessWidget {
           children: [
             Expanded(child: _StatCard('En attente', pendingEnrollments.toString(), Icons.hourglass_empty, Colors.orange)),
             const SizedBox(width: 12),
-            Expanded(child: _StatCard('Adhérents', '0', Icons.card_membership, Colors.purple)),
+            Expanded(child: _StatCard('Adhérents', memberCount.toString(), Icons.card_membership, Colors.purple)),
           ],
+        ),
+        const SizedBox(height: 24),
+        Text('Inscriptions mensuelles', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        GlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 150,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _TrendChartPainter(data: graphData),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle)),
+                  const SizedBox(width: 8),
+                  const Text('Inscriptions', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 24),
         Text('Actions rapides', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
@@ -390,4 +425,80 @@ class _EnrollmentsPage extends StatelessWidget {
     }
     return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color)), child: Text(text, style: TextStyle(color: color, fontSize: 10)));
   }
+}
+
+class _TrendChartPainter extends CustomPainter {
+  final List<Map<String, dynamic>> data;
+  _TrendChartPainter({required this.data});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+
+    final paintLine = Paint()
+      ..color = Colors.blue
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final paintPoint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.fill;
+
+    final paintGrid = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.1)
+      ..strokeWidth = 1;
+
+    double maxVal = 0;
+    for (var d in data) {
+      if ((d['count'] as int).toDouble() > maxVal) maxVal = (d['count'] as int).toDouble();
+    }
+    if (maxVal == 0) maxVal = 5;
+    maxVal *= 1.2;
+
+    // Grid
+    for (int i = 0; i <= 4; i++) {
+      final y = size.height - (i * size.height / 4);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paintGrid);
+    }
+
+    final xStep = size.width / (data.length > 1 ? data.length - 1 : 1);
+    final path = Path();
+
+    for (int i = 0; i < data.length; i++) {
+      final val = (data[i]['count'] as int).toDouble();
+      final x = i * xStep;
+      final y = size.height - (val / maxVal) * size.height;
+
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+
+    canvas.drawPath(path, paintLine);
+
+    for (int i = 0; i < data.length; i++) {
+      final val = (data[i]['count'] as int).toDouble();
+      final x = i * xStep;
+      final y = size.height - (val / maxVal) * size.height;
+      canvas.drawCircle(Offset(x, y), 4, paintPoint);
+
+      // Label (Month)
+      final monthStr = data[i]['month'].split('-')[1];
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: monthStr,
+          style: const TextStyle(color: Colors.grey, fontSize: 10),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(x - textPainter.width / 2, size.height + 8));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
