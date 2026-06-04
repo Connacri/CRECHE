@@ -61,10 +61,31 @@ class ClubService extends AdminSupabaseService {
     final response = await adminClient
         .from('users')
         .select('id, name, email, role, profile_images, phone_number')
-        .or('name.ilike.%$query%,email.ilike.%$query%')
+        .or('name.ilike.%${query}%,email.ilike.%${query}%')
         .eq('role', 'coach')
         .limit(20);
     return (response as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Recherche des utilisateurs (parents/coachs) pour ajout comme membres
+  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    final response = await adminClient
+        .from('users')
+        .select('id, name, email, profile_images')
+        .or('name.ilike.%${query}%,email.ilike.%${query}%')
+        .limit(20);
+    return (response as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Ajoute un membre au club
+  Future<void> addMember({required String clubId, required String userId, String type = 'standard'}) async {
+    await adminClient.from('members').insert({
+      'club_id': clubId,
+      'user_id': userId,
+      'membership_type': type,
+      'status': 'active',
+      'start_date': DateTime.now().toIso8601String().split('T')[0],
+    });
   }
 
   /// Récupère les membres d'un club
@@ -91,5 +112,15 @@ class ClubService extends AdminSupabaseService {
   /// Supprime un membre (ou le désactive)
   Future<void> removeMember(String memberId) async {
     await adminClient.from('members').delete().eq('id', memberId);
+  }
+
+  /// Récupère tous les clubs disponibles
+  Future<List<Map<String, dynamic>>> getAvailableClubs() async {
+    final response = await adminClient
+        .from('users')
+        .select('id, name, email, profile_images, location, bio')
+        .eq('role', 'school')
+        .eq('is_active', true);
+    return (response as List).cast<Map<String, dynamic>>();
   }
 }

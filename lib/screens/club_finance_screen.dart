@@ -18,6 +18,9 @@ class _ClubFinanceScreenState extends State<ClubFinanceScreen> {
   Map<String, dynamic>? _summary;
   List<Map<String, dynamic>> _recentInvoices = [];
   List<Map<String, dynamic>> _expenses = [];
+  List<Map<String, dynamic>> _inventory = [];
+  Map<String, dynamic>? _subStatus;
+
   bool _isLoading = true;
   int _selectedYear = DateTime.now().year;
   String _tab = 'overview';
@@ -40,11 +43,12 @@ class _ClubFinanceScreenState extends State<ClubFinanceScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
-      // Parallélisation des requêtes pour de meilleures performances
       final results = await Future.wait([
         _financeService.getFinancialSummary(userId, _selectedYear),
         _financeService.getRecentInvoices(userId),
         _financeService.getClubExpenses(userId),
+        _financeService.getInventoryItems(userId),
+        _financeService.getSubscriptionStatus(userId),
       ]);
 
       if (mounted) {
@@ -52,6 +56,8 @@ class _ClubFinanceScreenState extends State<ClubFinanceScreen> {
           _summary = results[0] as Map<String, dynamic>;
           _recentInvoices = results[1] as List<Map<String, dynamic>>;
           _expenses = results[2] as List<Map<String, dynamic>>;
+          _inventory = results[3] as List<Map<String, dynamic>>;
+          _subStatus = results[4] as Map<String, dynamic>;
           _isLoading = false;
         });
       }
@@ -59,10 +65,7 @@ class _ClubFinanceScreenState extends State<ClubFinanceScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.redAccent),
         );
       }
     }
@@ -103,351 +106,279 @@ class _ClubFinanceScreenState extends State<ClubFinanceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Finances du Club'),
-        elevation: 0,
+        title: const Text('Finance & Gestion'),
         actions: [
-          _buildYearPicker(),
+          IconButton(icon: const Icon(Icons.add_shopping_cart), onPressed: _showAddExpenseDialog, tooltip: 'Ajouter une dépense'),
+          IconButton(icon: const Icon(Icons.inventory), onPressed: _showAddInventoryDialog, tooltip: 'Ajouter au stock'),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                children: [
-                  if (_summary != null) _buildSummaryCards(),
-                  const SizedBox(height: 24),
-                  _buildTabBar(),
-                  const SizedBox(height: 16),
-                  _buildTabContent(),
-                ],
-              ),
-            ),
+          : _buildBody(),
     );
   }
 
-  Widget _buildYearPicker() {
-    return PopupMenuButton<int>(
-      initialValue: _selectedYear,
-      onSelected: (year) {
-        setState(() {
-          _selectedYear = year;
-        });
-        _loadData();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Text('$_selectedYear', style: const TextStyle(fontWeight: FontWeight.bold)),
-            const Icon(Icons.arrow_drop_down),
-          ],
-        ),
-      ),
-      itemBuilder: (ctx) => List.generate(5, (i) {
-        final year = DateTime.now().year - i;
-        return PopupMenuItem(
-          value: year,
-          child: Text(year.toString()),
-        );
-      }),
-    );
-  }
-
-  Widget _buildTabContent() {
-    if (_tab == 'overview') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildMonthlyChart(),
-          const SizedBox(height: 24),
-          Text(
-            'Dépenses par catégorie',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          _buildExpenseByCategories(),
-        ],
-      );
-    } else if (_tab == 'invoices') {
-      return _recentInvoices.isEmpty
-          ? _buildEmptyState('Aucune facture trouvée')
-          : Column(children: _recentInvoices.map((inv) => _buildInvoiceCard(inv)).toList());
-    } else {
-      return _expenses.isEmpty
-          ? _buildEmptyState('Aucune dépense enregistrée')
-          : Column(children: _expenses.map((exp) => _buildExpenseCard(exp)).toList());
-    }
-  }
-
-  Widget _buildEmptyState(String message) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(48.0),
-        child: Column(
-          children: [
-            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(message, style: TextStyle(color: Colors.grey[500])),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryCards() {
-    final totalRevenue = _summary?['total_revenue']?.toDouble() ?? 0.0;
-    final totalExpenses = _summary?['total_expenses']?.toDouble() ?? 0.0;
-    final netProfit = _summary?['net_profit']?.toDouble() ?? 0.0;
-    final pendingAmount = _summary?['pending_amount']?.toDouble() ?? 0.0;
-
+  Widget _buildBody() {
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(child: _metricCard('Revenus', _fmt(totalRevenue), Colors.green, Icons.trending_up)),
-            const SizedBox(width: 12),
-            Expanded(child: _metricCard('Dépenses', _fmt(totalExpenses), Colors.red, Icons.trending_down)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _metricCard('Bénéfice net', _fmt(netProfit), Colors.blue, Icons.account_balance)),
-            const SizedBox(width: 12),
-            Expanded(child: _metricCard('En attente', _fmt(pendingAmount), Colors.orange, Icons.hourglass_empty)),
-          ],
+        _buildTabs(),
+        Expanded(
+          child: _getContentForTab(),
         ),
       ],
     );
   }
 
-  Widget _metricCard(String label, String value, Color color, IconData icon) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 8),
-              Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w500)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
+  Widget _getContentForTab() {
+    switch (_tab) {
+      case 'overview': return _buildOverview();
+      case 'invoices': return _buildInvoicesList();
+      case 'expenses': return _buildExpensesList();
+      case 'inventory': return _buildInventoryList();
+      case 'subscriptions': return _buildSubscriptionsOverview();
+      default: return _buildOverview();
+    }
   }
 
-  Widget _buildTabBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(4),
+  Widget _buildTabs() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           _tabButton('Vue d\'ensemble', 'overview'),
           _tabButton('Factures', 'invoices'),
           _tabButton('Dépenses', 'expenses'),
+          _tabButton('Stock', 'inventory'),
+          _tabButton('Abonnements', 'subscriptions'),
         ],
       ),
     );
   }
 
-  Widget _tabButton(String label, String tab) {
-    final isSelected = _tab == tab;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _tab = tab),
-        borderRadius: BorderRadius.circular(8),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: isSelected ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2))] : [],
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget _tabButton(String label, String value) {
+    final isSelected = _tab == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (_) => setState(() => _tab = value),
+      ),
+    );
+  }
+
+  Widget _buildOverview() {
+    if (_summary == null) return const Center(child: Text('Aucune donnée'));
+
+    final monthlyData = (_summary!['monthly'] as List?)?.map((m) => BarData(
+      month: m['month'],
+      revenue: (m['revenue'] as num).toDouble(),
+      expenses: (m['expenses'] as num).toDouble(),
+    )).toList() ?? [];
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildStatCard('Revenu Total', _summary!['total_revenue'], Colors.green),
+        const SizedBox(height: 12),
+        _buildStatCard('Dépenses Totales', _summary!['total_expenses'], Colors.red),
+        const SizedBox(height: 12),
+        _buildStatCard('Bénéfice Net', _summary!['net_profit'], Colors.blue),
+        const SizedBox(height: 24),
+        if (monthlyData.isNotEmpty) ...[
+          const Text('Performance Mensuelle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 200,
+            child: CustomPaint(
+              painter: _EnhancedBarChartPainter(data: monthlyData),
+              size: Size.infinite,
             ),
           ),
+          const SizedBox(height: 32),
+        ],
+        const Text('Aperçu Abonnements', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        const SizedBox(height: 12),
+        _buildSubStats(),
+      ],
+    );
+  }
+
+  Widget _buildSubStats() {
+    if (_subStatus == null) return const SizedBox.shrink();
+    return Row(
+      children: [
+        Expanded(child: _miniStat('Actifs', '${_subStatus!['total_active_members'] ?? 0}', Colors.green)),
+        const SizedBox(width: 8),
+        Expanded(child: _miniStat('Expirent soon', '${_subStatus!['expiring_soon'] ?? 0}', Colors.orange)),
+      ],
+    );
+  }
+
+  Widget _miniStat(String label, String val, Color color) {
+    return GlassCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Text(val, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: const TextStyle(fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String label, dynamic value, Color color) {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(_fmt(value as num?), style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvoicesList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _recentInvoices.length,
+      itemBuilder: (context, i) => _buildInvoiceCard(_recentInvoices[i]),
+    );
+  }
+
+  Widget _buildInvoiceCard(Map<String, dynamic> inv) {
+    final status = inv['status'] ?? 'pending';
+    final color = _statusColor(status);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(Icons.receipt_long, color: color),
+        title: Text(inv['invoice_number'] ?? 'Sans numéro'),
+        subtitle: Text('Total: ${_fmt(inv['total_amount'])}'),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          child: Text(_statusLabel(status), style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
         ),
       ),
     );
   }
 
-  Widget _buildMonthlyChart() {
-    final monthlyData = _summary?['monthly'] as List?;
-    if (monthlyData == null || monthlyData.isEmpty) {
-      return const SizedBox.shrink();
-    }
+  Widget _buildExpensesList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _expenses.length,
+      itemBuilder: (context, i) => _buildExpenseCard(_expenses[i]),
+    );
+  }
 
-    final List<BarData> bars = monthlyData.map((m) {
-      return BarData(
-        month: m['month'] as int,
-        revenue: (m['revenue'] as num?)?.toDouble() ?? 0,
-        expenses: (m['expenses'] as num?)?.toDouble() ?? 0,
-      );
-    }).toList();
+  Widget _buildExpenseCard(Map<String, dynamic> exp) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: const Icon(Icons.remove_circle, color: Colors.red),
+        title: Text(exp['title'] ?? 'Sans titre'),
+        subtitle: Text('${exp['category']} • ${exp['date']}'),
+        trailing: Text(_fmt(exp['amount']), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
 
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Performance Mensuelle', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              Row(
-                children: [
-                  _legendItem('Revenus', Colors.green),
-                  const SizedBox(width: 8),
-                  _legendItem('Dépenses', Colors.red),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _EnhancedBarChartPainter(data: bars),
+  Widget _buildInventoryList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _inventory.length,
+      itemBuilder: (context, i) {
+        final item = _inventory[i];
+        final stock = item['quantity_in_stock'] ?? 0;
+        final alert = item['min_quantity_alert'] ?? 5;
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: const Icon(Icons.inventory_2),
+            title: Text(item['name'] ?? ''),
+            subtitle: Text('Prix vente: ${_fmt(item['sale_price'])}'),
+            onTap: () => _showUpdateStockDialog(item),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('$stock', style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: stock <= alert ? Colors.red : Colors.green,
+                )),
+                const Text('en stock', style: TextStyle(fontSize: 10)),
+              ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubscriptionsOverview() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.card_membership, size: 64, color: Colors.blue),
+          const SizedBox(height: 16),
+          Text('${_subStatus?['total_active_members'] ?? 0} abonnés actifs', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text('CA Abonnements: ${_fmt(_subStatus?['total_revenue_members'])}'),
         ],
       ),
     );
   }
 
-  Widget _legendItem(String label, Color color) {
-    return Row(
-      children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-      ],
-    );
-  }
+  void _showAddExpenseDialog() {
+    final titleController = TextEditingController();
+    final amountController = TextEditingController();
+    String category = 'equipment';
+    bool isSaving = false;
 
-  Widget _buildExpenseByCategories() {
-    final catData = _summary?['expense_by_cat'] as Map<String, dynamic>?;
-    if (catData == null || catData.isEmpty) {
-      return const Text('Aucune donnée de catégorie');
-    }
-
-    final totalExpenses = (_summary!['total_expenses'] as num?)?.toDouble() ?? 1.0;
-    
-    return Column(
-      children: catData.entries.map((e) => _buildCategoryBar(e.key, (e.value as num).toDouble(), totalExpenses)).toList(),
-    );
-  }
-
-  Widget _buildCategoryBar(String category, double amount, double total) {
-    final labels = {
-      'equipment': 'Équipement', 'venue': 'Lieu', 'staff': 'Personnel',
-      'transport': 'Transport', 'marketing': 'Marketing', 'utilities': 'Services',
-      'license_fees': 'Licences', 'maintenance': 'Entretien', 'medical': 'Médical', 'other': 'Autre',
-    };
-    
-    final percentage = total > 0 ? (amount / total) : 0.0;
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Nouvelle dépense'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(labels[category] ?? category, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-              Text(_fmt(amount), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Stack(
-            children: [
-              Container(
-                height: 8,
-                width: double.infinity,
-                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
-              ),
-              FractionallySizedBox(
-                widthFactor: percentage.clamp(0.0, 1.0),
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [Colors.red[300]!, Colors.red[700]!]),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
+              TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Titre')),
+              TextField(controller: amountController, decoration: const InputDecoration(labelText: 'Montant (DA)'), keyboardType: TextInputType.number),
+              DropdownButtonFormField<String>(
+                value: category,
+                items: [
+                  'equipment', 'venue', 'staff', 'transport', 'marketing', 'utilities', 'other'
+                ].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                onChanged: (v) => setDialogState(() => category = v!),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInvoiceCard(Map<String, dynamic> inv) {
-    final total = (inv['total_amount'] as num?)?.toDouble() ?? 0.0;
-    final paid = (inv['paid_amount'] as num?)?.toDouble() ?? 0.0;
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.description_outlined, color: Colors.blue, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(inv['invoice_number'] ?? 'Sans numéro', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text(
-                        inv['created_at'] != null ? DateFormat('dd/MM/yyyy').format(DateTime.parse(inv['created_at'])) : '',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildStatusChip(inv['status'] ?? 'draft'),
-              ],
-            ),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _infoColumn('Montant total', _fmt(total)),
-                _infoColumn('Montant payé', _fmt(paid), color: Colors.green),
-                _infoColumn('Reste', _fmt(total - paid), color: Colors.orange),
-              ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (titleController.text.isEmpty || amountController.text.isEmpty) return;
+                setDialogState(() => isSaving = true);
+                final auth = context.read<AuthProviderV2>();
+                await _financeService.createExpense({
+                  'club_id': auth.currentUser!.uid,
+                  'title': titleController.text,
+                  'amount': double.parse(amountController.text),
+                  'category': category,
+                  'created_by': auth.currentUser!.uid,
+                });
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _loadData();
+                }
+              },
+              child: const Text('Enregistrer'),
             ),
           ],
         ),
@@ -455,65 +386,150 @@ class _ClubFinanceScreenState extends State<ClubFinanceScreen> {
     );
   }
 
-  Widget _buildStatusChip(String status) {
-    final color = _statusColor(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Text(
-        _statusLabel(status),
-        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
+  void _showAddInventoryDialog() {
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    final qtyController = TextEditingController();
+    bool isSaving = false;
 
-  Widget _infoColumn(String label, String value, {Color? color}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
-      ],
-    );
-  }
-
-  Widget _buildExpenseCard(Map<String, dynamic> exp) {
-    final labels = {
-      'equipment': 'Équipement', 'venue': 'Lieu', 'staff': 'Personnel',
-      'transport': 'Transport', 'marketing': 'Marketing', 'utilities': 'Services',
-      'license_fees': 'Licences', 'maintenance': 'Entretien', 'medical': 'Médical', 'other': 'Autre',
-    };
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              height: 40,
-              width: 40,
-              decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Nouvel article en stock'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nom de l\'article')),
+              TextField(controller: priceController, decoration: const InputDecoration(labelText: 'Prix de vente'), keyboardType: TextInputType.number),
+              TextField(controller: qtyController, decoration: const InputDecoration(labelText: 'Quantité initiale'), keyboardType: TextInputType.number),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (nameController.text.isEmpty) return;
+                setDialogState(() => isSaving = true);
+                final auth = context.read<AuthProviderV2>();
+                await _financeService.createInventoryItem({
+                  'club_id': auth.currentUser!.uid,
+                  'name': nameController.text,
+                  'sale_price': double.tryParse(priceController.text) ?? 0,
+                  'quantity_in_stock': int.tryParse(qtyController.text) ?? 0,
+                });
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _loadData();
+                }
+              },
+              child: const Text('Enregistrer'),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(exp['description'] ?? 'Sans description', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(
-                    '${labels[exp['category']] ?? exp['category']} • ${exp['date'] ?? ''}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddInvoiceDialog() {
+    final amountController = TextEditingController();
+    String type = 'subscription';
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Nouvelle facture'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: amountController, decoration: const InputDecoration(labelText: 'Montant Total (DA)'), keyboardType: TextInputType.number),
+              DropdownButtonFormField<String>(
+                value: type,
+                items: [
+                  'subscription', 'session', 'event', 'custom'
+                ].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                onChanged: (v) => setDialogState(() => type = v!),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (amountController.text.isEmpty) return;
+                setDialogState(() => isSaving = true);
+                final auth = context.read<AuthProviderV2>();
+                await _financeService.createInvoice({
+                  'club_id': auth.currentUser!.uid,
+                  'total_amount': double.parse(amountController.text),
+                  'type': type,
+                  'status': 'pending',
+                  'created_by': auth.currentUser!.uid,
+                });
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _loadData();
+                }
+              },
+              child: const Text('Générer'),
             ),
-            Text(_fmt((exp['amount'] as num?)?.toDouble()), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showUpdateStockDialog(Map<String, dynamic> item) {
+    final qtyController = TextEditingController();
+    String type = 'sale';
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Mouvement de stock: ${item['name']}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: type,
+                items: [
+                  DropdownMenuItem(value: 'sale', child: Text('Vente (-)')),
+                  DropdownMenuItem(value: 'stock_in', child: Text('Réapprovisionnement (+)')),
+                  DropdownMenuItem(value: 'adjustment', child: Text('Ajustement (+/-)')),
+                ],
+                onChanged: (v) => setDialogState(() => type = v!),
+              ),
+              TextField(
+                controller: qtyController,
+                decoration: const InputDecoration(labelText: 'Quantité'),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (qtyController.text.isEmpty) return;
+                setDialogState(() => isSaving = true);
+                final auth = context.read<AuthProviderV2>();
+                await _financeService.updateInventoryStock(
+                  item['id'],
+                  auth.currentUser!.uid,
+                  int.parse(qtyController.text),
+                  type,
+                );
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _loadData();
+                }
+              },
+              child: const Text('Confirmer'),
+            ),
           ],
         ),
       ),
@@ -536,20 +552,18 @@ class _EnhancedBarChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
 
-    final paintRevenue = Paint()..color = Colors.green.withValues(alpha: 0.8);
-    final paintExpenses = Paint()..color = Colors.red.withValues(alpha: 0.8);
-    final paintGrid = Paint()..color = Colors.grey.withValues(alpha: 0.1)..strokeWidth = 1;
+    final paintRevenue = Paint()..color = Colors.green.withOpacity(0.8);
+    final paintExpenses = Paint()..color = Colors.red.withOpacity(0.8);
+    final paintGrid = Paint()..color = Colors.grey.withOpacity(0.1)..strokeWidth = 1;
 
-    // Calcul du maximum pour l'échelle
     double maxVal = 0;
     for (var d in data) {
       if (d.revenue > maxVal) maxVal = d.revenue;
       if (d.expenses > maxVal) maxVal = d.expenses;
     }
     if (maxVal == 0) maxVal = 1000;
-    maxVal *= 1.2; // Ajout d'une marge en haut
+    maxVal *= 1.2;
 
-    // Dessin des lignes de grille horizontales
     const gridLines = 4;
     for (int i = 0; i <= gridLines; i++) {
       final y = size.height - (i * size.height / gridLines);
@@ -562,14 +576,12 @@ class _EnhancedBarChartPainter extends CustomPainter {
     final months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
     for (int i = 0; i < 12; i++) {
-      // On cherche la donnée pour ce mois (1-12)
       final monthIndex = i + 1;
       final d = data.firstWhere((element) => element.month == monthIndex, 
           orElse: () => BarData(month: monthIndex, revenue: 0, expenses: 0));
 
       final xBase = i * barGroupWidth + (barGroupWidth - (barWidth * 2 + spacing)) / 2;
 
-      // Dessin du Revenue
       if (d.revenue > 0) {
         final h = (d.revenue / maxVal) * size.height;
         final rect = RRect.fromRectAndCorners(
@@ -580,7 +592,6 @@ class _EnhancedBarChartPainter extends CustomPainter {
         canvas.drawRRect(rect, paintRevenue);
       }
 
-      // Dessin des Dépenses
       if (d.expenses > 0) {
         final h = (d.expenses / maxVal) * size.height;
         final rect = RRect.fromRectAndCorners(
@@ -591,7 +602,6 @@ class _EnhancedBarChartPainter extends CustomPainter {
         canvas.drawRRect(rect, paintExpenses);
       }
 
-      // Label du mois
       final textPainter = TextPainter(
         text: TextSpan(text: months[i], style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.bold)),
         textDirection: ui.TextDirection.ltr,
