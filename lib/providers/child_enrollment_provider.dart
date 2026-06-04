@@ -1,3 +1,4 @@
+import '../services/club_service.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/child_model_complete.dart';
@@ -279,8 +280,57 @@ class ChildEnrollmentProvider extends ChangeNotifier {
 
   void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
   void _setError(String error) { _error = error; notifyListeners(); }
-}
+  final ClubService _clubService = ClubService();
+  int _memberCount = 0;
+  int get memberCount => _memberCount;
 
+  List<Map<String, dynamic>> _monthlyEnrollmentStats = [];
+  List<Map<String, dynamic>> get monthlyEnrollmentStats => _monthlyEnrollmentStats;
+
+  Future<void> loadDashboardStats(String ownerId) async {
+    try {
+      _setLoading(true);
+
+      // Load member count
+      final members = await _clubService.getClubMembers(ownerId);
+      _memberCount = members.length;
+
+      // Load monthly enrollment stats (last 6 months)
+      final enrollments = await _supabaseChildService.getEnrollmentsForOwner(ownerId);
+
+      Map<String, int> stats = {};
+      final now = DateTime.now();
+      for (int i = 0; i < 6; i++) {
+        final monthDate = DateTime(now.year, now.month - i, 1);
+        final key = "${monthDate.year}-${monthDate.month.toString().padLeft(2, '0')}";
+        stats[key] = 0;
+      }
+
+      for (var e in enrollments) {
+        final date = e.enrolledAt;
+        final key = "${date.year}-${date.month.toString().padLeft(2, '0')}";
+        if (stats.containsKey(key)) {
+          stats[key] = stats[key]! + 1;
+        }
+      }
+
+      _monthlyEnrollmentStats = stats.entries.map((entry) => {
+        'month': entry.key,
+        'count': entry.value
+      }).toList();
+
+      // Sort by month ascending
+      _monthlyEnrollmentStats.sort((a, b) => a['month'].compareTo(b['month']));
+
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      // Error loading dashboard stats
+      _setLoading(false);
+    }
+  }
+}
 extension EnrollmentModelExtensions on EnrollmentModel {
   String get paymentDescription => totalAmount == null ? 'Gratuit' : (isFullyPaid ? 'Payé' : 'En attente');
+
 }
