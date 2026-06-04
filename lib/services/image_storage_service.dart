@@ -57,6 +57,28 @@ class ImageStorageService extends AdminSupabaseService {
     }
   }
 
+  Future<String?> uploadFile(File file, String folder) async {
+    try {
+      final String fileName = '${_uuid.v4()}_${file.path.split('/').last}';
+      final String filePath = '$folder/$fileName';
+      final bytes = await file.readAsBytes();
+
+      String contentType = 'application/octet-stream';
+      if (fileName.toLowerCase().endsWith('.pdf')) contentType = 'application/pdf';
+      else if (fileName.toLowerCase().endsWith('.jpg') || fileName.toLowerCase().endsWith('.jpeg')) contentType = 'image/jpeg';
+      else if (fileName.toLowerCase().endsWith('.png')) contentType = 'image/png';
+
+      await adminClient.storage.from(_profileBucket).uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: FileOptions(upsert: true, contentType: contentType),
+          );
+      return adminClient.storage.from(_profileBucket).getPublicUrl(filePath);
+    } catch (e) {
+      throw Exception("Erreur upload file: $e");
+    }
+  }
+
   Future<CourseImage> uploadCourseImage({required File imageFile, required String courseId}) async {
     final fileToUpload = await _compressImage(imageFile);
     final imgId = _uuid.v4();
