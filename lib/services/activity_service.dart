@@ -25,7 +25,7 @@ class ActivityService extends AdminSupabaseService {
   Future<List<Map<String, dynamic>>> _getMemberActivities(String clubId) async {
     final res = await adminClient
         .from('members')
-        .select('*, user:users(name)')
+        .select('*, user:users!user_id(name)')
         .eq('club_id', clubId)
         .order('created_at', ascending: false)
         .limit(10);
@@ -48,7 +48,7 @@ class ActivityService extends AdminSupabaseService {
 
     final res = await adminClient
         .from('coaching_history')
-        .select('*, user:users(name), course:courses(title)')
+        .select('*, coach:users!coach_id(name), course:courses(title)')
         .inFilter('course_id', courseIds)
         .order('assigned_at', ascending: false)
         .limit(10);
@@ -56,7 +56,7 @@ class ActivityService extends AdminSupabaseService {
     return (res as List).map((c) => {
       'type': 'coach',
       'title': 'Coach assigné',
-      'subtitle': '${c['user']['name']} assigné à ${c['course']['title']}',
+      'subtitle': '${c['coach']['name']} assigné à ${c['course']['title']}',
       'date': c['assigned_at'],
       'icon': 'people_outline',
     }).toList();

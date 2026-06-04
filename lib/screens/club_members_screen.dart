@@ -89,6 +89,12 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Adhérents (${_members.length})'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add),
+            onPressed: _showAddMemberDialog,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -236,6 +242,78 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
           const SizedBox(width: 4),
           Text(text, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
         ],
+      ),
+    );
+  }
+
+  void _showAddMemberDialog() {
+    String query = '';
+    List<Map<String, dynamic>> searchResults = [];
+    bool isSearching = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Ajouter un adhérent'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Rechercher par nom ou email...',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: (v) async {
+                    if (v.length < 3) return;
+                    setDialogState(() => isSearching = true);
+                    final results = await _clubService.searchUsers(v);
+                    setDialogState(() {
+                      searchResults = results;
+                      isSearching = false;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                if (isSearching)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: searchResults.length,
+                      itemBuilder: (context, i) {
+                        final user = searchResults[i];
+                        return ListTile(
+                          title: Text(user['name'] ?? ''),
+                          subtitle: Text(user['email'] ?? ''),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.add_circle, color: Colors.green),
+                            onPressed: () async {
+                              final auth = context.read<AuthProviderV2>();
+                              await _clubService.addMember(
+                                clubId: auth.currentUser!.uid,
+                                userId: user['id'],
+                              );
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                _loadMembers();
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),
+          ],
+        ),
       ),
     );
   }
