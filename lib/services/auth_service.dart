@@ -317,8 +317,6 @@ class AuthService {
           'email': email,
           'role': role,
           'is_active': true,
-          'profile_completed': false,
-          'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
         },
         // ✅ onConflict sur 'id' → mise à jour partielle si la ligne existe
