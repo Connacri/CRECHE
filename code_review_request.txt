@@ -1,0 +1,11 @@
+I have updated the version string to 1.2.73 (derived from the latest git tag) across the repository.
+
+Files modified:
+- README.md: Updated version title from V1.2.11 to V1.2.73.
+- windows/innosetup/setup.iss: Updated MyAppVersion from 1.2.8 to 1.2.73.
+- windows/inno-setup.iss: Updated MyAppVersion from 1.2.0 to 1.2.73.
+- .github/workflows/build.yml: Updated the default fallback LATEST_TAG from v1.2.0 to v1.2.73 and updated the associated comment.
+
+Verification:
+- Grep confirmed no old versions (1.2.11, 1.2.8, 1.2.0) remain in these files.
+- 'flutter test' passed.
