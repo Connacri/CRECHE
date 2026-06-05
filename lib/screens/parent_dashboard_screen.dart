@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import "package:qr_flutter/qr_flutter.dart";
+
 import 'package:image_cropper/image_cropper.dart';
 
 import '../../dependences/calendar_timeline/calendar_timeline.dart';
@@ -12,6 +13,7 @@ import '../providers/auth_provider_v2.dart';
 import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/child_model_complete.dart';
+
 import '../providers/child_enrollment_provider.dart';
 import '../providers/course_provider_complete.dart';
 import '../services/hybrid_image_picker.dart';
@@ -489,8 +491,8 @@ class _ChildProfileDialog extends StatelessWidget {
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
                         _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(child.dateOfBirth)),
-                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo?.bloodType ?? 'Non spécifié'),
-                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo?.allergies.join(", ") ?? 'Aucune'),
+                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo.bloodType ?? 'Non spécifié'),
+                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo.allergies.isEmpty ? 'Aucune' : child.medicalInfo.allergies.join(", ")),
                         
                         const SizedBox(height: 32),
                         Row(
@@ -756,7 +758,7 @@ class _ChildProfileDialog extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _getStatusColor(status).withOpacity(0.1),
+        color: _getStatusColor(status).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -967,7 +969,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<ChildGender>(
-                value: _gender,
+                initialValue: _gender,
                 decoration: const InputDecoration(labelText: 'Genre'),
                 items: ChildGender.values.map((g) => DropdownMenuItem(
                   value: g,

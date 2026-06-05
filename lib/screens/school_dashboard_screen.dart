@@ -1,6 +1,5 @@
-import "package:mobile_scanner/mobile_scanner.dart";
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
+
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider_v2.dart';
@@ -8,12 +7,13 @@ import '../providers/course_provider_complete.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../models/user_model.dart';
 import '../models/course_model_complete.dart';
-import '../models/enrollment_model_complete.dart';
-import '../models/child_model_complete.dart';
+
+
 import '../models/session_schedule_model.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/add_session_dialog.dart';
+import '../widgets/enrollments_page.dart';
 import 'profile_screen.dart';
 import 'create_course_screen.dart';
 
@@ -39,7 +39,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
     switch (_selectedIndex) {
       case 0: return const _DashboardOverview();
       case 1: return const _PlanningManagementPage();
-      case 2: return const _EnrollmentsPage();
+      case 2: return const EnrollmentsPage();
       case 3: return const ProfileScreen();
       default: return const _DashboardOverview();
     }
@@ -54,18 +54,76 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
         child: BottomNavigationBar(
           elevation: 0,
           backgroundColor: Colors.transparent,
-          currentIndex: _selectedIndex,
-          onTap: (i) => setState(() => _selectedIndex = i),
-          selectedItemColor: Theme.of(context).colorScheme.primary,
-          unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
           type: BottomNavigationBarType.fixed,
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Aperçu'),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Planning'),
-            BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Inscriptions'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
+            BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Stats'),
+            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: 'Planning'),
+            BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Inscrits'),
+            BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DashboardOverview extends StatelessWidget {
+  const _DashboardOverview();
+
+  @override
+  Widget build(BuildContext context) {
+    final courses = context.watch<CourseProvider>().userCourses;
+    final enrollmentProvider = context.watch<ChildEnrollmentProvider>();
+    final enrollments = enrollmentProvider.ownerEnrollmentsDetailed;
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildStatCard('Cours actifs', courses.where((c) => c.isActive).length.toString(), Icons.school, Colors.blue)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStatCard('Inscriptions', enrollments.length.toString(), Icons.people, Colors.green)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildEnrollmentTrend(context, enrollmentProvider),
+      ],
+    );
+  }
+
+  Widget _buildEnrollmentTrend(BuildContext context, ChildEnrollmentProvider provider) {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Inscriptions récentes', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 150,
+            child: CustomPaint(
+              painter: _TrendChartPainter(provider.monthlyEnrollmentStats),
+              child: Container(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(height: 8),
+          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
       ),
     );
   }
@@ -137,10 +195,9 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
     );
   }
 
-  Future<void> _showAddScheduleDialog(BuildContext context, List<CourseModel> courses, List<UserModel> coaches, {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}) async {
+  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses, List<UserModel> coaches, {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}) {
     final provider = context.read<CourseProvider>();
-    
-    final result = await showDialog(
+    showDialog(
       context: context,
       builder: (context) => AddSessionDialog(
         courses: courses,
@@ -149,425 +206,29 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
         initialTimeSlot: initialTimeSlot,
         sessionToEdit: sessionToEdit,
       ),
-    );
-
-    if (result != null) {
-      if (result == 'delete' && sessionToEdit != null) {
-        await provider.deleteSchedule(sessionToEdit.id);
-      } else if (result is SessionSchedule) {
-        if (sessionToEdit != null) {
-          await provider.updateSchedule(sessionToEdit.id, result.toSupabase());
-          if (context.mounted) {
-            final auth = context.read<AuthProviderV2>();
-            provider.loadOwnerSchedules(auth.currentUser!.uid);
+    ).then((result) async {
+      if (result != null) {
+        if (result == 'delete' && sessionToEdit != null) {
+          await provider.deleteSchedule(sessionToEdit.id);
+        } else if (result is SessionSchedule) {
+          if (sessionToEdit != null) {
+            await provider.updateSchedule(sessionToEdit.id, result.toSupabase());
+            if (context.mounted) {
+               final auth = context.read<AuthProviderV2>();
+               provider.loadOwnerSchedules(auth.currentUser!.uid);
+            }
+          } else {
+            await provider.createSchedule(result);
           }
-        } else {
-          await provider.createSchedule(result);
         }
       }
-    }
-  }
-}
-
-class _DashboardOverview extends StatelessWidget {
-  const _DashboardOverview();
-
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.read<AuthProviderV2>();
-    final courses = context.watch<CourseProvider>().userCourses;
-    final enrollmentProvider = context.watch<ChildEnrollmentProvider>();
-    
-    // Auto-load stats if empty
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (auth.currentUser != null && enrollmentProvider.monthlyEnrollmentStats.isEmpty) {
-        enrollmentProvider.loadDashboardStats(auth.currentUser!.uid);
-        enrollmentProvider.loadOwnerEnrollmentsDetailed(auth.currentUser!.uid);
-      }
     });
-
-    final enrollments = enrollmentProvider.ownerEnrollmentsDetailed;
-    final memberCount = enrollmentProvider.memberCount;
-    final graphData = enrollmentProvider.monthlyEnrollmentStats;
-
-    final pendingEnrollments = enrollments.where((e) {
-      final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
-      return enrollment.status == EnrollmentStatus.pending;
-    }).length;
-
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const SizedBox(height: 24),
-        Text('Aperçu du Club', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _StatCard('Cours actifs', courses.where((c) => c.isActive).length.toString(), Icons.school, Colors.blue)),
-            const SizedBox(width: 12),
-            Expanded(child: _StatCard('Inscriptions', enrollments.length.toString(), Icons.people, Colors.green)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _StatCard('En attente', pendingEnrollments.toString(), Icons.hourglass_empty, Colors.orange)),
-            const SizedBox(width: 12),
-            Expanded(child: _StatCard('Adhérents', memberCount.toString(), Icons.card_membership, Colors.purple)),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Text('Inscriptions mensuelles', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        GlassCard(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 150,
-                width: double.infinity,
-                child: CustomPaint(
-                  painter: _TrendChartPainter(data: graphData),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle)),
-                  const SizedBox(width: 8),
-                  const Text('Inscriptions', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text('Actions rapides', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        InkWell(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateCourseScreen())),
-          borderRadius: BorderRadius.circular(16),
-          child: GlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.add_circle, color: Colors.blue, size: 28)),
-                const SizedBox(width: 16),
-                const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Créer un cours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), Text('Ajouter un nouveau cours au catalogue', style: TextStyle(fontSize: 13, color: Colors.grey))])),
-                const Icon(Icons.arrow_forward_ios, size: 16),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  const _StatCard(this.label, this.value, this.icon, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [Icon(icon, size: 18, color: color), const Spacer(), Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color))]),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-        ],
-      ),
-    );
-  }
-}
-
-class _EnrollmentsPage extends StatelessWidget {
-  const _EnrollmentsPage();
-
-  @override
-  Widget build(BuildContext context) {
-    final enrollmentProvider = context.watch<ChildEnrollmentProvider>();
-    final enrollments = enrollmentProvider.ownerEnrollmentsDetailed;
-    final provider = context.read<ChildEnrollmentProvider>();
-
-    return Column(
-      children: [
-        const SizedBox(height: 40),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Inscriptions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              IconButton(
-                icon: const Icon(Icons.qr_code_scanner),
-                onPressed: () => _openScanner(context, provider),
-                tooltip: "Scanner un QR Code de paiement",
-              ),
-            ],
-          ),
-        ),
-        if (enrollments.isEmpty)
-          const Expanded(child: Center(child: Text("Aucune inscription.")))
-        else
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: enrollments.length,
-              prototypeItem: const _EnrollmentCard(isPrototype: true),
-              itemBuilder: (context, index) {
-                final item = enrollments[index];
-                final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
-                final child = ChildModel.fromSupabase(item['child']);
-                final course = CourseModel.fromSupabase(item['course']);
-
-                return _EnrollmentCard(
-                  enrollment: enrollment,
-                  child: child,
-                  course: course,
-                  onApprove: () => _updateStatus(context, provider, enrollment.id, 'approved'),
-                  onReject: () => _rejectDialog(context, provider, enrollment.id),
-                  onConfirmPayment: () => _confirmPaymentFromQR(context, provider, enrollment.id),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  void _openScanner(BuildContext context, ChildEnrollmentProvider provider) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => Scaffold(
-      appBar: AppBar(title: const Text("Scanner Paiement")),
-      body: MobileScanner(
-        onDetect: (capture) {
-          final List<Barcode> barcodes = capture.barcodes;
-          if (barcodes.isNotEmpty) {
-            final String? code = barcodes.first.rawValue;
-            if (code != null) {
-              Navigator.pop(context);
-              _confirmPaymentFromQR(context, provider, code);
-            }
-          }
-        },
-      ),
-    )));
-  }
-
-  void _confirmPaymentFromQR(BuildContext context, ChildEnrollmentProvider provider, String enrollmentId) async {
-    final success = await provider.updateEnrollment(
-      enrollmentId: enrollmentId,
-      paymentStatus: PaymentStatus.paid,
-      paidAmount: 0 // Mock amount for now
-    );
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(success ? "Paiement validé avec succès" : "Erreur lors de la validation"))
-      );
-    }
-  }
-
-  void _updateStatus(BuildContext context, ChildEnrollmentProvider provider, String enrollmentId, String status) async {
-    final enrollmentStatus = status == 'approved'
-        ? EnrollmentStatus.approved
-        : status == 'rejected'
-            ? EnrollmentStatus.rejected
-            : EnrollmentStatus.cancelled;
-    try {
-      await provider.updateEnrollment(enrollmentId: enrollmentId, status: enrollmentStatus);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(status == 'approved' ? 'Inscription approuvée' : 'Inscription mise à jour')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
-      }
-    }
-  }
-
-  void _rejectDialog(BuildContext context, ChildEnrollmentProvider provider, String enrollmentId) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Refuser l\'inscription'),
-        content: const Text('Êtes-vous sûr de vouloir refuser cette inscription ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _updateStatus(context, provider, enrollmentId, 'rejected');
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('Refuser'),
-          ),
-        ],
-      ),
-    );
-  }
-
-}
-
-class _EnrollmentCard extends StatelessWidget {
-  final EnrollmentModel? enrollment;
-  final ChildModel? child;
-  final CourseModel? course;
-  final VoidCallback? onApprove;
-  final VoidCallback? onReject;
-  final VoidCallback? onConfirmPayment;
-  final bool isPrototype;
-
-  const _EnrollmentCard({
-    this.enrollment,
-    this.child,
-    this.course,
-    this.onApprove,
-    this.onReject,
-    this.onConfirmPayment,
-    this.isPrototype = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: GlassCard(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundImage: (child?.photoUrl != null && !isPrototype)
-                      ? CachedNetworkImageProvider(child!.photoUrl!)
-                      : null,
-                  child: (child?.photoUrl == null || isPrototype)
-                      ? Text(isPrototype ? 'A' : child!.firstName[0])
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isPrototype ? 'Nom de l\'enfant' : '${child!.firstName} ${child!.lastName}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        isPrototype ? 'Titre du cours' : course!.title,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                isPrototype
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey)),
-                        child: const Text('Statut', style: TextStyle(color: Colors.grey, fontSize: 10)))
-                    : _buildStatusChip(enrollment!.status),
-              ],
-            ),
-            if (!isPrototype) ...[
-              if (enrollment!.status == EnrollmentStatus.pending) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 36,
-                        child: ElevatedButton.icon(
-                          onPressed: onApprove,
-                          icon: const Icon(Icons.check, size: 18),
-                          label: const Text('Approuver', style: TextStyle(fontSize: 12)),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: SizedBox(
-                        height: 36,
-                        child: OutlinedButton.icon(
-                          onPressed: onReject,
-                          icon: const Icon(Icons.close, size: 18),
-                          label: const Text('Refuser', style: TextStyle(fontSize: 12)),
-                          style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ] else if (enrollment!.status == EnrollmentStatus.approved && enrollment!.paymentStatus != PaymentStatus.paid) ...[
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text("En attente de paiement", style: TextStyle(fontSize: 12, color: Colors.orange)),
-                    ElevatedButton(
-                      onPressed: onConfirmPayment,
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, minimumSize: const Size(0, 32)),
-                      child: const Text("Valider manuellement", style: TextStyle(fontSize: 11)),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusChip(EnrollmentStatus status) {
-    Color color;
-    String text;
-    switch (status) {
-      case EnrollmentStatus.approved:
-        color = Colors.green;
-        text = 'Approuvé';
-        break;
-      case EnrollmentStatus.pending:
-        color = Colors.orange;
-        text = 'En attente';
-        break;
-      case EnrollmentStatus.rejected:
-        color = Colors.red;
-        text = 'Refusé';
-        break;
-      case EnrollmentStatus.cancelled:
-        color = Colors.grey;
-        text = 'Annulé';
-        break;
-      case EnrollmentStatus.completed:
-        color = Colors.blue;
-        text = 'Terminé';
-        break;
-    }
-    return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color)),
-        child: Text(text, style: TextStyle(color: color, fontSize: 10)));
   }
 }
 
 class _TrendChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> data;
-  _TrendChartPainter({required this.data});
+  _TrendChartPainter(this.data);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -575,32 +236,17 @@ class _TrendChartPainter extends CustomPainter {
 
     final paintLine = Paint()
       ..color = Colors.blue
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
 
     final paintPoint = Paint()
       ..color = Colors.blue
       ..style = PaintingStyle.fill;
 
-    final paintGrid = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.1)
-      ..strokeWidth = 1;
+    final maxVal = data.fold<double>(0, (max, e) => (e['count'] as int) > max ? (e['count'] as int).toDouble() : max);
+    if (maxVal == 0) return;
 
-    double maxVal = 0;
-    for (var d in data) {
-      if ((d['count'] as int).toDouble() > maxVal) maxVal = (d['count'] as int).toDouble();
-    }
-    if (maxVal == 0) maxVal = 5;
-    maxVal *= 1.2;
-
-    // Grid
-    for (int i = 0; i <= 4; i++) {
-      final y = size.height - (i * size.height / 4);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paintGrid);
-    }
-
-    final xStep = size.width / (data.length > 1 ? data.length - 1 : 1);
+    final xStep = size.width / (data.length - 1);
     final path = Path();
 
     for (int i = 0; i < data.length; i++) {
@@ -608,11 +254,8 @@ class _TrendChartPainter extends CustomPainter {
       final x = i * xStep;
       final y = size.height - (val / maxVal) * size.height;
 
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
+      if (i == 0) { path.moveTo(x, y); }
+      else { path.lineTo(x, y); }
     }
 
     canvas.drawPath(path, paintLine);
@@ -622,23 +265,9 @@ class _TrendChartPainter extends CustomPainter {
       final x = i * xStep;
       final y = size.height - (val / maxVal) * size.height;
       canvas.drawCircle(Offset(x, y), 4, paintPoint);
-
-      // Label (Month)
-      final monthStr = data[i]['month'].split('-')[1];
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: monthStr,
-          style: const TextStyle(color: Colors.grey, fontSize: 10),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(x - textPainter.width / 2, size.height + 8));
     }
   }
 
   @override
-  bool shouldRepaint(covariant _TrendChartPainter oldDelegate) {
-    return !listEquals(data, oldDelegate.data);
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
