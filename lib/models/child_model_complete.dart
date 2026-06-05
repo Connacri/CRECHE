@@ -48,6 +48,8 @@ class ChildModel {
   final DateTime dateOfBirth;
   final ChildGender gender;
   final String? photoUrl;
+  final String? birthCertificateUrl;
+  final String? medicalCertificateUrl;
 
   String? get photoUrlWithCache {
     if (photoUrl == null || photoUrl!.isEmpty) return null;
@@ -68,6 +70,8 @@ class ChildModel {
     required this.dateOfBirth,
     required this.gender,
     this.photoUrl,
+    this.birthCertificateUrl,
+    this.medicalCertificateUrl,
     this.schoolGrade,
     required this.medicalInfo,
     required this.createdAt,
@@ -99,6 +103,8 @@ class ChildModel {
         orElse: () => ChildGender.other,
       ),
       photoUrl: data['photo_url'],
+      birthCertificateUrl: data['birth_certificate_url'],
+      medicalCertificateUrl: data['medical_certificate_url'],
       schoolGrade: data['school_grade'],
       medicalInfo: data['medical_info'] != null
           ? MedicalInfo.fromMap(data['medical_info'])
@@ -117,6 +123,8 @@ class ChildModel {
       'date_of_birth': dateOfBirth.toIso8601String(),
       'gender': gender.name,
       'photo_url': photoUrl,
+      'birth_certificate_url': birthCertificateUrl,
+      'medical_certificate_url': medicalCertificateUrl,
       'school_grade': schoolGrade,
       'medical_info': medicalInfo.toMap(),
       'created_at': createdAt.toIso8601String(),
@@ -148,6 +156,8 @@ class ChildModel {
     DateTime? dateOfBirth,
     ChildGender? gender,
     String? photoUrl,
+    String? birthCertificateUrl,
+    String? medicalCertificateUrl,
     String? schoolGrade,
     MedicalInfo? medicalInfo,
     DateTime? createdAt,
@@ -162,6 +172,8 @@ class ChildModel {
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       gender: gender ?? this.gender,
       photoUrl: photoUrl ?? this.photoUrl,
+      birthCertificateUrl: birthCertificateUrl ?? this.birthCertificateUrl,
+      medicalCertificateUrl: medicalCertificateUrl ?? this.medicalCertificateUrl,
       schoolGrade: schoolGrade ?? this.schoolGrade,
       medicalInfo: medicalInfo ?? this.medicalInfo,
       createdAt: createdAt ?? this.createdAt,
