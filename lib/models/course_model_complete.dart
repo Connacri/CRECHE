@@ -349,18 +349,13 @@ class CourseModel {
     return currentStudents < maxStudents;
   }
 
-  bool isAvailableNow() {
+  int get availableSpots => maxStudents - currentStudents;
+
+  bool get isAvailableNow {
     final now = DateTime.now();
     return isActive &&
         hasAvailableSpots() &&
         now.isAfter(seasonStartDate) &&
         now.isBefore(seasonEndDate);
-  }
-
-  int get availableSpots => maxStudents - currentStudents;
-
-  bool get isAvailableNow {
-    final now = DateTime.now();
-    return isActive && now.isAfter(seasonStartDate) && now.isBefore(seasonEndDate);
   }
 }

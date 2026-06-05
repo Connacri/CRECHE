@@ -70,69 +70,6 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
   }
 }
 
-class _OverviewPage extends StatelessWidget {
-  const _OverviewPage();
-
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProviderV2>();
-    final user = auth.userData != null ? UserModel.fromSupabase(auth.userData!) : null;
-
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          expandedHeight: 120,
-          flexibleSpace: FlexibleSpaceBar(
-            title: Text('Tableau de Bord', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontWeight: FontWeight.bold)),
-            background: Container(color: Theme.of(context).colorScheme.primary),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(24),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              Text('Bienvenue, ${user?.name ?? "Club"}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 24),
-              _buildStatsGrid(context),
-            ]),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatsGrid(BuildContext context) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      children: [
-        _buildStatCard(context, 'Membres', '124', Icons.people, Colors.blue),
-        _buildStatCard(context, 'Cours Actifs', '12', Icons.school, Colors.green),
-        _buildStatCard(context, 'Sessions/Jour', '8', Icons.timer, Colors.orange),
-        _buildStatCard(context, 'Revenus', '450k', Icons.payments, Colors.purple),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 32),
-          const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        ],
-      ),
-    );
-  }
-}
-
 class _PlanningManagementPage extends StatefulWidget {
   const _PlanningManagementPage();
 
