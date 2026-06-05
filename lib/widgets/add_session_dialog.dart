@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/session_schedule_model.dart';
 import '../models/course_model_complete.dart';
+import '../models/user_model.dart';
+import '../providers/course_provider_complete.dart';
+import 'package:provider/provider.dart';
 
 class AddSessionDialog extends StatefulWidget {
   final List<CourseModel> courses;
-  final List<Map<String, dynamic>> coaches;
+  final List<UserModel> coaches;
   final DayOfWeek? initialDay;
   final TimeSlot? initialTimeSlot;
   final SessionSchedule? sessionToEdit;
@@ -29,21 +32,22 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
   String? _selectedCoachId;
-  final _roomController = TextEditingController();
+  String? _roomName;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    final edit = widget.sessionToEdit;
-    _selectedCourseId = edit?.courseId ?? (widget.courses.isNotEmpty ? widget.courses.first.id : '');
-    _selectedDay = edit?.dayOfWeek ?? widget.initialDay ?? DayOfWeek.monday;
-
-    if (edit != null) {
-      _startTime = TimeOfDay.fromDateTime(edit.timeSlot.startTime);
-      _endTime = TimeOfDay.fromDateTime(edit.timeSlot.endTime);
-      _selectedCoachId = edit.coachId;
-      _roomController.text = edit.roomName ?? '';
+    if (widget.sessionToEdit != null) {
+      _selectedCourseId = widget.sessionToEdit!.courseId;
+      _selectedDay = widget.sessionToEdit!.dayOfWeek;
+      _startTime = TimeOfDay.fromDateTime(widget.sessionToEdit!.timeSlot.startTime);
+      _endTime = TimeOfDay.fromDateTime(widget.sessionToEdit!.timeSlot.endTime);
+      _selectedCoachId = widget.sessionToEdit!.coachId;
+      _roomName = widget.sessionToEdit!.roomName;
     } else {
+      _selectedCourseId = widget.courses.isNotEmpty ? widget.courses.first.id : "";
+      _selectedDay = widget.initialDay ?? DayOfWeek.monday;
       _startTime = widget.initialTimeSlot != null
           ? TimeOfDay.fromDateTime(widget.initialTimeSlot!.startTime)
           : const TimeOfDay(hour: 9, minute: 0);
@@ -53,10 +57,66 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
     }
   }
 
+  Future<void> _selectTime(bool isStart) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _startTime : _endTime,
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startTime = picked;
+        } else {
+          _endTime = picked;
+        }
+      });
+    }
+  }
+
+  void _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day, _startTime.hour, _startTime.minute);
+    final end = DateTime(now.year, now.month, now.day, _endTime.hour, _endTime.minute);
+
+    final schedule = SessionSchedule(
+      id: widget.sessionToEdit?.id ?? "",
+      courseId: _selectedCourseId,
+      enrollmentId: "",
+      dayOfWeek: _selectedDay,
+      timeSlot: TimeSlot(startTime: start, endTime: end),
+      startDate: DateTime(2024, 1, 1),
+      endDate: DateTime(2025, 1, 1),
+      currentEnrollment: 0,
+      maxCapacity: 30,
+      coachId: _selectedCoachId,
+      roomName: _roomName,
+    );
+
+    final provider = context.read<CourseProvider>();
+    bool success;
+    if (widget.sessionToEdit != null) {
+      success = await provider.updateSchedule(schedule.id, schedule.toSupabase());
+    } else {
+      success = await provider.createSchedule(schedule);
+    }
+
+    if (mounted) {
+      setState(() => _isSaving = false);
+      if (success) {
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erreur lors de la sauvegarde')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.sessionToEdit == null ? 'Nouvelle Session' : 'Modifier Session'),
+      title: Text(widget.sessionToEdit != null ? 'Modifier la session' : 'Nouvelle session'),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -64,23 +124,16 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                initialValue: _selectedCourseId,
-                decoration: const InputDecoration(labelText: 'Cours'),
-                items: widget.courses.map((c) => DropdownMenuItem(
-                  value: c.id,
-                  child: Text(c.title),
-                )).toList(),
+                value: _selectedCourseId,
+                items: widget.courses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.title))).toList(),
                 onChanged: (val) => setState(() => _selectedCourseId = val!),
+                decoration: const InputDecoration(labelText: 'Cours'),
               ),
-              const SizedBox(height: 16),
               DropdownButtonFormField<DayOfWeek>(
-                initialValue: _selectedDay,
-                decoration: const InputDecoration(labelText: 'Jour'),
-                items: DayOfWeek.values.map((d) => DropdownMenuItem(
-                  value: d,
-                  child: Text(d.displayName),
-                )).toList(),
+                value: _selectedDay,
+                items: DayOfWeek.values.map((d) => DropdownMenuItem(value: d, child: Text(d.displayName))).toList(),
                 onChanged: (val) => setState(() => _selectedDay = val!),
+                decoration: const InputDecoration(labelText: 'Jour'),
               ),
               const SizedBox(height: 16),
               Row(
@@ -89,41 +142,31 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
                     child: ListTile(
                       title: const Text('Début'),
                       subtitle: Text(_startTime.format(context)),
-                      onTap: () async {
-                        final time = await showTimePicker(context: context, initialTime: _startTime);
-                        if (time != null) setState(() => _startTime = time);
-                      },
+                      onTap: () => _selectTime(true),
                     ),
                   ),
                   Expanded(
                     child: ListTile(
                       title: const Text('Fin'),
                       subtitle: Text(_endTime.format(context)),
-                      onTap: () async {
-                        final time = await showTimePicker(context: context, initialTime: _endTime);
-                        if (time != null) setState(() => _endTime = time);
-                      },
+                      onTap: () => _selectTime(false),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
               DropdownButtonFormField<String?>(
-                initialValue: _selectedCoachId,
-                decoration: const InputDecoration(labelText: 'Coach'),
+                value: _selectedCoachId,
                 items: [
-                  const DropdownMenuItem<String?>(value: null, child: Text('Aucun coach')),
-                  ...widget.coaches.map((c) => DropdownMenuItem<String?>(
-                    value: c['id'],
-                    child: Text(c['name'] ?? 'Inconnu'),
-                  )),
+                  const DropdownMenuItem(value: null, child: Text('Non assigné')),
+                  ...widget.coaches.map((c) => DropdownMenuItem(value: c.uid, child: Text(c.name))),
                 ],
                 onChanged: (val) => setState(() => _selectedCoachId = val),
+                decoration: const InputDecoration(labelText: 'Coach'),
               ),
-              const SizedBox(height: 16),
               TextFormField(
-                controller: _roomController,
-                decoration: const InputDecoration(labelText: 'Salle / Lieu', hintText: 'ex: Salle 101'),
+                initialValue: _roomName,
+                decoration: const InputDecoration(labelText: 'Salle / Endroit'),
+                onChanged: (val) => _roomName = val,
               ),
             ],
           ),
@@ -131,35 +174,9 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-        if (widget.sessionToEdit != null)
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'delete'),
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
         ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              final now = DateTime.now();
-              final start = DateTime(now.year, now.month, now.day, _startTime.hour, _startTime.minute);
-              final end = DateTime(now.year, now.month, now.day, _endTime.hour, _endTime.minute);
-
-              final session = SessionSchedule(
-                id: widget.sessionToEdit?.id ?? '',
-                courseId: _selectedCourseId,
-                enrollmentId: '', // Non utilisé pour les templates d'horaires
-                dayOfWeek: _selectedDay,
-                timeSlot: TimeSlot(startTime: start, endTime: end),
-                startDate: DateTime.now(), // Devrait être lié à la saison du cours
-                endDate: DateTime.now().add(const Duration(days: 90)),
-                currentEnrollment: 0,
-                maxCapacity: 20,
-                coachId: _selectedCoachId,
-                roomName: _roomController.text,
-              );
-              Navigator.pop(context, session);
-            }
-          },
-          child: const Text('Enregistrer'),
+          onPressed: _isSaving ? null : _save,
+          child: _isSaving ? const CircularProgressIndicator() : const Text('Enregistrer'),
         ),
       ],
     );

@@ -108,7 +108,7 @@ class UserProfileImages {
       lastUpdated: map['lastUpdated'] != null
           ? (map['lastUpdated'] is String
               ? DateTime.parse(map['lastUpdated'])
-              : DateTime.fromMillisecondsSinceEpoch(0)) // Fallback if format is weird
+              : DateTime.fromMillisecondsSinceEpoch(0))
           : null,
     );
   }
@@ -173,6 +173,12 @@ class UserModel {
   final String? phoneNumber;
   final Map<String, dynamic>? metadata;
 
+  // Coach specific fields
+  final String? palmares;
+  final List<String>? diplomas;
+  final List<String>? certificates;
+  final String? cvUrl;
+
   UserModel({
     required this.uid,
     required this.email,
@@ -188,6 +194,10 @@ class UserModel {
     this.bio,
     this.phoneNumber,
     this.metadata,
+    this.palmares,
+    this.diplomas,
+    this.certificates,
+    this.cvUrl,
   }) : profileImages = profileImages ?? UserProfileImages();
 
   static DateTime _parseDateTime(dynamic value) {
@@ -246,6 +256,10 @@ class UserModel {
       bio: data['bio'],
       phoneNumber: data['phone_number'] ?? data['phone'],
       metadata: data['metadata'],
+      palmares: data['palmares'],
+      diplomas: data['diplomas'] != null ? List<String>.from(data['diplomas']) : null,
+      certificates: data['certificates'] != null ? List<String>.from(data['certificates']) : null,
+      cvUrl: data['cv_url'],
     );
   }
 
@@ -264,6 +278,10 @@ class UserModel {
       'bio': bio,
       'phone_number': phoneNumber,
       'metadata': metadata,
+      'palmares': palmares,
+      'diplomas': diplomas,
+      'certificates': certificates,
+      'cv_url': cvUrl,
     };
   }
 
@@ -282,6 +300,10 @@ class UserModel {
     String? bio,
     String? phoneNumber,
     Map<String, dynamic>? metadata,
+    String? palmares,
+    List<String>? diplomas,
+    List<String>? certificates,
+    String? cvUrl,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -299,6 +321,10 @@ class UserModel {
       bio: bio ?? this.bio,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       metadata: metadata ?? this.metadata,
+      palmares: palmares ?? this.palmares,
+      diplomas: diplomas ?? this.diplomas,
+      certificates: certificates ?? this.certificates,
+      cvUrl: cvUrl ?? this.cvUrl,
     );
   }
 
