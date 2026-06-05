@@ -491,8 +491,8 @@ class _ChildProfileDialog extends StatelessWidget {
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
                         _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(child.dateOfBirth)),
-                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo?.bloodType ?? 'Non spécifié'),
-                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo?.allergies.join(", ") ?? 'Aucune'),
+                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo.bloodType ?? 'Non spécifié'),
+                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo.allergies.join(", ") ?? 'Aucune'),
                         
                         const SizedBox(height: 32),
                         Row(

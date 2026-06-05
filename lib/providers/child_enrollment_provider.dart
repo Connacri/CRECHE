@@ -7,7 +7,6 @@ import '../models/daily_activity_model.dart';
 import '../services/supabase_service.dart';
 import '../services/club_service.dart';
 import '../services/image_storage_service.dart';
-import '../services/club_service.dart';
 
 class ChildEnrollmentProvider with ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
@@ -30,18 +29,33 @@ class ChildEnrollmentProvider with ChangeNotifier {
 
   final Map<String, Map<String, dynamic>> _childrenLocations = {};
 
+  Future<void> loadChildren(String parentId) async {
+    if (parentId.isEmpty) return;
+    try {
+      _setLoading(true);
+      _children = await _supabaseChildService.getChildren(parentId);
+      _setLoading(false);
+    } catch (e) {
+      _setError('Erreur lors du chargement des enfants: $e');
+      _setLoading(false);
+    }
+  }
+
   Future<bool> addChild({
     required String parentId,
     required String firstName,
     required String lastName,
     required DateTime dateOfBirth,
     required ChildGender gender,
+    String? photoUrl,
+    String? schoolGrade,
+    MedicalInfo? medicalInfo,
     File? photoFile,
     File? birthCertificateFile,
     File? medicalCertificateFile,
   }) async {
     try {
-      _isLoading = true; notifyListeners();
+      _setLoading(true);
       String? finalPhotoUrl = photoUrl;
       if (photoFile != null) finalPhotoUrl = await _imageService.uploadImage(photoFile, 'children_photos');
 
@@ -51,28 +65,28 @@ class ChildEnrollmentProvider with ChangeNotifier {
       String? medicalCertificateUrl;
       if (medicalCertificateFile != null) medicalCertificateUrl = await _imageService.uploadFile(medicalCertificateFile, 'certificates');
 
-      ChildGender genderEnum = gender is ChildGender ? gender : ChildGender.values.firstWhere((g) => g.name == gender.toString(), orElse: () => ChildGender.other);
       final child = ChildModel(
         id: '',
         parentId: parentId,
         firstName: firstName,
         lastName: lastName,
         dateOfBirth: dateOfBirth,
-        gender: genderEnum,
+        gender: gender,
         photoUrl: finalPhotoUrl,
         birthCertificateUrl: birthCertificateUrl,
         medicalCertificateUrl: medicalCertificateUrl,
         schoolGrade: schoolGrade,
         medicalInfo: medicalInfo ?? MedicalInfo(),
         createdAt: DateTime.now(),
-        updatedAt: DateTime.now()
+        updatedAt: DateTime.now(),
       );
       await _supabaseChildService.createChild(child);
       await loadChildren(parentId);
-      _isLoading = false; notifyListeners();
+      _setLoading(false);
       return true;
     } catch (e) {
-      _error = 'Erreur lors de l\'ajout: $e'; _isLoading = false; notifyListeners();
+      _setError('Erreur lors de l\'ajout: $e');
+      _setLoading(false);
       return false;
     }
   }
@@ -82,7 +96,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     String? firstName,
     String? lastName,
     DateTime? dateOfBirth,
-    dynamic gender,
+    ChildGender? gender,
     String? photoUrl,
     String? birthCertificateUrl,
     String? medicalCertificateUrl,
@@ -93,7 +107,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     File? newMedicalCertificate,
   }) async {
     try {
-      _isLoading = true; notifyListeners();
+      _setLoading(true);
       final childIndex = _children.indexWhere((c) => c.id == childId);
       if (childIndex == -1) throw 'Enfant non trouvé';
 
@@ -106,14 +120,11 @@ class ChildEnrollmentProvider with ChangeNotifier {
       String? finalMedicalCertUrl = medicalCertificateUrl;
       if (newMedicalCertificate != null) finalMedicalCertUrl = await _imageService.uploadFile(newMedicalCertificate, 'certificates');
 
-      ChildGender? genderEnum;
-      if (gender != null) genderEnum = gender is ChildGender ? gender : ChildGender.values.firstWhere((g) => g.name == gender.toString(), orElse: () => ChildGender.other);
-
       final updates = <String, dynamic>{
         if (firstName != null) 'first_name': firstName,
         if (lastName != null) 'last_name': lastName,
         if (dateOfBirth != null) 'date_of_birth': dateOfBirth.toIso8601String(),
-        if (gender != null) 'gender': genderEnum?.name ?? gender.toString(),
+        if (gender != null) 'gender': gender.name,
         if (finalPhotoUrl != null) 'photo_url': finalPhotoUrl,
         if (finalBirthCertUrl != null) 'birth_certificate_url': finalBirthCertUrl,
         if (finalMedicalCertUrl != null) 'medical_certificate_url': finalMedicalCertUrl,
@@ -122,21 +133,23 @@ class ChildEnrollmentProvider with ChangeNotifier {
         'updated_at': DateTime.now().toIso8601String(),
       };
       await _supabaseChildService.updateChild(childId, updates);
+      
       _children[childIndex] = _children[childIndex].copyWith(
         firstName: firstName,
         lastName: lastName,
         dateOfBirth: dateOfBirth,
-        gender: genderEnum,
+        gender: gender,
         photoUrl: finalPhotoUrl,
         birthCertificateUrl: finalBirthCertUrl,
         medicalCertificateUrl: finalMedicalCertUrl,
         schoolGrade: schoolGrade,
         medicalInfo: medicalInfo,
-        updatedAt: DateTime.now()
+        updatedAt: DateTime.now(),
       );
-      _isLoading = false; notifyListeners();
+      _setLoading(false);
       return true;
     } catch (e) {
+      _setError('Erreur lors de la mise à jour: $e');
       _setLoading(false);
       return false;
     }
@@ -148,9 +161,9 @@ class ChildEnrollmentProvider with ChangeNotifier {
       await _supabaseChildService.softDeleteChild(childId);
       _children.removeWhere((c) => c.id == childId);
       _setLoading(false);
-      notifyListeners();
       return true;
     } catch (e) {
+      _setError('Erreur lors de la suppression: $e');
       _setLoading(false);
       return false;
     }
@@ -163,6 +176,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
       _enrollments = await _supabaseChildService.getEnrollments(parentId);
       _setLoading(false);
     } catch (e) {
+      _setError('Erreur lors du chargement des inscriptions: $e');
       _setLoading(false);
     }
   }
@@ -175,6 +189,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
       await loadOwnerEnrollmentsDetailed(ownerId);
       _setLoading(false);
     } catch (e) {
+      _setError('Erreur lors du chargement des inscriptions (propriétaire): $e');
       _setLoading(false);
     }
   }
@@ -199,9 +214,11 @@ class ChildEnrollmentProvider with ChangeNotifier {
         paidAmount: 0,
       );
       await _supabaseChildService.createEnrollment(enrollment);
+      await loadEnrollments(parentId);
       _setLoading(false);
       return true;
     } catch (e) {
+      _setError('Erreur lors de la création de l\'inscription: $e');
       _setLoading(false);
       return false;
     }
@@ -234,9 +251,9 @@ class ChildEnrollmentProvider with ChangeNotifier {
         );
       }
       _setLoading(false);
-      notifyListeners();
       return true;
     } catch (e) {
+      _setError('Erreur lors de la mise à jour de l\'inscription: $e');
       _setLoading(false);
       return false;
     }
@@ -257,6 +274,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
       _schedules = await _supabaseChildService.getSchedulesForParent(parentId);
       _setLoading(false);
     } catch (e) {
+      _setError('Erreur lors du chargement des emplois du temps: $e');
       _setLoading(false);
     }
   }
@@ -269,10 +287,10 @@ class ChildEnrollmentProvider with ChangeNotifier {
     }
     try {
       _setLoading(true);
-      final response = await _supabaseChildService.adminClient.from('session_schedules').select().eq('school_id', schoolId);
-      _schedules = (response as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
+      _schedules = await _supabaseChildService.getSchedulesByOwner(schoolId);
       _setLoading(false);
     } catch (e) {
+      _setError('Erreur lors du chargement des emplois du temps de l\'école: $e');
       _setLoading(false);
     }
   }
@@ -327,7 +345,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
   void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
   void _setError(String error) { _error = error; notifyListeners(); }
 
-  final ClubService _clubService = ClubService();
   int _memberCount = 0;
   int get memberCount => _memberCount;
 
@@ -374,36 +391,10 @@ class ChildEnrollmentProvider with ChangeNotifier {
   Future<void> loadOwnerEnrollmentsDetailed(String ownerId) async {
     try {
       _setLoading(true);
-      _ownerEnrollmentsDetailed = await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
-      _setLoading(false);
-    } catch (e) {
-      _setLoading(false);
-    }
-  }
-
-  List<DailyActivity> getActivitiesForChild(String childId) {
-    return _dailyActivities.where((a) => a.childId == childId).toList();
-  }
-
-  Future<void> loadDailyActivities(String parentId, DateTime date) async {
-    try {
-      _setLoading(true);
-      _dailyActivities = await _supabaseChildService.getDailyActivities(parentId, date);
-      _setLoading(false);
-    } catch (e) {
-      _setLoading(false);
-    }
-  }
-
-  List<Map<String, dynamic>> _ownerEnrollmentsDetailed = [];
-  List<Map<String, dynamic>> get ownerEnrollmentsDetailed => _ownerEnrollmentsDetailed;
-
-  Future<void> loadOwnerEnrollmentsDetailed(String ownerId) async {
-    try {
-      _setLoading(true);
       _ownerEnrollmentsDetailed = await _supabaseChildService.getEnrollmentsForOwnerDetailed(ownerId);
       _setLoading(false);
     } catch (e) {
+      _setError('Erreur lors du chargement détaillé: $e');
       _setLoading(false);
     }
   }
@@ -418,6 +409,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
       _dailyActivities = await _supabaseChildService.getDailyActivities(parentId, date);
       _setLoading(false);
     } catch (e) {
+      _setError('Erreur lors du chargement des activités: $e');
       _setLoading(false);
     }
   }

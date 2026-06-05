@@ -4,13 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider_v2.dart';
 import '../providers/course_provider_complete.dart';
+import '../providers/child_enrollment_provider.dart';
 import '../models/user_model.dart';
 import '../models/course_model_complete.dart';
+import '../models/enrollment_model_complete.dart';
+import '../models/child_model_complete.dart';
 import '../models/session_schedule_model.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/add_session_dialog.dart';
 import 'profile_screen.dart';
+import 'create_course_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
   const SchoolDashboard({super.key});
@@ -32,10 +36,11 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
 
   Widget _buildPage() {
     switch (_selectedIndex) {
-      case 0: return const _OverviewPage();
+      case 0: return const _DashboardOverview();
       case 1: return const _PlanningManagementPage();
-      case 2: return const ProfileScreen();
-      default: return const _OverviewPage();
+      case 2: return const _EnrollmentsPage();
+      case 3: return const ProfileScreen();
+      default: return const _DashboardOverview();
     }
   }
 
@@ -52,9 +57,11 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
           onTap: (i) => setState(() => _selectedIndex = i),
           selectedItemColor: Theme.of(context).colorScheme.primary,
           unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          type: BottomNavigationBarType.fixed,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Aperçu'),
             BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Planning'),
+            BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Inscriptions'),
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
           ],
         ),
@@ -140,9 +147,9 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final auth = context.read<AuthProviderV2>();
-        final provider = context.read<CourseProvider>();
-        provider.loadOwnerSchedules(auth.currentUser!.uid);
-        provider.loadCoaches();
+        final courseProvider = context.read<CourseProvider>();
+        courseProvider.loadOwnerSchedules(auth.currentUser!.uid);
+        courseProvider.loadCoaches();
       }
     });
   }
@@ -192,8 +199,10 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
     );
   }
 
-  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses, List<UserModel> coaches, {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}) {
-    showDialog(
+  Future<void> _showAddScheduleDialog(BuildContext context, List<CourseModel> courses, List<UserModel> coaches, {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}) async {
+    final provider = context.read<CourseProvider>();
+    
+    final result = await showDialog(
       context: context,
       builder: (context) => AddSessionDialog(
         courses: courses,
@@ -210,7 +219,6 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
       } else if (result is SessionSchedule) {
         if (sessionToEdit != null) {
           await provider.updateSchedule(sessionToEdit.id, result.toSupabase());
-          // Rafraîchir
           if (context.mounted) {
             final auth = context.read<AuthProviderV2>();
             provider.loadOwnerSchedules(auth.currentUser!.uid);
@@ -226,11 +234,20 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
 class _DashboardOverview extends StatelessWidget {
   const _DashboardOverview();
 
-
   @override
   Widget build(BuildContext context) {
+    final auth = context.read<AuthProviderV2>();
     final courses = context.watch<CourseProvider>().userCourses;
     final enrollmentProvider = context.watch<ChildEnrollmentProvider>();
+    
+    // Auto-load stats if empty
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (auth.currentUser != null && enrollmentProvider.monthlyEnrollmentStats.isEmpty) {
+        enrollmentProvider.loadDashboardStats(auth.currentUser!.uid);
+        enrollmentProvider.loadOwnerEnrollmentsDetailed(auth.currentUser!.uid);
+      }
+    });
+
     final enrollments = enrollmentProvider.ownerEnrollmentsDetailed;
     final memberCount = enrollmentProvider.memberCount;
     final graphData = enrollmentProvider.monthlyEnrollmentStats;
@@ -243,6 +260,9 @@ class _DashboardOverview extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        const SizedBox(height: 24),
+        Text('Aperçu du Club', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(child: _StatCard('Cours actifs', courses.where((c) => c.isActive).length.toString(), Icons.school, Colors.blue)),
@@ -334,11 +354,13 @@ class _EnrollmentsPage extends StatelessWidget {
   const _EnrollmentsPage();
   @override
   Widget build(BuildContext context) {
-    final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
+    final enrollmentProvider = context.watch<ChildEnrollmentProvider>();
+    final enrollments = enrollmentProvider.ownerEnrollmentsDetailed;
     final provider = context.read<ChildEnrollmentProvider>();
 
     return Column(
       children: [
+        const SizedBox(height: 40),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Row(
@@ -531,6 +553,7 @@ class _EnrollmentsPage extends StatelessWidget {
     return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color)), child: Text(text, style: TextStyle(color: color, fontSize: 10)));
   }
 }
+
 class _TrendChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> data;
   _TrendChartPainter({required this.data});
@@ -602,4 +625,7 @@ class _TrendChartPainter extends CustomPainter {
       textPainter.paint(canvas, Offset(x - textPainter.width / 2, size.height + 8));
     }
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
