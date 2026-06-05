@@ -144,10 +144,10 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
       context: context,
       builder: (context) => useWindowsVersion
           ? LocationPickerDialogWindows(
-              initialLocation: _selectedLocation,
+              initialLocation: _selectedLocation != null ? AppLocation(latitude: _selectedLocation!.latitude, longitude: _selectedLocation!.longitude, address: _selectedLocation!.address, city: _selectedLocation!.city, country: _selectedLocation!.country) : null,
             )
           : LocationPickerDialog(
-              initialLocation: _selectedLocation,
+              initialLocation: _selectedLocation != null ? AppLocation(latitude: _selectedLocation!.latitude, longitude: _selectedLocation!.longitude, address: _selectedLocation!.address, city: _selectedLocation!.city, country: _selectedLocation!.country) : null,
             ),
     );
 

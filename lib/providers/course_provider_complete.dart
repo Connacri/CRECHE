@@ -3,18 +3,17 @@ import 'package:flutter/material.dart';
 import '../models/course_model_complete.dart';
 import '../models/user_model.dart';
 import '../models/session_schedule_model.dart';
-import '../services/course_service.dart';
+import '../services/supabase_service.dart';
 import '../services/image_storage_service.dart';
 import '../services/location_service_osm.dart';
 import '../services/auth_service.dart';
-import '../services/child_service.dart';
 
 class CourseProvider extends ChangeNotifier {
-  final CourseService _courseService = CourseService();
+  final SupabaseCourseService _courseService = SupabaseCourseService();
   final ImageStorageService _imageService = ImageStorageService();
   final LocationService _locationService = LocationService();
   final AuthService _authService = AuthService();
-  final ChildService _childService = ChildService();
+  final SupabaseChildService _childService = SupabaseChildService();
 
   List<CourseModel> _courses = [];
   List<CourseModel> get courses => _courses;
@@ -57,7 +56,7 @@ class CourseProvider extends ChangeNotifier {
       _clearError();
       final newCourses = await _courseService.getCourses(
         limit: 10,
-        lastTimestamp: _lastDocumentTimestamp,
+        lastDocumentTimestamp: _lastDocumentTimestamp,
       );
       if (newCourses.length < 10) {
         _hasMoreCourses = false;
@@ -359,7 +358,8 @@ class CourseProvider extends ChangeNotifier {
 
   Future<void> loadCoaches() async {
     try {
-      _coaches = await _authService.getCoaches();
+      final rawCoaches = await _authService.getCoaches();
+      _coaches = rawCoaches.map((json) => UserModel.fromSupabase(json)).toList();
       notifyListeners();
     } catch (e) {
       print("❌ [CourseProvider] Erreur loadCoaches: $e");

@@ -345,4 +345,10 @@ class CourseModel {
       updatedAt: DateTime.now(),
     );
   }
+
+  bool hasAvailableSpots() {
+    return currentStudents < maxStudents;
+  }
+
+  int get availableSpots => maxStudents - currentStudents;
 }
