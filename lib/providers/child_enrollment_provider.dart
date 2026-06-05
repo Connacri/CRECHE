@@ -6,6 +6,7 @@ import '../models/daily_activity_model.dart';
 import '../models/session_schedule_model.dart';
 import '../services/supabase_service.dart';
 import '../services/image_storage_service.dart';
+import '../services/club_service.dart';
 
 class ChildEnrollmentProvider with ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
@@ -32,16 +33,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
   String? _error;
   String? get error => _error;
 
-  Future<void> loadChildren(String parentId) async {
-    if (parentId.isEmpty) return;
-    try {
-      _setLoading(true);
-      _children = await _supabaseChildService.getChildren(parentId);
-      _setLoading(false);
-    } catch (e) {
-      _setLoading(false);
-    }
-  }
 
   Future<bool> addChild({
     required String parentId,
@@ -54,8 +45,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
     File? photoFile,
     File? birthCertificateFile,
     File? medicalCertificateFile,
-    String? schoolGrade,
-    MedicalInfo? medicalInfo,
   }) async {
     try {
       _setLoading(true);
@@ -454,6 +443,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     }
   }
 
+  void _setError(String? value) { _error = value; notifyListeners(); }
   void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
 }
 
