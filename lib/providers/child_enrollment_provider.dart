@@ -5,37 +5,46 @@ import '../models/enrollment_model_complete.dart';
 import '../models/session_schedule_model.dart';
 import '../models/daily_activity_model.dart';
 import '../services/supabase_service.dart';
-import '../services/image_storage_service.dart';
 import '../services/club_service.dart';
+import '../services/image_storage_service.dart';
 
-class ChildEnrollmentProvider with ChangeNotifier {
+class ChildEnrollmentProvider extends ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
+  final ClubService _clubService = ClubService();
   final ImageStorageService _imageService = ImageStorageService();
 
   List<ChildModel> _children = [];
-  List<EnrollmentModel> _enrollments = [];
-  List<SessionSchedule> _schedules = [];
-  List<DailyActivity> _dailyActivities = [];
-  bool _isLoading = false;
-  String? _error;
-
   List<ChildModel> get children => _children;
+
+  List<EnrollmentModel> _enrollments = [];
   List<EnrollmentModel> get enrollments => _enrollments;
+
+  List<SessionSchedule> _schedules = [];
   List<SessionSchedule> get schedules => _schedules;
+
+  List<DailyActivity> _dailyActivities = [];
   List<DailyActivity> get dailyActivities => _dailyActivities;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
 
   final Map<String, Map<String, dynamic>> _childrenLocations = {};
 
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  String? _error;
+  String? get error => _error;
+
+  void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
+  void _setError(String error) { _error = error; notifyListeners(); }
+
   Future<void> loadChildren(String parentId) async {
-    if (parentId.isEmpty) { _children = []; notifyListeners(); return; }
+    if (parentId.isEmpty) return;
     try {
-      _isLoading = true; notifyListeners();
+      _setLoading(true);
       _children = await _supabaseChildService.getChildren(parentId);
-      _isLoading = false; notifyListeners();
+      _setLoading(false);
     } catch (e) {
-      _error = 'Impossible de charger les enfants'; _isLoading = false; notifyListeners();
+      _setError(e.toString());
+      _setLoading(false);
     }
   }
 
@@ -44,47 +53,44 @@ class ChildEnrollmentProvider with ChangeNotifier {
     required String firstName,
     required String lastName,
     required DateTime dateOfBirth,
-    required dynamic gender,
-    String? photoUrl,
-    String? schoolGrade,
-    MedicalInfo? medicalInfo,
+    required ChildGender gender,
     File? photoFile,
-    File? birthCertificateFile,
-    File? medicalCertificateFile,
+    String? schoolGrade,
   }) async {
     try {
-      _isLoading = true; notifyListeners();
-      String? finalPhotoUrl = photoUrl;
-      if (photoFile != null) finalPhotoUrl = await _imageService.uploadImage(photoFile, 'children_photos');
+      _setLoading(true);
+      String? photoUrl;
 
-      String? birthCertificateUrl;
-      if (birthCertificateFile != null) birthCertificateUrl = await _imageService.uploadFile(birthCertificateFile, 'certificates');
+      if (photoFile != null) {
+        final tempId = "temp_${DateTime.now().millisecondsSinceEpoch}";
+        photoUrl = await _imageService.uploadChildPhoto(
+          imageFile: photoFile,
+          userId: parentId,
+          childId: tempId
+        );
+      }
 
-      String? medicalCertificateUrl;
-      if (medicalCertificateFile != null) medicalCertificateUrl = await _imageService.uploadFile(medicalCertificateFile, 'certificates');
-
-      ChildGender genderEnum = gender is ChildGender ? gender : ChildGender.values.firstWhere((g) => g.name == gender.toString(), orElse: () => ChildGender.other);
       final child = ChildModel(
-        id: '',
+        id: "",
         parentId: parentId,
         firstName: firstName,
         lastName: lastName,
         dateOfBirth: dateOfBirth,
-        gender: genderEnum,
-        photoUrl: finalPhotoUrl,
-        birthCertificateUrl: birthCertificateUrl,
-        medicalCertificateUrl: medicalCertificateUrl,
+        gender: gender,
+        photoUrl: photoUrl,
         schoolGrade: schoolGrade,
-        medicalInfo: medicalInfo ?? MedicalInfo(),
+        medicalInfo: MedicalInfo(),
         createdAt: DateTime.now(),
-        updatedAt: DateTime.now()
+        updatedAt: DateTime.now(),
       );
-      await _supabaseChildService.createChild(child);
-      await loadChildren(parentId);
-      _isLoading = false; notifyListeners();
+
+      final id = await _supabaseChildService.createChild(child);
+      _children.add(child.copyWith(id: id));
+      _setLoading(false);
+      notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erreur lors de l\'ajout: $e'; _isLoading = false; notifyListeners();
+      _setLoading(false);
       return false;
     }
   }
@@ -94,113 +100,141 @@ class ChildEnrollmentProvider with ChangeNotifier {
     String? firstName,
     String? lastName,
     DateTime? dateOfBirth,
-    dynamic gender,
-    String? photoUrl,
-    String? birthCertificateUrl,
-    String? medicalCertificateUrl,
-    String? schoolGrade,
-    MedicalInfo? medicalInfo,
+    ChildGender? gender,
     File? newPhoto,
-    File? newBirthCertificate,
-    File? newMedicalCertificate,
+    String? schoolGrade,
   }) async {
     try {
-      _isLoading = true; notifyListeners();
-      final childIndex = _children.indexWhere((c) => c.id == childId);
-      if (childIndex == -1) throw 'Enfant non trouvé';
+      _setLoading(true);
+      final Map<String, dynamic> updates = {};
+      if (firstName != null) updates['first_name'] = firstName;
+      if (lastName != null) updates['last_name'] = lastName;
+      if (dateOfBirth != null) updates['date_of_birth'] = dateOfBirth.toIso8601String();
+      if (gender != null) updates['gender'] = gender.name;
+      if (schoolGrade != null) updates['school_grade'] = schoolGrade;
 
-      String? finalPhotoUrl = photoUrl;
-      if (newPhoto != null) finalPhotoUrl = await _imageService.uploadImage(newPhoto, 'children_photos');
+      final index = _children.indexWhere((c) => c.id == childId);
+      if (index == -1) return false;
+      final parentId = _children[index].parentId;
 
-      String? finalBirthCertUrl = birthCertificateUrl;
-      if (newBirthCertificate != null) finalBirthCertUrl = await _imageService.uploadFile(newBirthCertificate, 'certificates');
+      if (newPhoto != null) {
+        final photoUrl = await _imageService.uploadChildPhoto(
+          imageFile: newPhoto,
+          userId: parentId,
+          childId: childId
+        );
+        if (photoUrl != null) updates['photo_url'] = photoUrl;
+      }
 
-      String? finalMedicalCertUrl = medicalCertificateUrl;
-      if (newMedicalCertificate != null) finalMedicalCertUrl = await _imageService.uploadFile(newMedicalCertificate, 'certificates');
-
-      ChildGender? genderEnum;
-      if (gender != null) genderEnum = gender is ChildGender ? gender : ChildGender.values.firstWhere((g) => g.name == gender.toString(), orElse: () => ChildGender.other);
-
-      final updates = <String, dynamic>{
-        if (firstName != null) 'first_name': firstName,
-        if (lastName != null) 'last_name': lastName,
-        if (dateOfBirth != null) 'date_of_birth': dateOfBirth.toIso8601String(),
-        if (gender != null) 'gender': genderEnum?.name ?? gender.toString(),
-        if (finalPhotoUrl != null) 'photo_url': finalPhotoUrl,
-        if (finalBirthCertUrl != null) 'birth_certificate_url': finalBirthCertUrl,
-        if (finalMedicalCertUrl != null) 'medical_certificate_url': finalMedicalCertUrl,
-        if (schoolGrade != null) 'school_grade': schoolGrade,
-        if (medicalInfo != null) 'medical_info': medicalInfo.toMap(),
-        'updated_at': DateTime.now().toIso8601String(),
-      };
       await _supabaseChildService.updateChild(childId, updates);
-      _children[childIndex] = _children[childIndex].copyWith(
-        firstName: firstName,
-        lastName: lastName,
-        dateOfBirth: dateOfBirth,
-        gender: genderEnum,
-        photoUrl: finalPhotoUrl,
-        birthCertificateUrl: finalBirthCertUrl,
-        medicalCertificateUrl: finalMedicalCertUrl,
-        schoolGrade: schoolGrade,
-        medicalInfo: medicalInfo,
-        updatedAt: DateTime.now()
-      );
-      _isLoading = false; notifyListeners();
+      _children[index] = ChildModel.fromSupabase({..._children[index].toSupabase(), ...updates, 'id': childId});
+
+      _setLoading(false);
+      notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erreur modification'; _isLoading = false; notifyListeners();
+      _setLoading(false);
       return false;
     }
   }
 
   Future<bool> deleteChild(String childId) async {
     try {
-      _isLoading = true; notifyListeners();
+      _setLoading(true);
       await _supabaseChildService.softDeleteChild(childId);
       _children.removeWhere((c) => c.id == childId);
-      _enrollments.removeWhere((e) => e.childId == childId);
-      _isLoading = false; notifyListeners();
+      _setLoading(false);
+      notifyListeners();
       return true;
     } catch (e) {
-      _isLoading = false; notifyListeners(); return false;
-    }
-  }
-
-  Future<bool> createEnrollment({required String courseId, required String childId, required String parentId, double? totalAmount}) async {
-    try {
-      _setLoading(true);
-      final enrollment = EnrollmentModel(id: '', courseId: courseId, childId: childId, parentId: parentId, status: EnrollmentStatus.pending, enrolledAt: DateTime.now(), paymentStatus: PaymentStatus.pending, totalAmount: totalAmount, paidAmount: 0, attendanceHistory: []);
-      await _supabaseChildService.createEnrollment(enrollment);
-      await loadEnrollments(parentId);
-      _setLoading(false); return true;
-    } catch (e) {
-      _setLoading(false); return false;
+      _setLoading(false);
+      return false;
     }
   }
 
   Future<void> loadEnrollments(String parentId) async {
-    if (parentId.isEmpty) { _enrollments = []; notifyListeners(); return; }
+    if (parentId.isEmpty) return;
     try {
       _setLoading(true);
       _enrollments = await _supabaseChildService.getEnrollments(parentId);
-      _setLoading(false); notifyListeners();
+      _setLoading(false);
     } catch (e) {
       _setLoading(false);
     }
   }
 
-  Future<bool> updateEnrollment({required String enrollmentId, EnrollmentStatus? status, PaymentStatus? paymentStatus, double? paidAmount}) async {
+  Future<void> loadOwnerEnrollments(String ownerId) async {
+    if (ownerId.isEmpty) return;
     try {
       _setLoading(true);
-      final updates = <String, dynamic>{ if (status != null) 'status': status.name, if (paymentStatus != null) 'payment_status': paymentStatus.name, if (paidAmount != null) 'paid_amount': paidAmount, 'updated_at': DateTime.now().toIso8601String() };
-      await _supabaseChildService.updateEnrollment(enrollmentId, updates);
-      final index = _enrollments.indexWhere((e) => e.id == enrollmentId);
-      if (index != -1) _enrollments[index] = _enrollments[index].copyWith(status: status, paymentStatus: paymentStatus, paidAmount: paidAmount);
-      _setLoading(false); notifyListeners();
+      _enrollments = await _supabaseChildService.getEnrollmentsForOwner(ownerId);
+      await loadOwnerEnrollmentsDetailed(ownerId);
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> createEnrollment({
+    required String courseId,
+    required String childId,
+    required String parentId,
+    double? totalAmount,
+  }) async {
+    try {
+      _setLoading(true);
+      final enrollment = EnrollmentModel(
+        id: "",
+        courseId: courseId,
+        childId: childId,
+        parentId: parentId,
+        status: EnrollmentStatus.pending,
+        enrolledAt: DateTime.now(),
+        paymentStatus: PaymentStatus.pending,
+        totalAmount: totalAmount,
+        paidAmount: 0,
+      );
+      await _supabaseChildService.createEnrollment(enrollment);
+      _setLoading(false);
       return true;
     } catch (e) {
-      _setLoading(false); return false;
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  Future<bool> updateEnrollment({
+    required String enrollmentId,
+    EnrollmentStatus? status,
+    PaymentStatus? paymentStatus,
+    double? paidAmount,
+  }) async {
+    try {
+      _setLoading(true);
+      final Map<String, dynamic> updates = {};
+      if (status != null) {
+        updates['status'] = status.name;
+        if (status == EnrollmentStatus.approved) updates['approved_at'] = DateTime.now().toIso8601String();
+      }
+      if (paymentStatus != null) updates['payment_status'] = paymentStatus.name;
+      if (paidAmount != null) updates['paid_amount'] = paidAmount;
+
+      await _supabaseChildService.updateEnrollment(enrollmentId, updates);
+
+      final index = _enrollments.indexWhere((e) => e.id == enrollmentId);
+      if (index != -1) {
+        _enrollments[index] = _enrollments[index].copyWith(
+          status: status,
+          paymentStatus: paymentStatus,
+          paidAmount: paidAmount
+        );
+      }
+      _setLoading(false);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setLoading(false);
+      return false;
     }
   }
 
@@ -209,23 +243,31 @@ class ChildEnrollmentProvider with ChangeNotifier {
   }
 
   Future<void> loadAllSchedulesForParent(String parentId) async {
-    if (parentId.isEmpty) { _schedules = []; notifyListeners(); return; }
+    if (parentId.isEmpty) {
+      _schedules = [];
+      notifyListeners();
+      return;
+    }
     try {
       _setLoading(true);
       _schedules = await _supabaseChildService.getSchedulesForParent(parentId);
-      _setLoading(false); notifyListeners();
+      _setLoading(false);
     } catch (e) {
       _setLoading(false);
     }
   }
 
   Future<void> loadSchedulesForSchool(String schoolId) async {
-    if (schoolId.isEmpty) { _schedules = []; notifyListeners(); return; }
+    if (schoolId.isEmpty) {
+      _schedules = [];
+      notifyListeners();
+      return;
+    }
     try {
       _setLoading(true);
       final response = await _supabaseChildService.adminClient.from('session_schedules').select().eq('school_id', schoolId);
       _schedules = (response as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
-      _setLoading(false); notifyListeners();
+      _setLoading(false);
     } catch (e) {
       _setLoading(false);
     }
@@ -240,8 +282,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
   bool isChildEnrolledInCourse(String childId, String courseId) {
     return _enrollments.any((e) => e.childId == childId && e.courseId == courseId && e.status != EnrollmentStatus.rejected && e.status != EnrollmentStatus.cancelled);
   }
-
-  // === ✅ CALCULS DE FACTURATION ===
 
   double getTotalDueForChild(String childId) {
     return getEnrollmentsForChild(childId).fold(0.0, (sum, e) => sum + e.remainingAmount);
@@ -268,8 +308,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
     return earliest;
   }
 
-  // === ✅ ACTIVITÉS ET GEOFENCING ===
-
   Map<String, dynamic>? getChildLocation(String childId) {
     if (!_childrenLocations.containsKey(childId)) {
       _childrenLocations[childId] = {
@@ -282,25 +320,14 @@ class ChildEnrollmentProvider with ChangeNotifier {
     return _childrenLocations[childId];
   }
 
-  void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
-  void _setError(String error) { _error = error; notifyListeners(); }
-
-  final ClubService _clubService = ClubService();
-  int _memberCount = 0;
-  int get memberCount => _memberCount;
-
   List<Map<String, dynamic>> _monthlyEnrollmentStats = [];
   List<Map<String, dynamic>> get monthlyEnrollmentStats => _monthlyEnrollmentStats;
 
   Future<void> loadDashboardStats(String ownerId) async {
     try {
       _setLoading(true);
+      await _clubService.getClubMembers(ownerId);
 
-      // Load member count
-      final members = await _clubService.getClubMembers(ownerId);
-      _memberCount = members.length;
-
-      // Load monthly enrollment stats (last 6 months)
       final enrollments = await _supabaseChildService.getEnrollmentsForOwner(ownerId);
 
       Map<String, int> stats = {};
@@ -323,14 +350,9 @@ class ChildEnrollmentProvider with ChangeNotifier {
         'month': entry.key,
         'count': entry.value
       }).toList();
-
-      // Sort by month ascending
       _monthlyEnrollmentStats.sort((a, b) => a['month'].compareTo(b['month']));
-
       _setLoading(false);
-      notifyListeners();
     } catch (e) {
-      // Error loading dashboard stats
       _setLoading(false);
     }
   }

@@ -73,7 +73,7 @@ class AuthWrapper extends StatelessWidget {
             case 'parent':
               return const ParentDashboard();
             case 'coach':
-              return const CoachDashboard();
+              return const CoachDashboardScreen();
             case 'school':
               return const SchoolDashboard();
             case 'transporteur':

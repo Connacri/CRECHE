@@ -1,102 +1,77 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
-
-import "../models/session_schedule_model.dart";
 import '../models/course_model_complete.dart';
-import "../services/auth_service.dart";
-import '../services/image_storage_service.dart';
-import '../services/location_service_osm.dart' show LocationService;
+import '../models/user_model.dart';
+import '../models/session_schedule_model.dart';
 import '../services/supabase_service.dart';
+import '../services/image_storage_service.dart';
+import '../services/location_service_osm.dart';
+import '../services/auth_service.dart';
 
-/// Provider complet pour la gestion des cours avec Supabase
 class CourseProvider extends ChangeNotifier {
   final SupabaseCourseService _courseService = SupabaseCourseService();
-  final SupabaseChildService _childService = SupabaseChildService();
-  final AuthService _authService = AuthService();
   final ImageStorageService _imageService = ImageStorageService();
   final LocationService _locationService = LocationService();
+  final AuthService _authService = AuthService();
+  final SupabaseChildService _childService = SupabaseChildService();
 
-  List<SessionSchedule> _schedules = [];
-  List<Map<String, dynamic>> _coaches = [];
   List<CourseModel> _courses = [];
-  List<CourseModel> _userCourses = [];
-  CourseModel? _selectedCourse;
-  bool _isLoading = false;
-  String? _error;
-  bool _hasMoreCourses = true;
-  DateTime? _lastDocumentTimestamp;
-
-  final ValueNotifier<double> uploadProgressNotifier =
-      ValueNotifier<double>(0.0);
-
-  // Getters
-  List<SessionSchedule> get schedules => _schedules;
-  List<Map<String, dynamic>> get coaches => _coaches;
   List<CourseModel> get courses => _courses;
 
+  List<CourseModel> _userCourses = [];
   List<CourseModel> get userCourses => _userCourses;
 
+  CourseModel? _selectedCourse;
   CourseModel? get selectedCourse => _selectedCourse;
 
+  List<UserModel> _coaches = [];
+  List<UserModel> get coaches => _coaches;
+
+  List<SessionSchedule> _schedules = [];
+  List<SessionSchedule> get schedules => _schedules;
+
+  bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  String? _error;
   String? get error => _error;
 
+  final ValueNotifier<double> uploadProgressNotifier = ValueNotifier<double>(0.0);
+
+  DateTime? _lastDocumentTimestamp;
+  bool _hasMoreCourses = true;
   bool get hasMoreCourses => _hasMoreCourses;
 
-  double get uploadProgress => uploadProgressNotifier.value;
-
-  @override
-  void dispose() {
-    uploadProgressNotifier.dispose();
-    super.dispose();
-  }
-
-  /// Charge une liste de cours avec pagination et filtres
-  Future<void> loadCourses({
-    bool refresh = false,
-    CourseSeason? season,
-    CourseCategory? category,
-    bool? isActive = true,
-  }) async {
+  Future<void> loadCourses({bool refresh = false}) async {
     if (_isLoading) return;
+    if (refresh) {
+      _courses.clear();
+      _lastDocumentTimestamp = null;
+      _hasMoreCourses = true;
+    }
+    if (!_hasMoreCourses) return;
 
     try {
       _setLoading(true);
       _clearError();
-
-      if (refresh) {
-        _courses.clear();
-        _lastDocumentTimestamp = null;
-        _hasMoreCourses = true;
-      }
-
       final newCourses = await _courseService.getCourses(
-        limit: 20,
+        limit: 10,
         lastDocumentTimestamp: _lastDocumentTimestamp,
-        season: season,
-        category: category,
-        isActive: isActive,
       );
-
-      if (newCourses.isEmpty) {
+      if (newCourses.length < 10) {
         _hasMoreCourses = false;
-      } else {
+      }
+      if (newCourses.isNotEmpty) {
         _courses.addAll(newCourses);
         _lastDocumentTimestamp = newCourses.last.createdAt;
       }
-
       _setLoading(false);
     } catch (e) {
       _setError('Erreur lors du chargement des cours: $e');
-      print(e);
       _setLoading(false);
     }
   }
 
-  /// 🔧 FIX : Crée un nouveau cours dans Supabase
-  /// ✅ STRATÉGIE CORRECTE : Créer le cours D'ABORD, puis uploader les images avec le vrai ID
   Future<bool> createCourse({
     required String title,
     required String description,
@@ -110,6 +85,7 @@ class CourseProvider extends ChangeNotifier {
     required List<File> imageFiles,
     required String currentUserId,
     required String currentUserRole,
+    String? clubId,
     int maxStudents = 30,
     List<String> tags = const [],
     Map<String, dynamic>? metadata,
@@ -120,30 +96,19 @@ class CourseProvider extends ChangeNotifier {
       _clearError();
       _setUploadProgress(0.0);
 
-      print(
-          '╔═══════════════════════════════════════════════════════════════════');
-      print('🔵 [CourseProvider] Création cours - DÉBUT');
-      print(
-          '╚═══════════════════════════════════════════════════════════════════');
-
-      // 🎯 ÉTAPE 1 : Créer le cours SANS images pour obtenir l'ID réel de Supabase
-      print('📝 [CourseProvider] ÉTAPE 1/3 : Création cours (sans images)...');
-
       final newCourse = CourseModel(
         id: '',
-        // ✅ Vide, Supabase va générer l'UUID
         title: title,
         description: description,
         category: category,
         price: price,
-
         season: season,
         seasonStartDate: seasonStartDate,
         seasonEndDate: seasonEndDate,
         location: location,
         images: [],
-        // ✅ Vide au départ
         createdBy: currentUserId,
+        clubId: clubId,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: true,
@@ -154,90 +119,51 @@ class CourseProvider extends ChangeNotifier {
       );
 
       final courseId = await _courseService.createCourse(newCourse);
-      print('✅ [CourseProvider] Cours créé avec ID: $courseId');
 
-      // 🎯 ÉTAPE 2 : Upload des images avec le VRAI courseId
       List<CourseImage> uploadedImages = [];
       if (imageFiles.isNotEmpty) {
-        print(
-            '📤 [CourseProvider] ÉTAPE 2/3 : Upload ${imageFiles.length} images...');
-
         uploadedImages = await _imageService.uploadMultipleCourseImages(
           imageFiles: imageFiles,
-          courseId: courseId, // ✅ Utilise le vrai ID de Supabase
+          courseId: courseId,
           onProgress: (current, total) {
             _setUploadProgress(current / total);
             onImageUploadProgress?.call(current, total);
-            print('📤 [CourseProvider] Progression upload: $current/$total');
           },
         );
-
-        print('✅ [CourseProvider] ${uploadedImages.length} images uploadées');
-      } else {
-        print('⚠️ [CourseProvider] Aucune image à uploader');
       }
 
-      // 🎯 ÉTAPE 3 : Mettre à jour le cours avec les URLs des images
       if (uploadedImages.isNotEmpty) {
-        print(
-            '📝 [CourseProvider] ÉTAPE 3/3 : Mise à jour cours avec images...');
-
         await _courseService.updateCourse(
           courseId,
           {
             'images': uploadedImages.map((img) => img.toMap()).toList(),
           },
         );
-
-        print(
-            '✅ [CourseProvider] Cours mis à jour avec ${uploadedImages.length} images');
       }
-
-      // 🎯 ÉTAPE 4 : Re-fetch pour avoir les données complètes
-      print('🔄 [CourseProvider] ÉTAPE 4/4 : Récupération cours complet...');
 
       final createdCourse = await _courseService.getCourse(courseId);
       if (createdCourse != null) {
         _courses.insert(0, createdCourse);
         _userCourses.insert(0, createdCourse);
-        print('✅ [CourseProvider] Cours ajouté aux listes locales');
-      } else {
-        print('⚠️ [CourseProvider] Impossible de récupérer le cours créé');
       }
 
       _setLoading(false);
       _setUploadProgress(0.0);
-
-      print(
-          '╔═══════════════════════════════════════════════════════════════════');
-      print('✅ [CourseProvider] Création cours - SUCCÈS');
-      print(
-          '╚═══════════════════════════════════════════════════════════════════');
-
+      notifyListeners();
       return true;
-    } catch (e, stackTrace) {
-      print(
-          '╔═══════════════════════════════════════════════════════════════════');
-      print('❌ [CourseProvider] ERREUR création cours: $e');
-      print('❌ [CourseProvider] StackTrace: $stackTrace');
-      print(
-          '╚═══════════════════════════════════════════════════════════════════');
-
-      _setError('Erreur lors de la création du cours: $e');
+    } catch (e) {
+      _setError('Erreur lors de la création: $e');
       _setLoading(false);
-      _setUploadProgress(0.0);
       return false;
     }
   }
 
-  /// Met à jour un cours existant
   Future<bool> updateCourse({
     required String courseId,
     String? title,
     String? description,
     CourseCategory? category,
     double? price,
-    String? currency,
     CourseSeason? season,
     DateTime? seasonStartDate,
     DateTime? seasonEndDate,
@@ -246,6 +172,7 @@ class CourseProvider extends ChangeNotifier {
     int? maxStudents,
     List<String>? tags,
     bool? isActive,
+    String? clubId,
     Map<String, dynamic>? metadata,
     Function(int current, int total)? onImageUploadProgress,
   }) async {
@@ -254,33 +181,25 @@ class CourseProvider extends ChangeNotifier {
       _clearError();
       _setUploadProgress(0.0);
 
-      print('🔵 [CourseProvider] Mise à jour cours: $courseId');
-
-      final updates = <String, dynamic>{};
+      final Map<String, dynamic> updates = {
+        'updated_at': DateTime.now().toIso8601String(),
+      };
 
       if (title != null) updates['title'] = title;
       if (description != null) updates['description'] = description;
       if (category != null) updates['category'] = category.name;
       if (price != null) updates['price'] = price;
-      if (currency != null) updates['currency'] = currency;
       if (season != null) updates['season'] = season.name;
-      if (seasonStartDate != null) {
-        updates['season_start_date'] = seasonStartDate.toIso8601String();
-      }
-      if (seasonEndDate != null) {
-        updates['season_end_date'] = seasonEndDate.toIso8601String();
-      }
+      if (seasonStartDate != null) updates['season_start_date'] = seasonStartDate.toIso8601String();
+      if (seasonEndDate != null) updates['season_end_date'] = seasonEndDate.toIso8601String();
       if (location != null) updates['location'] = location.toMap();
       if (maxStudents != null) updates['max_students'] = maxStudents;
       if (tags != null) updates['tags'] = tags;
       if (isActive != null) updates['is_active'] = isActive;
+      if (clubId != null) updates['club_id'] = clubId;
       if (metadata != null) updates['metadata'] = metadata;
 
-      // Upload des nouvelles images
       if (newImageFiles != null && newImageFiles.isNotEmpty) {
-        print(
-            '📤 [CourseProvider] Upload ${newImageFiles.length} nouvelles images...');
-
         final uploadedImages = await _imageService.uploadMultipleCourseImages(
           imageFiles: newImageFiles,
           courseId: courseId,
@@ -294,14 +213,11 @@ class CourseProvider extends ChangeNotifier {
         if (existingCourse != null) {
           final allImages = [...existingCourse.images, ...uploadedImages];
           updates['images'] = allImages.map((img) => img.toMap()).toList();
-          print('✅ [CourseProvider] Total images: ${allImages.length}');
         }
       }
 
-      // Mettre à jour dans Supabase
       await _courseService.updateCourse(courseId, updates);
 
-      // Re-fetch pour avoir les données à jour
       final updatedCourse = await _courseService.getCourse(courseId);
       if (updatedCourse != null) {
         _updateLocalCourse(updatedCourse);
@@ -310,100 +226,63 @@ class CourseProvider extends ChangeNotifier {
       _setLoading(false);
       _setUploadProgress(0.0);
       notifyListeners();
-
-      print('✅ [CourseProvider] Cours mis à jour avec succès');
       return true;
-    } catch (e, stackTrace) {
-      print('❌ [CourseProvider] Erreur mise à jour: $e');
-      print('❌ [CourseProvider] StackTrace: $stackTrace');
-
+    } catch (e) {
       _setError('Erreur lors de la mise à jour: $e');
       _setLoading(false);
-      _setUploadProgress(0.0);
       return false;
     }
   }
 
-  /// Supprime un cours
   Future<bool> deleteCourse(String courseId) async {
     try {
       _setLoading(true);
-      _clearError();
-
-      print('🗑️ [CourseProvider] Suppression cours: $courseId');
-
-      // Récupérer le cours pour supprimer les images
       final course = await _courseService.getCourse(courseId);
-
       if (course != null && course.images.isNotEmpty) {
-        print(
-            '🗑️ [CourseProvider] Suppression ${course.images.length} images...');
         await _imageService.deleteMultipleImages(course.images, courseId);
       }
-
-      // Supprimer de Supabase
       await _courseService.deleteCourse(courseId);
-
-      // Retirer localement
       _courses.removeWhere((c) => c.id == courseId);
       _userCourses.removeWhere((c) => c.id == courseId);
-
-      if (_selectedCourse?.id == courseId) {
-        _selectedCourse = null;
-      }
-
+      if (_selectedCourse?.id == courseId) _selectedCourse = null;
       _setLoading(false);
       notifyListeners();
-
-      print('✅ [CourseProvider] Cours supprimé avec succès');
       return true;
-    } catch (e, stackTrace) {
-      print('❌ [CourseProvider] Erreur suppression: $e');
-      print('❌ [CourseProvider] StackTrace: $stackTrace');
-
+    } catch (e) {
       _setError('Erreur lors de la suppression: $e');
       _setLoading(false);
       return false;
     }
   }
 
-  /// Charge les cours d'un utilisateur
   Future<void> loadUserCourses(String userId) async {
     try {
       _setLoading(true);
-      _clearError();
       _userCourses = await _courseService.getUserCourses(userId);
       _setLoading(false);
     } catch (e) {
       _setError('Erreur lors du chargement des cours utilisateur: $e');
-      print(e);
       _setLoading(false);
     }
   }
 
-  /// Charge un cours spécifique
   Future<void> loadCourseById(String courseId) async {
     try {
       _setLoading(true);
-      _clearError();
       _selectedCourse = await _courseService.getCourse(courseId);
       _setLoading(false);
     } catch (e) {
       _setError('Erreur lors du chargement du cours: $e');
-      print(e);
       _setLoading(false);
     }
   }
 
-  /// Supprime une image d'un cours
   Future<bool> removeImageFromCourse(String courseId, CourseImage image) async {
     try {
       await _imageService.deleteCourseImage(image, courseId);
-
       final course = await _courseService.getCourse(courseId);
       if (course != null) {
-        final updatedImages =
-            course.images.where((img) => img.id != image.id).toList();
+        final updatedImages = course.images.where((img) => img.id != image.id).toList();
         await _courseService.updateCourse(
           courseId,
           {'images': updatedImages.map((img) => img.toMap()).toList()},
@@ -413,28 +292,23 @@ class CourseProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _setError("Erreur lors de la suppression de l'image: $e");
-      print(e);
       return false;
     }
   }
 
-  /// Recherche de cours
   Future<List<CourseModel>> searchCourses(String searchTerm) async {
     try {
       return await _courseService.searchCourses(searchTerm);
     } catch (e) {
       _setError('Erreur lors de la recherche: $e');
-      print(e);
       return [];
     }
   }
 
-  /// Tri par distance géographique
   Future<void> sortCoursesByDistance() async {
     try {
       final position = await _locationService.getCurrentPosition();
       if (position == null) return;
-
       _courses = await _locationService.sortCoursesByDistance(
         _courses,
         position.latitude,
@@ -443,11 +317,9 @@ class CourseProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _setError('Erreur lors du tri par distance: $e');
-      print(e);
     }
   }
 
-  /// Charge les cours à proximité
   Future<void> loadCoursesNearby({
     required double latitude,
     required double longitude,
@@ -455,23 +327,18 @@ class CourseProvider extends ChangeNotifier {
   }) async {
     try {
       _setLoading(true);
-      _clearError();
-
       _courses = await _courseService.getCoursesNearby(
         latitude: latitude,
         longitude: longitude,
         radiusKm: radiusKm,
       );
-
       _setLoading(false);
     } catch (e) {
       _setError('Erreur lors du chargement des cours à proximité: $e');
-      print(e);
       _setLoading(false);
     }
   }
 
-  /// Filtres locaux
   List<CourseModel> filterCoursesBySeason(CourseSeason season) {
     return _courses.where((course) => course.season == season).toList();
   }
@@ -481,27 +348,24 @@ class CourseProvider extends ChangeNotifier {
   }
 
   List<CourseModel> getAvailableCourses() {
-    return _courses.where((course) => course.isAvailableNow()).toList();
+    return _courses.where((course) => course.isActive).toList();
   }
 
-  /// Sélectionne un cours
   void selectCourse(CourseModel? course) {
     _selectedCourse = course;
     notifyListeners();
   }
 
-  /// Vide les listes locales
-  /// Charge les coaches disponibles
   Future<void> loadCoaches() async {
     try {
-      _coaches = await _authService.getCoaches();
+      final rawCoaches = await _authService.getCoaches();
+      _coaches = rawCoaches.map((json) => UserModel.fromSupabase(json)).toList();
       notifyListeners();
     } catch (e) {
       print("❌ [CourseProvider] Erreur loadCoaches: $e");
     }
   }
 
-  /// Charge les horaires pour un propriétaire
   Future<void> loadOwnerSchedules(String ownerId) async {
     try {
       _setLoading(true);
@@ -513,7 +377,6 @@ class CourseProvider extends ChangeNotifier {
     }
   }
 
-  /// Ajoute une session au planning
   Future<bool> createSchedule(SessionSchedule schedule) async {
     try {
       _setLoading(true);
@@ -530,17 +393,10 @@ class CourseProvider extends ChangeNotifier {
     }
   }
 
-  /// Met à jour une session
   Future<bool> updateSchedule(String id, Map<String, dynamic> updates) async {
     try {
       _setLoading(true);
       await _childService.updateSchedule(id, updates);
-      final index = _schedules.indexWhere((s) => s.id == id);
-      if (index != -1) {
-        // On pourrait recharger ou mettre à jour localement si on avait un copyWithFromMap
-        // Pour faire simple et sûr, on recharge tout le planning de lowner
-        // Mais ici on va juste notifier quil faut recharger
-      }
       _setLoading(false);
       return true;
     } catch (e) {
@@ -550,7 +406,6 @@ class CourseProvider extends ChangeNotifier {
     }
   }
 
-  /// Supprime une session
   Future<bool> deleteSchedule(String id) async {
     try {
       _setLoading(true);
@@ -577,8 +432,6 @@ class CourseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // === Méthodes privées ===
-
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -599,13 +452,8 @@ class CourseProvider extends ChangeNotifier {
 
   void _updateLocalCourse(CourseModel updatedCourse) {
     final index = _courses.indexWhere((c) => c.id == updatedCourse.id);
-    if (index != -1) {
-      _courses[index] = updatedCourse;
-    }
-
+    if (index != -1) _courses[index] = updatedCourse;
     final userIndex = _userCourses.indexWhere((c) => c.id == updatedCourse.id);
-    if (userIndex != -1) {
-      _userCourses[userIndex] = updatedCourse;
-    }
+    if (userIndex != -1) _userCourses[userIndex] = updatedCourse;
   }
 }

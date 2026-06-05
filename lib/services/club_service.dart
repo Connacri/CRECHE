@@ -1,4 +1,5 @@
 import 'supabase_service.dart';
+import '../models/user_model.dart';
 
 class ClubService extends AdminSupabaseService {
   /// Récupère les cours créés par le club
@@ -115,12 +116,12 @@ class ClubService extends AdminSupabaseService {
   }
 
   /// Récupère tous les clubs disponibles
-  Future<List<Map<String, dynamic>>> getAvailableClubs() async {
+  Future<List<UserModel>> getAvailableClubs() async {
     final response = await adminClient
         .from('users')
-        .select('id, name, email, profile_images, location, bio')
+        .select()
         .eq('role', 'school')
         .eq('is_active', true);
-    return (response as List).cast<Map<String, dynamic>>();
+    return (response as List).map((json) => UserModel.fromSupabase(json)).toList();
   }
 }
