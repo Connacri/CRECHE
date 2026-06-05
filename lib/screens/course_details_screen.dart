@@ -22,7 +22,6 @@ class CourseDetailsScreen extends StatefulWidget {
 
 class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   late CourseModel _course;
-  bool _isEnrolling = false;
 
   @override
   void initState() {
@@ -81,7 +80,6 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     
     return Scaffold(
       extendBodyBehindAppBar: true,
