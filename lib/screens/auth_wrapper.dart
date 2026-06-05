@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 
-import '../screens/autresDashboard.dart';
+import '../screens/autres_dashboard_screen.dart';
 import '../screens/coach_dashboard_screen.dart';
 import '../screens/parent_dashboard_screen.dart';
 import '../screens/school_dashboard_screen.dart';

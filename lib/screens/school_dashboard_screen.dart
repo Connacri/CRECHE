@@ -15,6 +15,7 @@ import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/add_session_dialog.dart';
 import '../widgets/enrollments_page.dart';
 import 'profile_screen.dart';
+import 'create_course_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
   const SchoolDashboard({super.key});
@@ -142,9 +143,9 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final auth = context.read<AuthProviderV2>();
-        final provider = context.read<CourseProvider>();
-        provider.loadOwnerSchedules(auth.currentUser!.uid);
-        provider.loadCoaches();
+        final courseProvider = context.read<CourseProvider>();
+        courseProvider.loadOwnerSchedules(auth.currentUser!.uid);
+        courseProvider.loadCoaches();
       }
     });
   }

@@ -6,7 +6,6 @@ import '../models/daily_activity_model.dart';
 import '../models/session_schedule_model.dart';
 import '../services/supabase_service.dart';
 import '../services/image_storage_service.dart';
-import '../services/club_service.dart';
 
 class ChildEnrollmentProvider with ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
@@ -55,6 +54,8 @@ class ChildEnrollmentProvider with ChangeNotifier {
     File? photoFile,
     File? birthCertificateFile,
     File? medicalCertificateFile,
+    String? schoolGrade,
+    MedicalInfo? medicalInfo,
   }) async {
     try {
       _setLoading(true);
@@ -147,7 +148,8 @@ class ChildEnrollmentProvider with ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setLoading(false);
+      _isLoading = false;
+      notifyListeners();
       return false;
     }
   }
@@ -162,6 +164,18 @@ class ChildEnrollmentProvider with ChangeNotifier {
     } catch (e) {
       _setLoading(false);
       return false;
+    }
+  }
+
+  Future<void> loadChildren(String parentId) async {
+    if (parentId.isEmpty) return;
+    try {
+      _setLoading(true);
+      _children = await _supabaseChildService.getChildren(parentId);
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+      _setError('Erreur lors du chargement des enfants: $e');
     }
   }
 
@@ -279,6 +293,48 @@ class ChildEnrollmentProvider with ChangeNotifier {
       _setLoading(true);
       final response = await _supabaseChildService.adminClient.from('session_schedules').select().eq('school_id', schoolId);
       _schedules = (response as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> loadOwnerSchedules(String ownerId) async {
+    if (ownerId.isEmpty) return;
+    try {
+      _setLoading(true);
+      _schedules = await _supabaseChildService.getSchedulesByOwner(ownerId);
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> createSchedule(SessionSchedule schedule) async {
+    try {
+      _setLoading(true);
+      await _supabaseChildService.createSchedule(schedule);
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> updateSchedule(String scheduleId, Map<String, dynamic> updates) async {
+    try {
+      _setLoading(true);
+      await _supabaseChildService.updateSchedule(scheduleId, updates);
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> deleteSchedule(String scheduleId) async {
+    try {
+      _setLoading(true);
+      await _supabaseChildService.deleteSchedule(scheduleId);
+      _schedules.removeWhere((s) => s.id == scheduleId);
       _setLoading(false);
     } catch (e) {
       _setLoading(false);

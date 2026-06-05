@@ -8,7 +8,6 @@ import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
 import '../widgets/glass_card.dart';
 import '../services/finance_service.dart';
-import 'dart:ui' as ui;
 
 class ClubFinanceScreen extends StatefulWidget {
   const ClubFinanceScreen({super.key});
@@ -19,6 +18,7 @@ class ClubFinanceScreen extends StatefulWidget {
 
 class _ClubFinanceScreenState extends State<ClubFinanceScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  // ignore: unused_field
   final FinanceService _financeService = FinanceService();
   bool _isLoading = true;
 

@@ -301,7 +301,6 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
   }
 
   void _showAddMemberDialog() {
-    String query = '';
     List<Map<String, dynamic>> searchResults = [];
     bool isSearching = false;
 
