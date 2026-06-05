@@ -316,7 +316,7 @@ class _EnrollmentsPage extends StatelessWidget {
       itemBuilder: (context, index) {
         final item = enrollments[index];
         final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
-        final child = ChildModel.fromSupabase(item['child']);
+        final child = ChildModel.fromSupabase(item['child'] ?? ChildModel.mock().toSupabase());
         final course = CourseModel.fromSupabase(item['course']);
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),

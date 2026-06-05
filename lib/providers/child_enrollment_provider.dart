@@ -341,7 +341,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
   Future<void> loadOwnerEnrollmentsDetailed(String ownerId) async {
     try {
       _setLoading(true);
-      _ownerEnrollmentsDetailed = await _supabaseChildService.getEnrollmentsForOwnerDetailed(ownerId);
+      _ownerEnrollmentsDetailed = await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
       _setLoading(false);
     } catch (e) {
       _setLoading(false);

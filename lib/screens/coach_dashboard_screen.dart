@@ -288,7 +288,7 @@ class _EnrollmentsPage extends StatelessWidget {
       itemBuilder: (context, index) {
         final item = enrollments[index];
         final enrollmentJson = item['enrollment'] as Map<String, dynamic>;
-        final childJson = item['child'] as Map<String, dynamic>;
+        final childJson = (item["child"] as Map<String, dynamic>?) ?? ChildModel.mock().toSupabase();
         final courseJson = item['course'] as Map<String, dynamic>;
 
         final enrollment = EnrollmentModel.fromSupabase(enrollmentJson);
