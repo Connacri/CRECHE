@@ -1,4 +1,23 @@
-class _ChildFormDialogState extends State<_ChildFormDialog> {
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_cropper/image_cropper.dart';
+import '../models/child_model_complete.dart';
+import '../providers/child_enrollment_provider.dart';
+import '../services/hybrid_image_picker.dart';
+
+class ChildFormDialog extends StatefulWidget {
+  final ChildModel? child;
+  final String parentId;
+
+  const ChildFormDialog({super.key, this.child, required this.parentId});
+
+  @override
+  State<ChildFormDialog> createState() => _ChildFormDialogState();
+}
+
+class _ChildFormDialogState extends State<ChildFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
@@ -138,7 +157,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<ChildGender>(
-                value: _gender,
+                initialValue: _gender,
                 decoration: const InputDecoration(labelText: 'Genre'),
                 items: ChildGender.values.map((g) => DropdownMenuItem(
                   value: g,

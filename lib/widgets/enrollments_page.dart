@@ -1,5 +1,16 @@
-class _EnrollmentsPage extends StatelessWidget {
-  const _EnrollmentsPage();
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import '../models/enrollment_model_complete.dart';
+import '../models/child_model_complete.dart';
+import '../models/course_model_complete.dart';
+import '../providers/child_enrollment_provider.dart';
+import 'glass_card.dart';
+
+class EnrollmentsPage extends StatelessWidget {
+  const EnrollmentsPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     final enrollments = context.watch<ChildEnrollmentProvider>().ownerEnrollmentsDetailed;
@@ -196,6 +207,14 @@ class _EnrollmentsPage extends StatelessWidget {
       case EnrollmentStatus.cancelled: color = Colors.grey; text = 'Annulé'; break;
       case EnrollmentStatus.completed: color = Colors.blue; text = 'Terminé'; break;
     }
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color)), child: Text(text, style: TextStyle(color: color, fontSize: 10)));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color)
+      ),
+      child: Text(text, style: TextStyle(color: color, fontSize: 10))
+    );
   }
 }

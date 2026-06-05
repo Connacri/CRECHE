@@ -116,6 +116,12 @@ class ClubService extends AdminSupabaseService {
   }
 
   /// Récupère tous les clubs disponibles
+  /// Alias pour getAvailableClubs
+  Future<List<Map<String, dynamic>>> getSchools() async {
+    final response = await adminClient.from("users").select("id, name").eq("role", "school");
+    return (response as List).cast<Map<String, dynamic>>();
+  }
+
   Future<List<UserModel>> getAvailableClubs() async {
     final response = await adminClient
         .from('users')
