@@ -1,4 +1,13 @@
-  Widget _buildChildBillingCard(BuildContext context, ChildEnrollmentProvider provider, ChildModel child) {
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
+import 'providers/child_enrollment_provider.dart';
+import 'models/child_model_complete.dart';
+import 'models/enrollment_model_complete.dart';
+import 'widgets/glass_card.dart';
+
+class BillingMethods {
+  static Widget buildChildBillingCard(BuildContext context, ChildEnrollmentProvider provider, ChildModel child) {
     final enrollments = provider.getEnrollmentsForChild(child.id);
     final totalDue = provider.getTotalDueForChild(child.id);
     final nextRenewal = provider.getNextRenewalDateForChild(child.id);
@@ -45,7 +54,7 @@
                 if (enrollments.isEmpty)
                   const Text('Aucune inscription active.')
                 else
-                  ...enrollments.map((e) => _buildEnrollmentRow(context, e)),
+                  ...enrollments.map((e) => buildEnrollmentRow(context, e)),
 
                 if (nextRenewal != null) ...[
                   const Divider(height: 24),
@@ -68,7 +77,7 @@
     );
   }
 
-  Widget _buildEnrollmentRow(BuildContext context, EnrollmentModel enrollment) {
+  static Widget buildEnrollmentRow(BuildContext context, EnrollmentModel enrollment) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -103,3 +112,4 @@
       ),
     );
   }
+}

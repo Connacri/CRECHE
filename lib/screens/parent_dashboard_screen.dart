@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import "package:qr_flutter/qr_flutter.dart";
-import 'package:file_picker/file_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 
 import '../../dependences/calendar_timeline/calendar_timeline.dart';
@@ -13,7 +12,6 @@ import '../providers/auth_provider_v2.dart';
 import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/child_model_complete.dart';
-import '../models/daily_activity_model.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../providers/course_provider_complete.dart';
 import '../services/hybrid_image_picker.dart';
@@ -491,8 +489,8 @@ class _ChildProfileDialog extends StatelessWidget {
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
                         _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(child.dateOfBirth)),
-                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo?.bloodType ?? 'Non spécifié'),
-                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo?.allergies.join(", ") ?? 'Aucune'),
+                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo.bloodType ?? 'Non spécifié'),
+                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo.allergies.join(", ")),
                         
                         const SizedBox(height: 32),
                         Row(

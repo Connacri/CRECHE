@@ -5,13 +5,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider_v2.dart';
 import 'package:provider/provider.dart';
 
 import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
-import '../models/enrollment_model_complete.dart';
-import '../models/user_model.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../providers/course_provider_complete.dart';
 import '../services/image_storage_service.dart';
@@ -275,33 +274,6 @@ class _ParentDashboardState extends State<ParentDashboard>
             longitude: LocationService.defaultLongitude,
             address: LocationService.defaultAddress,
           ));
-    }
-  }
-
-  /// ✅ Sauvegarde localisation avec updateUserProfileSilent
-  Future<void> _saveUserLocation(AppLocation location) async {
-    try {
-      final result =
-          await context.read<AuthProviderV2>().updateUserProfileSilent({
-        'location': location.toMap(),
-      });
-
-      if (result.success) {
-        setState(() => _userLocation = location);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Localisation sauvegardée'),
-                backgroundColor: Colors.green),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-        );
-      }
     }
   }
 
@@ -585,19 +557,6 @@ class _EnrollmentDialogState extends State<EnrollmentDialog> {
         throw Exception('Utilisateur non connecté');
       }
 
-      // Créer l'inscription
-      final enrollment = EnrollmentModel(
-        id: '',
-        courseId: widget.course.id,
-        childId: _selectedChildId!,
-        parentId: currentUser.uid,
-        status: EnrollmentStatus.pending,
-        enrolledAt: DateTime.now(),
-        paymentStatus: PaymentStatus.pending,
-        totalAmount: widget.course.price,
-        paidAmount: 0,
-      );
-
       // TODO: Sauvegarder via ChildEnrollmentProvider
       // await childProvider.createEnrollment(enrollment);
 
@@ -815,9 +774,8 @@ class _ChildEnrollmentDialogState extends State<ChildEnrollmentDialog> {
       final childProvider = context.read<ChildEnrollmentProvider>();
 
       // Upload photo si nouvelle
-      String? photoUrl;
       if (_pickedImage != null) {
-        photoUrl = await _imageService.uploadChildPhoto(
+        await _imageService.uploadChildPhoto(
           imageFile: _pickedImage!,
           userId: currentUser.uid,
           childId: widget.existingChild?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),

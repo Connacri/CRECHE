@@ -1,5 +1,4 @@
-import 'dart:ui';
-import '../models/user_model.dart';
+
 
 enum CourseCategory {
   mathematics,
@@ -348,6 +347,14 @@ class CourseModel {
 
   bool hasAvailableSpots() {
     return currentStudents < maxStudents;
+  }
+
+  bool isAvailableNow() {
+    final now = DateTime.now();
+    return isActive &&
+        hasAvailableSpots() &&
+        now.isAfter(seasonStartDate) &&
+        now.isBefore(seasonEndDate);
   }
 
   int get availableSpots => maxStudents - currentStudents;

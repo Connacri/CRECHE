@@ -84,7 +84,6 @@ class FinanceService extends AdminSupabaseService {
   }
 
   Future<void> updateInventoryStock(String itemId, String clubId, int quantity, String type, {String? notes}) async {
-    final auth = adminClient.auth.currentUser; // Just to get a creator ID if needed, but we use clubId
     await adminClient.from('inventory_transactions').insert({
       'item_id': itemId,
       'club_id': clubId,
