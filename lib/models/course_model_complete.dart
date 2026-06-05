@@ -1,3 +1,6 @@
+import 'dart:ui';
+import '../models/user_model.dart';
+
 enum CourseCategory {
   mathematics,
   sciences,
@@ -52,7 +55,6 @@ enum CourseSeason {
     }
   }
 
-  /// Retourne les dates par défaut pour une saison donnée pour l'année en cours
   Map<String, DateTime> getDefaultDateRange() {
     final now = DateTime.now();
     final year = now.year;
@@ -123,7 +125,6 @@ class CourseLocation {
   }
 }
 
-/// Modèle d'image de cours adapté pour Supabase
 class CourseImage {
   final String id;
   final String? supabaseUrl;
@@ -139,7 +140,6 @@ class CourseImage {
     required this.uploadedAt,
   });
 
-  /// Désérialisation depuis Supabase (JSONB)
   factory CourseImage.fromMap(Map<String, dynamic> map) {
     return CourseImage(
       id: map['id'] ?? '',
@@ -154,7 +154,6 @@ class CourseImage {
     );
   }
 
-  /// Sérialisation pour Supabase (JSONB)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -165,7 +164,6 @@ class CourseImage {
     };
   }
 
-  /// CopyWith pour créer une copie modifiée
   CourseImage copyWith({
     String? id,
     String? supabaseUrl,
@@ -181,21 +179,6 @@ class CourseImage {
       uploadedAt: uploadedAt ?? this.uploadedAt,
     );
   }
-
-  @override
-  String toString() {
-    return 'CourseImage(id: $id, supabaseUrl: $supabaseUrl, isSynced: $isSynced)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    return other is CourseImage && other.id == id;
-  }
-
-  @override
-  int get hashCode => id.hashCode;
 }
 
 class CourseModel {
@@ -204,13 +187,13 @@ class CourseModel {
   final String description;
   final CourseCategory category;
   final double? price;
-
   final CourseSeason season;
   final DateTime seasonStartDate;
   final DateTime seasonEndDate;
   final CourseLocation location;
   final List<CourseImage> images;
   final String createdBy;
+  final String? clubId; // New field
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
@@ -231,6 +214,7 @@ class CourseModel {
     required this.location,
     required this.images,
     required this.createdBy,
+    this.clubId,
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
@@ -262,6 +246,7 @@ class CourseModel {
               .toList() ??
           [],
       createdBy: data['created_by'] ?? '',
+      clubId: data['club_id'],
       createdAt: DateTime.parse(data['created_at']),
       updatedAt: DateTime.parse(data['updated_at']),
       isActive: data['is_active'] ?? true,
@@ -284,6 +269,7 @@ class CourseModel {
       'location': location.toMap(),
       'images': images.map((img) => img.toMap()).toList(),
       'created_by': createdBy,
+      'club_id': clubId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'is_active': isActive,
@@ -292,42 +278,6 @@ class CourseModel {
       'tags': tags,
       'metadata': metadata,
     };
-  }
-
-  bool isAvailableNow() {
-    final now = DateTime.now();
-    return isActive &&
-        now.isAfter(seasonStartDate) &&
-        now.isBefore(seasonEndDate) &&
-        currentStudents < maxStudents;
-  }
-
-  bool hasAvailableSpots() {
-    return currentStudents < maxStudents;
-  }
-
-  int get availableSpots => maxStudents - currentStudents;
-
-  factory CourseModel.mock() {
-    return CourseModel(
-      id: 'mock-id',
-      title: 'Cours non trouvé',
-      description: 'Ce cours n\'a pas pu être chargé.',
-      category: CourseCategory.other,
-      price: 0.0,
-      season: CourseSeason.yearRound,
-      seasonStartDate: DateTime.now().subtract(const Duration(days: 365)),
-      seasonEndDate: DateTime.now().add(const Duration(days: 365)),
-      location: CourseLocation(
-        latitude: 0.0,
-        longitude: 0.0,
-        address: 'N/A',
-      ),
-      images: [],
-      createdBy: 'system',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
   }
 
   CourseModel copyWith({
@@ -342,7 +292,7 @@ class CourseModel {
     CourseLocation? location,
     List<CourseImage>? images,
     String? createdBy,
-    String? createdByRole,
+    String? clubId,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
@@ -363,6 +313,7 @@ class CourseModel {
       location: location ?? this.location,
       images: images ?? this.images,
       createdBy: createdBy ?? this.createdBy,
+      clubId: clubId ?? this.clubId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
@@ -370,6 +321,28 @@ class CourseModel {
       currentStudents: currentStudents ?? this.currentStudents,
       tags: tags ?? this.tags,
       metadata: metadata ?? this.metadata,
+    );
+  }
+
+  factory CourseModel.mock() {
+    return CourseModel(
+      id: 'mock-id',
+      title: 'Cours non trouvé',
+      description: 'Ce cours n\'a pas pu être chargé.',
+      category: CourseCategory.other,
+      price: 0.0,
+      season: CourseSeason.yearRound,
+      seasonStartDate: DateTime.now().subtract(const Duration(days: 365)),
+      seasonEndDate: DateTime.now().add(const Duration(days: 365)),
+      location: CourseLocation(
+        latitude: 0.0,
+        longitude: 0.0,
+        address: 'N/A',
+      ),
+      images: [],
+      createdBy: 'system',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
   }
 }

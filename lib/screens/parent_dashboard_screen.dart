@@ -1296,34 +1296,108 @@ class _BillingPage extends StatelessWidget {
   Widget _buildEnrollmentRow(BuildContext context, EnrollmentModel enrollment) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Cours #${enrollment.courseId.substring(0, 5)}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    Text(
+                      'Statut: ${enrollment.paymentStatus.displayName}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (enrollment.remainingAmount > 0)
+                    Text(
+                      '-${enrollment.paidAmount?.toStringAsFixed(0) ?? "0"} payé',
+                      style: const TextStyle(fontSize: 11, color: Colors.green),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          if (enrollment.status == EnrollmentStatus.approved && enrollment.paymentStatus != PaymentStatus.paid) ...[
+            const SizedBox(height: 12),
+            Row(
               children: [
-                Text('Cours #${enrollment.courseId.substring(0, 5)}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                Text(
-                  'Statut: ${enrollment.paymentStatus.displayName}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showPaymentQR(context, enrollment),
+                    icon: const Icon(Icons.qr_code, size: 18),
+                    label: const Text('Payer maintenant', style: TextStyle(fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              if (enrollment.remainingAmount > 0)
-                Text(
-                  '-${enrollment.paidAmount?.toStringAsFixed(0) ?? "0"} payé',
-                  style: const TextStyle(fontSize: 11, color: Colors.green),
+          ] else if (enrollment.status == EnrollmentStatus.completed && enrollment.paymentStatus == PaymentStatus.paid) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.verified, color: Colors.green, size: 16),
+                const SizedBox(width: 4),
+                const Text("Adhérent confirmé", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+              ],
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentQR(BuildContext context, EnrollmentModel enrollment) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Paiement par QR Code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Scannez ce code pour effectuer le paiement de votre inscription.'),
+            const SizedBox(height: 20),
+            Image.asset(
+              'assets/qrcode/qr.jpg',
+              width: 200,
+              height: 200,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 200,
+                height: 200,
+                color: Colors.grey[200],
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.qr_code, size: 50, color: Colors.grey),
+                    Text('QR Code non disponible', style: TextStyle(fontSize: 12)),
+                  ],
                 ),
-            ],
-          ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Montant: ${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 12),
+            const Text("Une fois le paiement effectué, le coach confirmera votre statut d'adhérent.",
+              textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),
         ],
       ),
     );
