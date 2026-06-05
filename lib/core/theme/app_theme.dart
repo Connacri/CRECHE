@@ -24,8 +24,7 @@ class AppTheme {
     );
 
     final appColors = isDark ? AppColors.dark : AppColors.light;
-    final headlineFont = GoogleFonts.quicksandTextTheme();
-    final bodyFont = GoogleFonts.sourceSans3TextTheme();
+    final oswaldFont = GoogleFonts.oswaldTextTheme();
 
     return ThemeData(
       extensions: [appColors],
@@ -33,21 +32,21 @@ class AppTheme {
       brightness: brightness,
       colorScheme: colorScheme,
       textTheme: (isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme).copyWith(
-        displayLarge: headlineFont.displayLarge?.copyWith(color: colorScheme.onSurface),
-        displayMedium: headlineFont.displayMedium?.copyWith(color: colorScheme.onSurface),
-        displaySmall: headlineFont.displaySmall?.copyWith(color: colorScheme.onSurface),
-        headlineLarge: headlineFont.headlineLarge?.copyWith(color: colorScheme.onSurface),
-        headlineMedium: headlineFont.headlineMedium?.copyWith(color: colorScheme.onSurface),
-        headlineSmall: headlineFont.headlineSmall?.copyWith(color: colorScheme.onSurface),
-        titleLarge: headlineFont.titleLarge?.copyWith(color: colorScheme.onSurface),
-        titleMedium: bodyFont.titleMedium?.copyWith(color: colorScheme.onSurface),
-        titleSmall: bodyFont.titleSmall?.copyWith(color: colorScheme.onSurface),
-        bodyLarge: bodyFont.bodyLarge?.copyWith(color: colorScheme.onSurface),
-        bodyMedium: bodyFont.bodyMedium?.copyWith(color: colorScheme.onSurface),
-        bodySmall: bodyFont.bodySmall?.copyWith(color: colorScheme.onSurface),
-        labelLarge: bodyFont.labelLarge?.copyWith(color: colorScheme.onSurface),
-        labelMedium: bodyFont.labelMedium?.copyWith(color: colorScheme.onSurface),
-        labelSmall: bodyFont.labelSmall?.copyWith(color: colorScheme.onSurface),
+        displayLarge: oswaldFont.displayLarge?.copyWith(color: colorScheme.onSurface),
+        displayMedium: oswaldFont.displayMedium?.copyWith(color: colorScheme.onSurface),
+        displaySmall: oswaldFont.displaySmall?.copyWith(color: colorScheme.onSurface),
+        headlineLarge: oswaldFont.headlineLarge?.copyWith(color: colorScheme.onSurface),
+        headlineMedium: oswaldFont.headlineMedium?.copyWith(color: colorScheme.onSurface),
+        headlineSmall: oswaldFont.headlineSmall?.copyWith(color: colorScheme.onSurface),
+        titleLarge: oswaldFont.titleLarge?.copyWith(color: colorScheme.onSurface),
+        titleMedium: oswaldFont.titleMedium?.copyWith(color: colorScheme.onSurface),
+        titleSmall: oswaldFont.titleSmall?.copyWith(color: colorScheme.onSurface),
+        bodyLarge: oswaldFont.bodyLarge?.copyWith(color: colorScheme.onSurface),
+        bodyMedium: oswaldFont.bodyMedium?.copyWith(color: colorScheme.onSurface),
+        bodySmall: oswaldFont.bodySmall?.copyWith(color: colorScheme.onSurface),
+        labelLarge: oswaldFont.labelLarge?.copyWith(color: colorScheme.onSurface),
+        labelMedium: oswaldFont.labelMedium?.copyWith(color: colorScheme.onSurface),
+        labelSmall: oswaldFont.labelSmall?.copyWith(color: colorScheme.onSurface),
       ),
 
       cardTheme: CardThemeData(

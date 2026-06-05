@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import "package:qr_flutter/qr_flutter.dart";
+import 'package:file_picker/file_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 import '../../dependences/calendar_timeline/calendar_timeline.dart';
 import '../providers/auth_provider_v2.dart';
@@ -61,7 +64,6 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ ÉCOUTE RÉACTIVE DES PROVIDERS
     final auth = context.watch<AuthProviderV2>();
     final childProvider = context.watch<ChildEnrollmentProvider>();
     
@@ -97,56 +99,31 @@ class _ParentDashboardState extends State<ParentDashboard> {
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: GlassCard(
         opacity: 0.8,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        borderRadius: BorderRadius.circular(30),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(0, Icons.home_rounded, 'Accueil'),
-            _buildNavItem(1, Icons.calendar_today_rounded, 'Planning'),
-            _buildNavItem(2, Icons.child_care_rounded, 'Enfants'),
-            _buildNavItem(3, Icons.search_rounded, 'Cours'),
-            _buildNavItem(4, Icons.receipt_long_rounded, 'Factures'),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (i) => setState(() => _selectedIndex = i),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Colors.grey,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accueil'),
+            BottomNavigationBarItem(icon: Icon(Icons.school_outlined), activeIcon: Icon(Icons.school), label: 'Cours'),
+            BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Factures'),
+            BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
-    final isSelected = _selectedIndex == index;
-    final colorScheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () => setState(() => _selectedIndex = index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _getSelectedPage() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    
     switch (_selectedIndex) {
       case 0: return const _HomePage();
-      case 1: return const _PlanningPage();
-      case 2: return const _ChildrenPage();
-      case 3: return const _CoursesPage();
-      case 4: return const _BillingPage();
+      case 1: return const _CoursesPage();
+      case 2: return const _BillingPage();
+      case 3: return const ProfileScreen();
       default: return const _HomePage();
     }
   }
@@ -198,32 +175,29 @@ class _UserHeader extends StatelessWidget {
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
               child: CircleAvatar(
                 key: ValueKey(avatarUrl ?? 'no-avatar'),
-                radius: 28, 
+                radius: 24,
                 backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
                 child: avatarUrl == null ? const Icon(Icons.person) : null,
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Bonjour, $userName', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const Text('Votre espace de sérénité'),
-                ],
-              ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Bonjour,', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
             ),
+            const Spacer(),
             IconButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
-              icon: const Icon(Icons.settings_outlined),
+              icon: const Icon(Icons.notifications_outlined),
+              onPressed: () {},
             ),
           ],
         );
       },
     );
   }
-
-
 }
 
 class _QuickChildren extends StatelessWidget {
@@ -231,10 +205,27 @@ class _QuickChildren extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.read<AuthProviderV2>();
+    final parentId = auth.userData?['id'] ?? '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Mes enfants', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Mes Enfants', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            TextButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => _ChildFormDialog(parentId: parentId),
+                );
+              },
+              child: const Text('Ajouter'),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
         SizedBox(
           height: 90,
@@ -299,29 +290,63 @@ class _StatCards extends StatelessWidget {
           attendedSessions += e.attendanceCount;
         }
 
-        final attendanceStr = totalSessions > 0 ? '$attendedSessions/$totalSessions' : '0/0';
+        final attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions * 100) : 0.0;
 
         return Row(
           children: [
-            Expanded(child: _buildStatCard(context, 'Présences', attendanceStr, Icons.check_circle_outline, Colors.green)),
+            Expanded(
+              child: _StatCard(
+                title: 'Inscriptions',
+                value: activeEnrollments.toString(),
+                subtitle: 'Cours actifs',
+                icon: Icons.school,
+                color: Colors.blue,
+              ),
+            ),
             const SizedBox(width: 16),
-            Expanded(child: _buildStatCard(context, 'Cours Actifs', '$activeEnrollments', Icons.book_outlined, Colors.blue)),
+            Expanded(
+              child: _StatCard(
+                title: 'Assiduité',
+                value: '${attendanceRate.toStringAsFixed(0)}%',
+                subtitle: 'Taux moyen',
+                icon: Icons.check_circle,
+                color: Colors.green,
+              ),
+            ),
           ],
         );
       },
     );
   }
+}
 
-  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GlassCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(fontSize: 12)),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 12),
+          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.grey)),
         ],
       ),
     );
@@ -343,269 +368,68 @@ class _CalendarSectionState extends State<_CalendarSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Planning hebdomadaire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        const Text('Planning', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         const SizedBox(height: 16),
         GlassCard(
-          padding: const EdgeInsets.all(8),
-          child: CalendarTimeline(
-            initialDate: _selectedDate,
-            firstDate: DateTime.now().subtract(const Duration(days: 30)),
-            lastDate: DateTime.now().add(const Duration(days: 30)),
-            onDateSelected: (date) {
-              setState(() => _selectedDate = date);
-              final authProvider = context.read<AuthProviderV2>();
-              final uid = authProvider.userData?['id'] ?? '';
-              context.read<ChildEnrollmentProvider>().loadDailyActivities(uid, date);
-            },
-            leftMargin: 20,
-            monthColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            dayColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            activeDayColor: Colors.white,
-            activeBackgroundDayColor: Theme.of(context).colorScheme.primary,
-            locale: 'fr',
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildDaySessions(),
-        const SizedBox(height: 16),
-        _buildDailyActivities(),
-      ],
-    );
-  }
-
-  Widget _buildDaySessions() {
-    return Consumer2<ChildEnrollmentProvider, CourseProvider>(
-      builder: (context, provider, courseProvider, _) {
-        final sessions = provider.getSchedulesForDate(_selectedDate);
-        if (sessions.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Text('Aucune activité prévue pour cette date'),
-            ),
-          );
-        }
-
-        return Column(
-          children: sessions.map((session) {
-            final course = courseProvider.courses.firstWhere(
-              (c) => c.id == session.courseId,
-              orElse: () => CourseModel.mock(),
-            );
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(Icons.access_time, size: 16, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Text(
-                      session.timeSlot.displayTime,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(course.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          if (session.location != null)
-                            Text(
-                              session.location!,
-                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            ),
-                        ],
-                      ),
-                    ),
-                    _buildBadge(context, session.isCancelled ? 'Annulé' : 'Confirmé', isCancelled: session.isCancelled),
-                  ],
-                ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: [
+              CalendarTimeline(
+                initialDate: _selectedDate,
+                firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                lastDate: DateTime.now().add(const Duration(days: 30)),
+                onDateSelected: (date) => setState(() => _selectedDate = date),
+                leftMargin: 20,
+                monthColor: Colors.blueGrey,
+                dayColor: Colors.teal[200],
+                activeDayColor: Colors.white,
+                activeBackgroundDayColor: Theme.of(context).colorScheme.primary,
+                dotColor: const Color(0xFF333A47),
+                locale: 'fr_FR',
               ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildDailyActivities() {
-    return Consumer<ChildEnrollmentProvider>(
-      builder: (context, provider, _) {
-        if (provider.dailyActivities.isEmpty) return const SizedBox();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Activités & Tâches', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            ...provider.dailyActivities.map((activity) {
-              final child = provider.children.firstWhere((c) => c.id == activity.childId, orElse: () => ChildModel.mock());
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: GlassCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      _getActivityIcon(activity.type),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(activity.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Text('Pour ${child.firstName}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                            if (activity.description != null)
-                              Text(activity.description!, style: const TextStyle(fontSize: 13)),
-                          ],
+              const SizedBox(height: 20),
+              Consumer<ChildEnrollmentProvider>(
+                builder: (context, provider, _) {
+                  final schedules = provider.getSchedulesForDate(_selectedDate);
+                  if (schedules.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text('Aucun cours prévu ce jour'),
+                    );
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: schedules.length,
+                    itemBuilder: (context, i) {
+                      final schedule = schedules[i];
+                      return ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              schedule.timeSlot.displayTime,
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                            ),
+                          ),
                         ),
-                      ),
-                      if (activity.status == 'completed')
-                        const Icon(Icons.check_circle, color: Colors.green)
-                      else
-                        const Icon(Icons.pending_actions, color: Colors.orange),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _getActivityIcon(ActivityType type) {
-    IconData icon;
-    Color color;
-    switch (type) {
-      case ActivityType.meal: icon = Icons.restaurant; color = Colors.orange; break;
-      case ActivityType.activity: icon = Icons.brush; color = Colors.green; break;
-      case ActivityType.task: icon = Icons.assignment; color = Colors.blue; break;
-      case ActivityType.nap: icon = Icons.king_bed; color = Colors.purple; break;
-      case ActivityType.other: icon = Icons.star; color = Colors.amber; break;
-    }
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-      child: Icon(icon, color: color),
-    );
-  }
-
-  Widget _buildBadge(BuildContext context, String text, {bool isCancelled = false}) {
-    final color = isCancelled ? Colors.red : Colors.green;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-      child: Text(text, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
-    );
-  }
-}
-
-class _PlanningPage extends StatelessWidget {
-  const _PlanningPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const _CalendarSection(),
-        const SizedBox(height: 100),
-      ],
-    );
-  }
-}
-
-class _ChildrenPage extends StatelessWidget {
-  const _ChildrenPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Consumer<ChildEnrollmentProvider>(
-          builder: (context, provider, _) {
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
-              itemCount: provider.children.length,
-              itemBuilder: (context, i) {
-                final child = provider.children[i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: GlassCard(
-                    padding: const EdgeInsets.all(8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        key: ValueKey(child.photoUrl ?? child.id),
-                        backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                        child: child.photoUrl == null ? Text(child.firstName[0]) : null,
-                      ),
-                      title: Text(child.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('${child.age} ans • ${child.schoolGrade ?? "Niveau non précisé"}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            onPressed: () => _showChildDialog(context, child: child),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => _confirmDeleteChild(context, child),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-        Positioned(
-          bottom: 100,
-          right: 24,
-          child: FloatingActionButton.extended(
-            onPressed: () => _showChildDialog(context),
-            icon: const Icon(Icons.add),
-            label: const Text('Ajouter un enfant'),
+                        title: Text('Cours #${schedule.courseId.substring(0, 5)}'),
+                        subtitle: Text(schedule.location ?? 'Salle non définie'),
+                        trailing: const Icon(Icons.chevron_right, size: 16),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ],
-    );
-  }
-
-  void _showChildDialog(BuildContext context, {ChildModel? child}) {
-    final authProvider = context.read<AuthProviderV2>();
-    final uid = authProvider.userData?['id'] ?? '';
-    showDialog(
-      context: context,
-      builder: (context) => _ChildFormDialog(
-        child: child,
-        parentId: uid,
-      ),
-    );
-  }
-
-  void _confirmDeleteChild(BuildContext context, ChildModel child) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer l\'enfant'),
-        content: Text('Êtes-vous sûr de vouloir supprimer ${child.firstName} ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () async {
-              await context.read<ChildEnrollmentProvider>().deleteChild(child.id);
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -622,7 +446,7 @@ class _ChildProfileDialog extends StatelessWidget {
     return Consumer<ChildEnrollmentProvider>(
       builder: (context, provider, _) {
         final childIndex = provider.children.indexWhere((c) => c.id == childId);
-        if (childIndex == -1) return const SizedBox(); // Handle deleted
+        if (childIndex == -1) return const SizedBox();
         final child = provider.children[childIndex];
         
         final enrollments = provider.getEnrollmentsForChild(child.id);
@@ -630,14 +454,21 @@ class _ChildProfileDialog extends StatelessWidget {
 
         return Dialog.fullscreen(
           child: Scaffold(
-            body: CustomScrollView(
+            body: SafeArea(child: CustomScrollView(
               slivers: [
                 SliverAppBar(
                   expandedHeight: 300,
                   pinned: true,
-                  leading: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: Text('${child.firstName} ${child.lastName}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    background: child.photoUrl != null
+                        ? CachedNetworkImage(imageUrl: child.photoUrl!, fit: BoxFit.cover)
+                        : Container(
+                            color: colorScheme.primary,
+                            child: Center(child: Text(child.firstName[0],
+                              style: const TextStyle(fontSize: 80, color: Colors.white))),
+                          ),
                   ),
                   actions: [
                     IconButton(
@@ -648,157 +479,97 @@ class _ChildProfileDialog extends StatelessWidget {
                       icon: const Icon(Icons.delete, color: Colors.white),
                       onPressed: () => _confirmDelete(context, child),
                     ),
-                    const SizedBox(width: 8),
                   ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: Text(
-                      child.firstName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        shadows: [Shadow(blurRadius: 10, color: Colors.black)],
-                      ),
-                    ),
-                    background: Hero(
-                      tag: 'child-photo-${child.id}',
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (child.photoUrl != null)
-                            CachedNetworkImage(
-                              imageUrl: child.photoUrl!,
-                              fit: BoxFit.cover,
-                            )
-                          else
-                            Container(
-                              color: colorScheme.primaryContainer,
-                              child: Icon(Icons.child_care, size: 100, color: colorScheme.onPrimaryContainer),
-                            ),
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.black.withValues(alpha: 0.3),
-                                  Colors.transparent,
-                                  Colors.black.withValues(alpha: 0.5),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Informations personnelles', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                        const Text('Informations Personnelles',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
-                        _buildInfoRow(context, Icons.person_outline, 'Nom complet', child.fullName),
-                        _buildInfoRow(context, Icons.cake_outlined, 'Âge', '${child.age} ans'),
-                        _buildInfoRow(context, Icons.school_outlined, 'Niveau', child.schoolGrade ?? 'Non précisé'),
-                        _buildInfoRow(context, Icons.wc_outlined, 'Genre', child.gender == ChildGender.male ? 'Garçon' : child.gender == ChildGender.female ? 'Fille' : 'Autre'),
+                        _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(child.dateOfBirth)),
+                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo?.bloodType ?? 'Non spécifié'),
+                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo?.allergies.join(", ") ?? 'Aucune'),
                         
-                        if (child.medicalInfo.allergies.isNotEmpty || child.medicalInfo.additionalNotes != null) ...[
-                          const SizedBox(height: 32),
-                          Text('Santé & Médical', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 16),
-                          if (child.medicalInfo.allergies.isNotEmpty)
-                            _buildInfoRow(context, Icons.warning_amber_rounded, 'Allergies', child.medicalInfo.allergies.join(', '), color: Colors.red),
-                          if (child.medicalInfo.additionalNotes != null)
-                            _buildInfoRow(context, Icons.note_alt_outlined, 'Notes', child.medicalInfo.additionalNotes!),
-                        ],
-
                         const SizedBox(height: 32),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Timeline des cours', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                            TextButton.icon(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _showCourseSelectionDialog(context, child);
-                              },
+                            const Text('Inscriptions',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            ElevatedButton.icon(
+                              onPressed: () => _showCourseSelectionDialog(context, child),
                               icon: const Icon(Icons.add),
-                              label: const Text('Ajouter un cours'),
+                              label: const Text('Inscrire'),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        if (enrollments.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(child: Text('Aucune inscription active')),
+                          ),
                       ],
                     ),
                   ),
                 ),
-                if (enrollments.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
-                      child: Text('Aucun cours inscrit pour le moment.'),
-                    ),
-                  )
-                else
+                if (enrollments.isNotEmpty)
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final enrollment = enrollments[index];
-                        final course = courses.firstWhere((c) => c.id == enrollment.courseId, orElse: () => CourseModel.mock());
-                        final isLast = index == enrollments.length - 1;
+                        final course = courses.firstWhere((c) => c.id == enrollment.courseId,
+                          orElse: () => CourseModel(
+                            id: '',
+                            title: 'Cours inconnu',
+                            description: '',
+                            category: CourseCategory.other,
+                            season: CourseSeason.yearRound,
+                            seasonStartDate: DateTime.now(),
+                            seasonEndDate: DateTime.now(),
+                            location: CourseLocation(latitude: 0.0, longitude: 0.0, address: ''),
+                            images: [],
+                            createdBy: '',
+                            createdAt: DateTime.now(),
+                            updatedAt: DateTime.now(),
+                          ));
 
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: IntrinsicHeight(
-                            child: Row(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          child: GlassCard(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
                               children: [
-                                Column(
+                                Row(
                                   children: [
                                     Container(
-                                      width: 12,
-                                      height: 12,
+                                      width: 50,
+                                      height: 50,
                                       decoration: BoxDecoration(
-                                        color: _getStatusColor(enrollment.status),
-                                        shape: BoxShape.circle,
+                                        color: colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
+                                      child: Icon(Icons.class_, color: colorScheme.onPrimaryContainer),
                                     ),
-                                    if (!isLast)
-                                      Expanded(
-                                        child: Container(
-                                          width: 2,
-                                          color: colorScheme.outlineVariant,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(bottom: 24),
-                                    child: GlassCard(
-                                      padding: const EdgeInsets.all(16),
+                                    const SizedBox(width: 16),
+                                    Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Text(
-                                                course.title,
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                              Expanded(
+                                                child: Text(course.title,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                               ),
                                               _buildBadge(context, enrollment.status.displayName, enrollment.status),
                                             ],
                                           ),
                                           const SizedBox(height: 4),
-                                          Text(
-                                            course.category.displayName,
-                                            style: TextStyle(fontSize: 12, color: colorScheme.primary),
-                                          ),
-                                          const SizedBox(height: 8),
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
@@ -821,14 +592,46 @@ class _ChildProfileDialog extends StatelessWidget {
                                                     minimumSize: const Size(0, 30),
                                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                                   ),
-                                                  child: const Text('Annuler', style: TextStyle(fontSize: 12)),
+                                                  child: const Text("Annuler", style: TextStyle(fontSize: 12)),
                                                 ),
                                             ],
                                           ),
+                                          if (enrollment.status == EnrollmentStatus.approved) ...[
+                                            const Divider(),
+                                            const SizedBox(height: 4),
+                                            if (enrollment.paymentStatus == PaymentStatus.paid)
+                                              const Row(
+                                                children: [
+                                                  Icon(Icons.verified, color: Colors.green, size: 20),
+                                                  SizedBox(width: 8),
+                                                  Text("Adhérent confirmé",
+                                                    style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13)),
+                                                ],
+                                              )
+                                            else
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  const Text("Paiement requis",
+                                                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500, fontSize: 13)),
+                                                  ElevatedButton.icon(
+                                                    onPressed: () => _showPaymentQR(context, enrollment),
+                                                    icon: const Icon(Icons.qr_code, size: 18),
+                                                    label: const Text("Payer", style: TextStyle(fontSize: 12)),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.orange,
+                                                      foregroundColor: Colors.white,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                                      minimumSize: const Size(0, 32),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                          ],
                                         ],
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -840,34 +643,92 @@ class _ChildProfileDialog extends StatelessWidget {
                   ),
                 const SliverToBoxAdapter(child: SizedBox(height: 50)),
               ],
-            ),
+            )),
           ),
         );
       },
     );
   }
 
-  void _confirmCancelEnrollment(BuildContext context, String enrollmentId, String courseTitle) {
+  void _showPaymentQR(BuildContext context, EnrollmentModel enrollment) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Paiement par QR Code"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Veuillez présenter ce code au club pour valider votre paiement."),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: QrImageView(
+                data: enrollment.id,
+                version: QrVersions.auto,
+                size: 200.0,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text("${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Fermer")),
+        ],
+      ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context, ChildModel child) {
+    showDialog(
+      context: context,
+      builder: (context) => _ChildFormDialog(child: child, parentId: child.parentId),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, ChildModel child) {
     showDialog(
       context: context,
       builder: (confirmContext) => AlertDialog(
-        title: const Text('Annuler l\'inscription'),
-        content: Text('Voulez-vous vraiment annuler l\'inscription au cours "$courseTitle" ?'),
+        title: const Text('Supprimer le profil'),
+        content: Text('Voulez-vous vraiment supprimer le profil de ${child.firstName} ? Cette action est irréversible.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(confirmContext), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(confirmContext), child: const Text('Annuler')),
           TextButton(
             onPressed: () async {
-              final success = await context.read<ChildEnrollmentProvider>().cancelEnrollment(enrollmentId);
+              final provider = confirmContext.read<ChildEnrollmentProvider>();
+              await provider.deleteChild(child.id);
               if (confirmContext.mounted) {
-                Navigator.pop(confirmContext);
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Inscription annulée avec succès')),
-                  );
-                }
+                Navigator.pop(confirmContext); // Close alert
+                Navigator.pop(context); // Close profile dialog
               }
             },
-            child: const Text('Oui, annuler', style: TextStyle(color: Colors.red)),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmCancelEnrollment(BuildContext context, String enrollmentId, String courseTitle) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Annuler l'inscription"),
+        content: Text("Voulez-vous vraiment annuler l'inscription au cours $courseTitle ?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Retour')),
+          TextButton(
+            onPressed: () async {
+              await context.read<ChildEnrollmentProvider>().cancelEnrollment(enrollmentId);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text("Confirmer l'annulation", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -875,18 +736,17 @@ class _ChildProfileDialog extends StatelessWidget {
   }
 
   Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value, {Color? color}) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: color ?? colorScheme.primary),
+          Icon(icon, size: 20, color: color ?? Colors.grey[600]),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
-              Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
             ],
           ),
         ],
@@ -895,17 +755,15 @@ class _ChildProfileDialog extends StatelessWidget {
   }
 
   Widget _buildBadge(BuildContext context, String text, EnrollmentStatus status) {
-    final color = _getStatusColor(status);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: _getStatusColor(status).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+        style: TextStyle(color: _getStatusColor(status), fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -920,44 +778,7 @@ class _ChildProfileDialog extends StatelessWidget {
     }
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
-  void _showEditDialog(BuildContext context, ChildModel child) {
-    final authProvider = context.read<AuthProviderV2>();
-    final uid = authProvider.userData?['id'] ?? '';
-    showDialog(
-      context: context,
-      builder: (context) => _ChildFormDialog(
-        child: child,
-        parentId: uid,
-      ),
-    );
-  }
-
-  void _confirmDelete(BuildContext context, ChildModel child) {
-    showDialog(
-      context: context,
-      builder: (confirmContext) => AlertDialog(
-        title: const Text('Supprimer l\'enfant'),
-        content: Text('Êtes-vous sûr de vouloir supprimer ${child.firstName} ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(confirmContext), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () async {
-              await context.read<ChildEnrollmentProvider>().deleteChild(child.id);
-              if (confirmContext.mounted) {
-                Navigator.pop(confirmContext); // Close alert
-                Navigator.pop(context); // Close profile dialog
-              }
-            },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
+  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
 }
 
 class _CoursesPage extends StatelessWidget {
@@ -979,7 +800,6 @@ class _CoursesPage extends StatelessWidget {
           itemBuilder: (context, i) {
             final course = courses[i];
             
-            // Trouver quels enfants du parent sont inscrits à ce cours
             final enrolledChildrenNames = children
                 .where((child) => childProvider.isChildEnrolledInCourse(child.id, course.id))
                 .map((child) => child.firstName)
@@ -1017,6 +837,8 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
   DateTime? _dateOfBirth;
   ChildGender _gender = ChildGender.other;
   File? _photo;
+  File? _birthCertificate;
+  File? _medicalCertificate;
   bool _isLoading = false;
 
   @override
@@ -1030,10 +852,20 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
   }
 
   Future<void> _pickImage() async {
-    final image = await HybridImagePickerService.pickProfileImage(context: context);
+    final image = await HybridImagePickerService.pickImage(context: context, crop: true, aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1));
     if (image != null) {
       setState(() => _photo = image);
     }
+  }
+
+  Future<void> _pickBirthCertificate() async {
+    final file = await HybridImagePickerService.pickDocument(context: context);
+    if (file != null) setState(() => _birthCertificate = file);
+  }
+
+  Future<void> _pickMedicalCertificate() async {
+    final file = await HybridImagePickerService.pickDocument(context: context);
+    if (file != null) setState(() => _medicalCertificate = file);
   }
 
   Future<void> _save() async {
@@ -1058,6 +890,8 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
         dateOfBirth: _dateOfBirth!,
         gender: _gender,
         photoFile: _photo,
+        birthCertificateFile: _birthCertificate,
+        medicalCertificateFile: _medicalCertificate,
         schoolGrade: _schoolGradeController.text,
       );
     } else {
@@ -1068,6 +902,8 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
         dateOfBirth: _dateOfBirth,
         gender: _gender,
         newPhoto: _photo,
+        newBirthCertificate: _birthCertificate,
+        newMedicalCertificate: _medicalCertificate,
         schoolGrade: _schoolGradeController.text,
       );
     }
@@ -1133,7 +969,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<ChildGender>(
-                initialValue: _gender,
+                value: _gender,
                 decoration: const InputDecoration(labelText: 'Genre'),
                 items: ChildGender.values.map((g) => DropdownMenuItem(
                   value: g,
@@ -1145,17 +981,66 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
                 controller: _schoolGradeController,
                 decoration: const InputDecoration(labelText: 'Niveau scolaire (ex: Petite Section)'),
               ),
+              const SizedBox(height: 16),
+              _buildDocumentPicker(
+                label: "Extrait de naissance",
+                file: _birthCertificate,
+                currentUrl: widget.child?.birthCertificateUrl,
+                onTap: _pickBirthCertificate,
+              ),
+              const SizedBox(height: 8),
+              _buildDocumentPicker(
+                label: "Certificat médical",
+                file: _medicalCertificate,
+                currentUrl: widget.child?.medicalCertificateUrl,
+                onTap: _pickMedicalCertificate,
+              ),
             ],
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Annuler")),
         ElevatedButton(
           onPressed: _isLoading ? null : _save,
-          child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Enregistrer'),
+          child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text("Enregistrer"),
         ),
       ],
+    );
+  }
+
+  Widget _buildDocumentPicker({
+    required String label,
+    File? file,
+    String? currentUrl,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(file != null || currentUrl != null ? Icons.check_circle : Icons.upload_file,
+                 color: file != null || currentUrl != null ? Colors.green : Colors.grey),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  Text(file != null ? file.path.split("/").last : (currentUrl != null ? "Déjà téléchargé" : "Facultatif"),
+                       style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1184,7 +1069,6 @@ class _BillingPage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Résumé global
             GlassCard(
               color: Theme.of(context).colorScheme.primary,
               child: Padding(
