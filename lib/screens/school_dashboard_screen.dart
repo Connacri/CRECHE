@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:ui' as ui;
 import '../providers/auth_provider_v2.dart';
 import '../providers/course_provider_complete.dart';
-import '../providers/child_enrollment_provider.dart';
 import '../models/user_model.dart';
+import '../models/course_model_complete.dart';
 import '../models/session_schedule_model.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/interactive_weekly_timetable.dart';
@@ -176,7 +175,7 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
         if (provider.isLoading)
           const Expanded(child: Center(child: CircularProgressIndicator()))
         else if (courses.isEmpty)
-          const Expanded(child: Center(child: Text('Créez d\'abord un cours pour pouvoir planifier des horaires.')))
+          const Expanded(child: Center(child: Text("Créez d'abord un cours pour pouvoir planifier des horaires.")))
         else
           Expanded(
             child: InteractiveWeeklyTimetable(
@@ -191,7 +190,7 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
     );
   }
 
-  void _showAddScheduleDialog(BuildContext context, List<dynamic> courses, List<UserModel> coaches, {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}) {
+  void _showAddScheduleDialog(BuildContext context, List<CourseModel> courses, List<UserModel> coaches, {DayOfWeek? initialDay, TimeSlot? initialTimeSlot, SessionSchedule? sessionToEdit}) {
     showDialog(
       context: context,
       builder: (context) => AddSessionDialog(
