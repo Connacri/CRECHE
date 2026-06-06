@@ -47,13 +47,24 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   }
 
   Future<void> _pickBirthCertificate() async {
-    final file = await HybridImagePickerService.pickDocument(context: context);
-    if (file != null) setState(() => _birthCertificate = file);
+    final file = await HybridImagePickerService.pickImage(context: context, crop: false); // Use pickImage to have preview
+    if (file != null) {
+      setState(() => _birthCertificate = file);
+    } else {
+      // Fallback to pickDocument if it's not an image (PDF etc)
+      final doc = await HybridImagePickerService.pickDocument(context: context);
+      if (doc != null) setState(() => _birthCertificate = doc);
+    }
   }
 
   Future<void> _pickMedicalCertificate() async {
-    final file = await HybridImagePickerService.pickDocument(context: context);
-    if (file != null) setState(() => _medicalCertificate = file);
+    final file = await HybridImagePickerService.pickImage(context: context, crop: false);
+    if (file != null) {
+      setState(() => _medicalCertificate = file);
+    } else {
+      final doc = await HybridImagePickerService.pickDocument(context: context);
+      if (doc != null) setState(() => _medicalCertificate = doc);
+    }
   }
 
   Future<void> _save() async {
@@ -169,14 +180,14 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                 controller: _schoolGradeController,
                 decoration: const InputDecoration(labelText: 'Niveau scolaire (ex: Petite Section)'),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _buildDocumentPicker(
                 label: "Extrait de naissance",
                 file: _birthCertificate,
                 currentUrl: widget.child?.birthCertificateUrl,
                 onTap: _pickBirthCertificate,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               _buildDocumentPicker(
                 label: "Certificat médical",
                 file: _medicalCertificate,
@@ -203,32 +214,70 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     String? currentUrl,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(file != null || currentUrl != null ? Icons.check_circle : Icons.upload_file,
-                 color: file != null || currentUrl != null ? Colors.green : Colors.grey),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  Text(file != null ? file.path.split("/").last : (currentUrl != null ? "Déjà téléchargé" : "Facultatif"),
-                       style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-                ],
-              ),
+    final bool hasFile = file != null || currentUrl != null;
+    final bool isImage = file != null && (file.path.endsWith('.jpg') || file.path.endsWith('.png') || file.path.endsWith('.jpeg')) ||
+                        (currentUrl != null && (currentUrl.toLowerCase().contains('.jpg') || currentUrl.toLowerCase().contains('.png') || currentUrl.toLowerCase().contains('.jpeg')));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: hasFile ? Colors.green.withOpacity(0.5) : Colors.grey[300]!),
             ),
-          ],
+            child: hasFile
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        if (isImage)
+                          Positioned.fill(
+                            child: file != null
+                              ? Image.file(file, fit: BoxFit.cover)
+                              : CachedNetworkImage(imageUrl: currentUrl!, fit: BoxFit.cover, placeholder: (c,u) => const Center(child: CircularProgressIndicator()), errorWidget: (c,u,e) => const Icon(Icons.error)),
+                          )
+                        else
+                          const Center(child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.description, size: 40, color: Colors.blue),
+                              Text("Fichier PDF/Doc", style: TextStyle(fontSize: 10)),
+                            ],
+                          )),
+                        Container(color: Colors.black26),
+                        const Center(child: Icon(Icons.refresh, color: Colors.white, size: 30)),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                            child: const Icon(Icons.check, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.upload_file, size: 32, color: Colors.grey),
+                      SizedBox(height: 4),
+                      Text("Cliquez pour télécharger", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

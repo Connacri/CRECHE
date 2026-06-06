@@ -10,6 +10,13 @@ import '../services/image_storage_service.dart';
 import '../widgets/glass_card.dart';
 import '../services/hybrid_image_picker.dart';
 
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
 class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
@@ -151,16 +158,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                       ],
                     ),
-                    SliverPadding(
-                      padding: const EdgeInsets.all(24),
-                      sliver: SliverList(
-                        delegate: SliverChildListDelegate([
-                          _buildAvatarSection(context, user, auth),
-                          const SizedBox(height: 32),
-                          if (_isEditing) _buildEditForm(user) else _buildInfoSection(context, user),
-                          const SizedBox(height: 32),
-                          _buildActionsSection(context, auth),
-                        ]),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            _buildProfileHeader(context, auth, user),
+                            const SizedBox(height: 24),
+                            _isEditing ? _buildEditForm(user) : _buildInfoSection(context, user),
+                            const SizedBox(height: 24),
+                            _buildActionsSection(context, auth),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -173,46 +182,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-
-  Future<void> _confirmDeleteAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer définitivement le compte ?'),
-        content: const Text(
-          'Cette action est irréversible. Toutes vos données (profil, enfants, cours, inscriptions, photos) seront définitivement supprimées.',
-          style: TextStyle(color: Colors.red),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('Supprimer définitivement'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      final auth = context.read<AuthProviderV2>();
-      final result = await auth.deleteAccount();
-      if (result.success && mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${result.message}')),
-        );
-      }
-    }
-  }
-
-  Widget _buildAvatarSection(BuildContext context, UserModel user, AuthProviderV2 auth) {
+  Widget _buildProfileHeader(BuildContext context, AuthProviderV2 auth, UserModel user) {
     final photoUrl = user.profileImages.profileImage;
-
     return Column(
       children: [
         GestureDetector(
@@ -222,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CircleAvatar(
                 key: ValueKey(photoUrl ?? 'no-avatar'),
                 radius: 60,
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
                 backgroundImage: photoUrl != null ? CachedNetworkImageProvider(photoUrl) : null,
                 child: photoUrl == null ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : "?", style: const TextStyle(fontSize: 40)) : null,
               ),
@@ -321,9 +292,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: const InputDecoration(labelText: 'Palmarès / Expérience', icon: Icon(Icons.emoji_events_outlined)),
                 maxLines: 3,
               ),
+              const SizedBox(height: 24),
+              _buildDocPicker('CV', _cvUrl, () => _pickFile(true)),
               const SizedBox(height: 16),
-              _buildDocPicker('CV', _cvUrl != null, () => _pickFile(true)),
               _buildDocList('Diplômes', _diplomas, () => _pickFile(false, isDiploma: true)),
+              const SizedBox(height: 16),
               _buildDocList('Certificats', _certificates, () => _pickFile(false)),
             ],
           ],
@@ -332,12 +305,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildDocPicker(String label, bool hasFile, VoidCallback onTap) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(label),
-      subtitle: Text(hasFile ? 'Fichier envoyé' : 'Aucun fichier'),
-      trailing: IconButton(icon: Icon(hasFile ? Icons.refresh : Icons.upload_file), onPressed: onTap),
+  Widget _buildDocPicker(String label, String? url, VoidCallback onTap) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        _buildThumbnailPreview(url, onTap, placeholder: Icons.description),
+      ],
     );
   }
 
@@ -348,20 +323,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: onAdd),
           ],
         ),
-        if (urls.isEmpty) const Text('Aucun document', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-        ...urls.map((url) => ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.file_present, size: 18),
-          title: Text(url.split('/').last, style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red), onPressed: () => setState(() => urls.remove(url))),
-        )),
-        const SizedBox(height: 16),
+        if (urls.isEmpty)
+          const Text('Aucun document', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic))
+        else
+          SizedBox(
+            height: 100,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: urls.length,
+              separatorBuilder: (c,i) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final url = urls[index];
+                return Stack(
+                  children: [
+                    _buildThumbnailPreview(url, () {}, size: 100),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () => setState(() => urls.remove(url)),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildThumbnailPreview(String? url, VoidCallback onTap, {IconData placeholder = Icons.image, double size = 120}) {
+    final bool hasFile = url != null;
+    final bool isImage = url != null && (url.toLowerCase().contains('.jpg') || url.toLowerCase().contains('.png') || url.toLowerCase().contains('.jpeg'));
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: size,
+        width: size,
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: hasFile ? Colors.green.withOpacity(0.5) : Colors.grey[300]!),
+        ),
+        child: hasFile
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: isImage
+                    ? CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (c,u) => const Center(child: CircularProgressIndicator()),
+                        errorWidget: (c,u,e) => const Icon(Icons.error)
+                      )
+                    : Center(child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(placeholder, size: size/3, color: Colors.blue),
+                          const Text("Fichier", style: TextStyle(fontSize: 10)),
+                        ],
+                      )),
+              )
+            : Center(child: Icon(Icons.add_a_photo_outlined, color: Colors.grey[400], size: size/3)),
+      ),
     );
   }
 
@@ -375,15 +410,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(height: 32),
           _buildInfoRow(Icons.location_on_outlined, 'Adresse', user.location?.address ?? 'Non renseigné'),
           const Divider(height: 32),
-          _buildInfoRow(Icons.person_outline, 'Rôle', user.role.name.toUpperCase()),
+          _buildInfoRow(Icons.person_outline, 'Rôle', user.role.displayName),
           if (user.role == UserRole.coach) ...[
             const Divider(height: 32),
             const Text('Informations Coach', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 16),
             _buildInfoRow(Icons.emoji_events, 'Palmarès', user.palmares ?? 'Non renseigné'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             _buildDocDisplay('CV', user.cvUrl),
+            const SizedBox(height: 16),
             _buildDocDisplayList('Diplômes', user.diplomas ?? []),
+            const SizedBox(height: 16),
             _buildDocDisplayList('Certificats', user.certificates ?? []),
           ],
         ],
@@ -393,11 +430,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDocDisplay(String label, String? url) {
     if (url == null) return const SizedBox.shrink();
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.description, color: Colors.blue),
-      title: Text(label),
-      onTap: () {}, // Open URL
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 8),
+        _buildThumbnailPreview(url, () {}, placeholder: Icons.description, size: 100),
+      ],
     );
   }
 
@@ -407,13 +446,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        ...urls.map((url) => ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.verified, color: Colors.green, size: 18),
-          title: Text(url.split('/').last, style: const TextStyle(fontSize: 12)),
-          onTap: () {},
-        )),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: urls.length,
+            separatorBuilder: (c,i) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => _buildThumbnailPreview(urls[index], () {}, size: 100),
+          ),
+        ),
       ],
     );
   }
@@ -467,11 +509,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
-}
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  void _confirmDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer le compte ?'),
+        content: const Text('Cette action est irréversible. Toutes vos données seront supprimées après 30 jours.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () async {
+              final auth = context.read<AuthProviderV2>();
+              await auth.deleteAccount();
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 }
