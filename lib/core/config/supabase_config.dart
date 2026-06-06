@@ -5,7 +5,7 @@ class SupabaseConfig {
   
   // 🛡️ Clé Service Role pour les opérations administratives (Bypass RLS)
   static const String _defaultServiceRoleKey = 
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsdnJseWl2Z3JibHR1aW5xZWh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDI1MjMxOCwiZXhwIjoyMDgwMzE3OTAxfQ.WLyMj_uZK9cvDStnpXzsttBf6EBi4cr5dU6tEaznNWo';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsdnJseWl2Z3JibHR1aW5xZWh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDI1MjMxOCwiZXhwIjoyMDk1ODI4MzE4fQ.WLyMj_uZK9cvDStnpXzsttBf6EBi4cr5dU6tEaznNWo';
 
   static const String url = String.fromEnvironment(
     'SUPABASE_URL',
