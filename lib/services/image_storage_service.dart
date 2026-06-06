@@ -1,11 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-
 import '../models/course_model_complete.dart';
 import 'supabase_service.dart';
 
@@ -16,13 +15,16 @@ class ImageStorageService extends AdminSupabaseService {
   static const String _profileBucket = 'profiles';
   static const String _coverBucket = 'covers';
 
-  static const int maxImageSizeKB = 500;
-  static const int imageQuality = 85;
+  static const int imageQuality = 80;
 
   bool get _isWindowsDesktop => !kIsWeb && Platform.isWindows;
 
   Future<File> _compressImage(File file) async {
-    if (_isWindowsDesktop) return file;
+    if (_isWindowsDesktop || kIsWeb) return file;
+
+    final path = file.path.toLowerCase();
+    if (!path.endsWith('.jpg') && !path.endsWith('.jpeg') && !path.endsWith('.png')) return file;
+
     final tempDir = await getTemporaryDirectory();
     final output = '${tempDir.path}/${_uuid.v4()}.jpg';
     try {
@@ -30,8 +32,8 @@ class ImageStorageService extends AdminSupabaseService {
         file.path,
         output,
         quality: imageQuality,
-        minWidth: 1280,
-        minHeight: 720,
+        minWidth: 1024,
+        minHeight: 1024,
       );
       if (compressed == null) return file;
       return File(compressed.path);
@@ -40,18 +42,22 @@ class ImageStorageService extends AdminSupabaseService {
     }
   }
 
+  /// Upload une image vers le bucket des profils
   Future<String?> uploadImage(File imageFile, String folder) async {
     try {
       final fileToUpload = await _compressImage(imageFile);
       final String fileName = '${_uuid.v4()}.jpg';
       final String filePath = '$folder/$fileName';
       final bytes = await fileToUpload.readAsBytes();
+
       await adminClient.storage.from(_profileBucket).uploadBinary(
             filePath,
             bytes,
             fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
           );
-      return adminClient.storage.from(_profileBucket).getPublicUrl(filePath);
+
+      final url = adminClient.storage.from(_profileBucket).getPublicUrl(filePath);
+      return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
       throw Exception("Erreur upload generic: $e");
     }
@@ -61,7 +67,9 @@ class ImageStorageService extends AdminSupabaseService {
     try {
       final String fileName = '${_uuid.v4()}_${file.path.split('/').last}';
       final String filePath = '$folder/$fileName';
-      final bytes = await file.readAsBytes();
+
+      final fileToUpload = await _compressImage(file);
+      final bytes = await fileToUpload.readAsBytes();
 
       String contentType = 'application/octet-stream';
       if (fileName.toLowerCase().endsWith('.pdf')) contentType = 'application/pdf';
@@ -73,7 +81,9 @@ class ImageStorageService extends AdminSupabaseService {
             bytes,
             fileOptions: FileOptions(upsert: true, contentType: contentType),
           );
-      return adminClient.storage.from(_profileBucket).getPublicUrl(filePath);
+
+      final url = adminClient.storage.from(_profileBucket).getPublicUrl(filePath);
+      return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
       throw Exception("Erreur upload file: $e");
     }
@@ -85,7 +95,13 @@ class ImageStorageService extends AdminSupabaseService {
     final filePath = '$courseId/$imgId.jpg';
     final bytes = await fileToUpload.readAsBytes();
     await adminClient.storage.from(_coursesBucket).uploadBinary(filePath, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true));
-    return CourseImage(id: imgId, supabaseUrl: adminClient.storage.from(_coursesBucket).getPublicUrl(filePath), localPath: imageFile.path, isSynced: true, uploadedAt: DateTime.now());
+    return CourseImage(
+      id: imgId,
+      supabaseUrl: adminClient.storage.from(_coursesBucket).getPublicUrl(filePath),
+      localPath: imageFile.path,
+      isSynced: true,
+      uploadedAt: DateTime.now()
+    );
   }
 
   Future<List<CourseImage>> uploadMultipleCourseImages({required List<File> imageFiles, required String courseId, Function(int, int)? onProgress}) async {
@@ -117,8 +133,15 @@ class ImageStorageService extends AdminSupabaseService {
     final fileToUpload = await _compressImage(imageFile);
     final String filePath = isProfileImage ? '$userId/avatar.jpg' : '$userId/cover.jpg';
     final bytes = await fileToUpload.readAsBytes();
-    await adminClient.storage.from(bucketName).uploadBinary(filePath, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
-    return adminClient.storage.from(bucketName).getPublicUrl(filePath);
+
+    await adminClient.storage.from(bucketName).uploadBinary(
+      filePath,
+      bytes,
+      fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg')
+    );
+
+    final url = adminClient.storage.from(bucketName).getPublicUrl(filePath);
+    return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   Future<String?> uploadChildPhoto({required File imageFile, required String userId, required String childId}) async {
@@ -126,7 +149,9 @@ class ImageStorageService extends AdminSupabaseService {
     final path = '$userId/children/$childId.jpg';
     final bytes = await fileToUpload.readAsBytes();
     await adminClient.storage.from(_profileBucket).uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
-    return adminClient.storage.from(_profileBucket).getPublicUrl(path);
+
+    final url = adminClient.storage.from(_profileBucket).getPublicUrl(path);
+    return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   Future<void> deleteAllUserStorageData(String userId, List<String> courseIds) async {
@@ -161,8 +186,7 @@ class ImageStorageService extends AdminSupabaseService {
         }
       }
     } catch (e) {
-      print('Error deleting storage data: $e');
-      // We don't rethrow to avoid blocking account deletion if some files are already gone
+      debugPrint('Error deleting storage data: $e');
     }
   }
 }
