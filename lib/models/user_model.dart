@@ -3,6 +3,10 @@ enum UserRole {
   parent,
   coach,
   school,
+  transporteur,
+  fournisseur,
+  user,
+  autres,
   unknown;
 
   static UserRole fromJson(String json) {
@@ -17,12 +21,43 @@ enum UserRole {
       case 'club':
       case 'organisation':
         return UserRole.school;
+      case 'transporteur':
+        return UserRole.transporteur;
+      case 'fournisseur':
+        return UserRole.fournisseur;
+      case 'user':
+        return UserRole.user;
+      case 'autres':
+        return UserRole.autres;
       default:
         return UserRole.unknown;
     }
   }
 
   String toJson() => name;
+
+  String get displayName {
+    switch (this) {
+      case UserRole.admin:
+        return 'Administrateur';
+      case UserRole.parent:
+        return 'Parent';
+      case UserRole.coach:
+        return 'Coach';
+      case UserRole.school:
+        return 'École/Club';
+      case UserRole.transporteur:
+        return 'Transporteur';
+      case UserRole.fournisseur:
+        return 'Fournisseur';
+      case UserRole.user:
+        return 'Utilisateur';
+      case UserRole.autres:
+        return 'Autres';
+      case UserRole.unknown:
+        return 'Inconnu';
+    }
+  }
 }
 
 class AppLocation {
@@ -39,6 +74,8 @@ class AppLocation {
     this.city,
     this.country,
   });
+
+  bool get hasLocation => latitude != 0.0 || longitude != 0.0;
 
   factory AppLocation.fromMap(Map<String, dynamic> map) {
     return AppLocation(
@@ -64,27 +101,43 @@ class AppLocation {
 class UserProfileImages {
   final String? profileImageSupabase;
   final String? profileImageLocal;
+  final String? coverImageSupabase;
+  final String? coverImageLocal;
+  final DateTime? lastUpdated;
   final bool isSynced;
 
   UserProfileImages({
     this.profileImageSupabase,
     this.profileImageLocal,
+    this.coverImageSupabase,
+    this.coverImageLocal,
+    this.lastUpdated,
     this.isSynced = false,
   });
+
+  String? get profileImage => profileImageSupabase ?? profileImageLocal;
+  String? get coverImage => coverImageSupabase ?? coverImageLocal;
 
   factory UserProfileImages.fromMap(Map<String, dynamic> map) {
     return UserProfileImages(
       profileImageSupabase: map['profileImageSupabase'] ?? map['profile_image_supabase'],
       profileImageLocal: map['profileImageLocal'] ?? map['profile_image_local'],
+      coverImageSupabase: map['coverImageSupabase'] ?? map['cover_image_supabase'],
+      coverImageLocal: map['coverImageLocal'] ?? map['cover_image_local'],
+      lastUpdated: map['lastUpdated'] != null ? DateTime.parse(map['lastUpdated'].toString()) :
+                  (map['last_updated'] != null ? DateTime.parse(map['last_updated'].toString()) : null),
       isSynced: map['isSynced'] ?? map['is_synced'] ?? false,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'profile_image_supabase': profileImageSupabase,
-      'profile_image_local': profileImageLocal,
-      'is_synced': isSynced,
+      'profileImageSupabase': profileImageSupabase,
+      'profileImageLocal': profileImageLocal,
+      'coverImageSupabase': coverImageSupabase,
+      'coverImageLocal': coverImageLocal,
+      'lastUpdated': lastUpdated?.toIso8601String(),
+      'isSynced': isSynced,
     };
   }
 }

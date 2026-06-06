@@ -1,424 +1,112 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:readmore/readmore.dart';
-
-import '../providers/auth_provider_v2.dart';
 import '../models/user_model.dart';
+import '../providers/auth_provider_v2.dart';
+import '../widgets/glass_card.dart';
+import 'package:intl/intl.dart';
 
-class AutreDashboard extends StatefulWidget {
-  const AutreDashboard({super.key});
+class AutresDashboardScreen extends StatefulWidget {
+  const AutresDashboardScreen({super.key});
 
   @override
-  State<AutreDashboard> createState() => _AutreDashboardState();
+  State<AutresDashboardScreen> createState() => _AutresDashboardScreenState();
 }
 
-class _AutreDashboardState extends State<AutreDashboard> {
-  bool _isLoading = true;
+class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
   UserModel? _user;
-  String? _error;
-
-  // Controllers pour édition inline
-  final Map<String, TextEditingController> _controllers = {};
-  final Map<String, bool> _editingFields = {};
-
-  // États des sections expandables
-  bool _infoExpanded = true;
-  bool _locationExpanded = false;
-  bool _imagesExpanded = false;
-  bool _metadataExpanded = false;
-  bool _technicalExpanded = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadUser();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
+  Future<void> _loadUser() async {
+    setState(() => _isLoading = true);
     try {
-      final authProvider = context.read<AuthProviderV2>();
-      final userData = authProvider.userData;
-
-      if (userData == null) {
-        setState(() {
-          _error = 'Aucune donnée utilisateur disponible';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // Construire le UserModel depuis les données brutes
-      _user = UserModel.fromSupabase(userData);
-
-      // Initialiser les controllers
-      _initializeControllers();
-
-      setState(() => _isLoading = false);
+      final auth = Provider.of<AuthProviderV2>(context, listen: false);
+      _user = auth.user;
     } catch (e) {
-      setState(() {
-        _error = 'Erreur lors du chargement: $e';
-        _isLoading = false;
-      });
+      debugPrint('Error loading user: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _initializeControllers() {
-    if (_user == null) return;
-
-    _controllers['name'] = TextEditingController(text: _user!.name);
-    _controllers['email'] = TextEditingController(text: _user!.email);
-    _controllers['bio'] = TextEditingController(text: _user!.bio ?? '');
-    _controllers['phoneNumber'] =
-        TextEditingController(text: _user!.phoneNumber ?? '');
-    _controllers['address'] =
-        TextEditingController(text: _user!.location?.address ?? '');
-    _controllers['city'] =
-        TextEditingController(text: _user!.location?.city ?? '');
-    _controllers['country'] =
-        TextEditingController(text: _user!.location?.country ?? '');
-  }
-
-  @override
-  void dispose() {
-    _controllers.values.forEach((controller) => controller.dispose());
-    super.dispose();
+  String _formatDateTime(DateTime dt) {
+    return DateFormat('dd/MM/yyyy HH:mm').format(dt);
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ ÉCOUTE RÉACTIVE DU PROFIL
-    final authProvider = context.watch<AuthProviderV2>();
-    final userData = authProvider.userData;
-
-    if (userData != null) {
-      // Synchroniser le modèle local si on n'est pas en train d'éditer
-      final newUser = UserModel.fromSupabase(userData);
-      if (_user == null || (!_isAnyFieldEditing() && _user!.updatedAt != newUser.updatedAt)) {
-        _user = newUser;
-        _initializeControllers();
-      }
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > 900;
-
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Mon Profil'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: _loadData,
-                tooltip: 'Actualiser',
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout),
-                onPressed: () => authProvider.logout(),
-                tooltip: 'Déconnexion',
-              ),
-            ],
-          ),
-          body: SafeArea(child: _buildBody(isDesktop, authProvider.isLoading)),
-        );
-      },
-    );
-  }
-
-  bool _isAnyFieldEditing() {
-    return _editingFields.values.any((editing) => editing);
-  }
-
-  Widget _buildBody(bool isDesktop, bool isAuthLoading) {
-    if (_isLoading || isAuthLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Chargement des données...'),
-          ],
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _loadData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
-            ),
-          ],
-        ),
-      );
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_user == null) {
-      return const Center(
-        child: Text('Aucun utilisateur trouvé'),
-      );
+      return const Scaffold(body: Center(child: Text('Utilisateur non trouvé')));
     }
 
-    // Vérifier si l'utilisateur est désactivé
-    if (!_user!.isActive) {
-      return _buildDeactivatedWarning();
-    }
-
-    return isDesktop ? _buildDesktopLayout() : _buildMobileLayout();
-  }
-
-  // ============================================================================
-  // LAYOUT MOBILE
-  // ============================================================================
-
-  Widget _buildMobileLayout() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildCoverAndAvatar(),
-          const SizedBox(height: 25),
-          Padding(
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/bg_ghibli.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
-              children: [
-                _buildQuickInfo(),
-                const SizedBox(height: 16),
-                _buildPersonalInfoSection(),
-                const SizedBox(height: 12),
-                _buildLocationSection(),
-                const SizedBox(height: 12),
-                _buildImagesSection(),
-                const SizedBox(height: 12),
-                _buildMetadataSection(),
-                const SizedBox(height: 12),
-                _buildTechnicalInfoSection(),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================================
-  // LAYOUT DESKTOP
-  // ============================================================================
-
-  Widget _buildDesktopLayout() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildCoverAndAvatar(),
-          const SizedBox(height: 25),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Colonne gauche
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      _buildQuickInfo(),
-                      const SizedBox(height: 16),
-                      _buildPersonalInfoSection(),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 24),
-                // Colonne droite
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    children: [
-                      _buildLocationSection(),
-                      const SizedBox(height: 16),
-                      _buildImagesSection(),
-                      const SizedBox(height: 16),
-                      _buildMetadataSection(),
-                      const SizedBox(height: 16),
-                      _buildTechnicalInfoSection(),
-                    ],
-                  ),
-                ),
+                _buildHeader(),
+                const SizedBox(height: 20),
+                _buildCoverAndAvatar(),
+                const SizedBox(height: 60), // Increased height for avatar overflow
+                _buildProfileInfo(),
+                const SizedBox(height: 20),
+                _buildProfessionalInfo(),
+                const SizedBox(height: 20),
+                _buildSystemInfo(),
+                const SizedBox(height: 30),
+                _buildLogoutButton(),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // ============================================================================
-  // COVER & AVATAR
-  // ============================================================================
-
-  Widget _buildCoverAndAvatar() {
-    final coverUrl = _user!.profileImages.coverImage;
-    final profileUrl = _user!.profileImages.profileImage;
-
-    return Stack(
-      clipBehavior: Clip.none,
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Cover Image
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-              gradient: coverUrl == null
-                  ? LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primaryContainer,
-                        Theme.of(context).colorScheme.secondaryContainer,
-                      ],
-                    )
-                  : null,
-              image: coverUrl != null
-                  ? DecorationImage(
-                      image: CachedNetworkImageProvider(coverUrl),
-                      fit: BoxFit.scaleDown,
-                    )
-                  : DecorationImage(
-                      image: AssetImage('assets/photos/a (5).png'),
-                      fit: BoxFit.cover,
-                    )),
-          child: coverUrl == null
-              ? Center(
-                  child: Icon(
-                    Icons.landscape,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                )
-              : null,
-        ),
-
-        // Avatar
-        Positioned(
-          bottom: -40,
-          left: 24,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                width: 4,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tableau de Bord',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              backgroundImage:
-                  profileUrl != null ? CachedNetworkImageProvider(profileUrl) : null,
-              child: profileUrl == null
-                  ? Text(
-                      _user!.name.isNotEmpty
-                          ? _user!.name[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    )
-                  : null,
+            Text(
+              'Profil ${_user!.role.displayName}',
+              style: const TextStyle(color: Colors.white70),
             ),
-          ),
+          ],
         ),
+        _buildRoleBadge(_user!.role),
       ],
     );
   }
 
-  // ============================================================================
-  // QUICK INFO (sous avatar)
-  // ============================================================================
-
-  Widget _buildQuickInfo() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _user!.name,
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _user!.email,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildRoleBadge(),
-              ],
-            ),
-            if (_user!.bio != null && _user!.bio!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ReadMoreText(
-                _user!.bio!,
-                trimMode: TrimMode.Length,
-                trimLength: 85,
-                trimLines: 2,
-                // colorClickableText: Colors.blue,
-                trimCollapsedText: '  more',
-                trimExpandedText: '  less',
-                moreStyle: Theme.of(context).textTheme.bodyMedium,
-              ),
-
-              // Text(
-              //   _user!.bio!,
-              //   style: Theme
-              //       .of(context)
-              //       .textTheme
-              //       .bodyMedium,
-              // ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoleBadge() {
-    final role = _user!.role;
+  Widget _buildRoleBadge(UserRole role) {
     IconData icon;
     Color color;
 
@@ -451,310 +139,108 @@ class _AutreDashboardState extends State<AutreDashboard> {
         icon = Icons.account_box;
         color = Colors.blue;
         break;
+      case UserRole.admin:
+        icon = Icons.admin_panel_settings;
+        color = Colors.red;
+        break;
+      case UserRole.unknown:
+        icon = Icons.help_outline;
+        color = Colors.grey;
+        break;
     }
 
     return Chip(
       avatar: Icon(icon, size: 18, color: Colors.white),
       label: Text(
         role.displayName,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
-      backgroundColor: color,
+      backgroundColor: color.withOpacity(0.7),
     );
   }
 
-  // ============================================================================
-  // SECTIONS EXPANDABLES
-  // ============================================================================
+  Widget _buildCoverAndAvatar() {
+    final coverUrl = _user!.profileImages.coverImage;
+    final profileUrl = _user!.profileImages.profileImage;
 
-  Widget _buildPersonalInfoSection() {
-    return Consumer<AuthProviderV2>(
-        // ✅ Rebuild UNIQUEMENT si userData change
-        builder: (context, authProvider, child) {
-      return _buildExpandableCard(
-        title: 'Informations personnelles',
-        icon: Icons.person,
-        isExpanded: _infoExpanded,
-        onTap: () => setState(() => _infoExpanded = !_infoExpanded),
-        children: [
-          _buildEditableField(
-            label: 'Nom complet',
-            value: _user!.name,
-            fieldKey: 'name',
-            icon: Icons.badge,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GlassCard(
+          opacity: 0.3,
+          child: SizedBox(
+            height: 150,
+            width: double.infinity,
+            child: coverUrl != null
+                ? Image.network(coverUrl, fit: BoxFit.cover)
+                : Container(color: Colors.grey.withOpacity(0.3)),
           ),
-          _buildEditableField(
-            label: 'Email',
-            value: _user!.email,
-            fieldKey: 'email',
-            icon: Icons.email,
-            readOnly: true, // L'email ne peut pas être modifié
+        ),
+        Positioned(
+          bottom: -40,
+          left: 20,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: CircleAvatar(
+              radius: 45,
+              backgroundImage: profileUrl != null
+                  ? NetworkImage(profileUrl)
+                  : const AssetImage('assets/images/default_avatar.png') as ImageProvider,
+            ),
           ),
-          _buildEditableField(
-            label: 'Téléphone',
-            value: _user!.phoneNumber ?? 'Non renseigné',
-            fieldKey: 'phoneNumber',
-            icon: Icons.phone,
-          ),
-          _buildEditableField(
-            label: 'Bio',
-            value: _user!.bio ?? 'Aucune bio',
-            fieldKey: 'bio',
-            icon: Icons.description,
-            maxLines: 3,
-          ),
-        ],
-      );
-    });
+        ),
+      ],
+    );
   }
 
-  Widget _buildLocationSection() {
+  Widget _buildProfileInfo() {
     final hasLocation = _user!.location?.hasLocation ?? false;
 
-    return _buildExpandableCard(
-      title: 'Localisation',
-      icon: Icons.location_on,
-      isExpanded: _locationExpanded,
-      onTap: () => setState(() => _locationExpanded = !_locationExpanded),
-      children: [
-        if (hasLocation) ...[
-          _buildEditableField(
-            label: 'Adresse',
-            value: _user!.location!.address,
-            fieldKey: 'address',
-            icon: Icons.home,
-          ),
-          _buildEditableField(
-            label: 'Ville',
-            value: _user!.location!.city ?? 'Non spécifiée',
-            fieldKey: 'city',
-            icon: Icons.location_city,
-          ),
-          _buildEditableField(
-            label: 'Pays',
-            value: _user!.location!.country ?? 'Non spécifié',
-            fieldKey: 'country',
-            icon: Icons.flag,
-          ),
-          _buildReadOnlyField(
-            label: 'Coordonnées GPS',
-            value:
-                '${_user!.location!.latitude.toStringAsFixed(6)}, ${_user!.location!.longitude.toStringAsFixed(6)}',
-            icon: Icons.my_location,
-          ),
-        ] else
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Aucune localisation configurée'),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildImagesSection() {
-    return _buildExpandableCard(
-      title: 'Images de profil',
-      icon: Icons.image,
-      isExpanded: _imagesExpanded,
-      onTap: () => setState(() => _imagesExpanded = !_imagesExpanded),
-      children: [
-        _buildImageInfo(
-          label: 'Photo de profil',
-          url: _user!.profileImages.profileImageSupabase,
-        ),
-        _buildImageInfo(
-          label: 'Image de couverture',
-          url: _user!.profileImages.coverImageSupabase,
-        ),
-        if (_user!.profileImages.lastUpdated != null)
-          _buildReadOnlyField(
-            label: 'Dernière mise à jour',
-            value: _formatDateTime(_user!.profileImages.lastUpdated!),
-            icon: Icons.update,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildMetadataSection() {
-    final metadata = _user!.metadata;
-
-    return _buildExpandableCard(
-      title: 'Métadonnées',
-      icon: Icons.data_object,
-      isExpanded: _metadataExpanded,
-      onTap: () => setState(() => _metadataExpanded = !_metadataExpanded),
-      children: [
-        if (metadata == null || metadata.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Aucune métadonnée'),
-          )
-        else
-          ...metadata.entries.map((entry) {
-            return _buildReadOnlyField(
-              label: entry.key,
-              value: entry.value.toString(),
-              icon: Icons.label,
-            );
-          }).toList(),
-      ],
-    );
-  }
-
-  Widget _buildTechnicalInfoSection() {
-    return _buildExpandableCard(
-      title: 'Informations techniques',
-      icon: Icons.settings,
-      isExpanded: _technicalExpanded,
-      onTap: () => setState(() => _technicalExpanded = !_technicalExpanded),
-      children: [
-        _buildReadOnlyField(
-          label: 'UID',
-          value: _user!.uid,
-          icon: Icons.fingerprint,
-        ),
-        _buildReadOnlyField(
-          label: 'Rôle',
-          value: _user!.role.name,
-          icon: Icons.badge,
-        ),
-        _buildReadOnlyField(
-          label: 'Compte actif',
-          value: _user!.isActive ? 'Oui' : 'Non',
-          icon: _user!.isActive ? Icons.check_circle : Icons.cancel,
-        ),
-        _buildReadOnlyField(
-          label: 'Créé le',
-          value: _formatDateTime(_user!.createdAt),
-          icon: Icons.calendar_today,
-        ),
-        _buildReadOnlyField(
-          label: 'Mis à jour le',
-          value: _formatDateTime(_user!.updatedAt),
-          icon: Icons.update,
-        ),
-        if (_user!.deactivatedAt != null)
-          _buildReadOnlyField(
-            label: 'Désactivé le',
-            value: _formatDateTime(_user!.deactivatedAt!),
-            icon: Icons.block,
-          ),
-        if (_user!.scheduledDeletionDate != null) ...[
-          _buildReadOnlyField(
-            label: 'Suppression programmée',
-            value: _formatDateTime(_user!.scheduledDeletionDate!),
-            icon: Icons.delete_forever,
-          ),
-          _buildReadOnlyField(
-            label: 'Jours restants',
-            value: '${_user!.getDaysUntilDeletion()} jours',
-            icon: Icons.timer,
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ============================================================================
-  // WIDGETS HELPER
-  // ============================================================================
-
-  Widget _buildExpandableCard({
-    required String title,
-    required IconData icon,
-    required bool isExpanded,
-    required VoidCallback onTap,
-    required List<Widget> children,
-  }) {
-    return Card(
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ListTile(
-            leading: Icon(icon),
-            title: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            trailing: Icon(
-              isExpanded ? Icons.expand_less : Icons.expand_more,
-            ),
-            onTap: onTap,
-          ),
-          if (isExpanded) ...children,
+          _buildReadOnlyField(label: 'Nom complet', value: _user!.name),
+          _buildReadOnlyField(label: 'Email', value: _user!.email),
+          _buildReadOnlyField(label: 'Téléphone', value: _user!.phoneNumber ?? 'Non renseigné'),
+          if (hasLocation)
+            _buildReadOnlyField(label: 'Adresse', value: _user!.location!.address),
+          _buildReadOnlyField(label: 'Bio', value: _user!.bio ?? 'Aucune bio', isLongText: true),
         ],
       ),
     );
   }
 
-  Widget _buildEditableField({
-    required String label,
-    required String value,
-    required String fieldKey,
-    required IconData icon,
-    bool readOnly = false,
-    int maxLines = 1,
-  }) {
-    final isEditing = _editingFields[fieldKey] ?? false;
-    final controller = _controllers[fieldKey];
+  Widget _buildProfessionalInfo() {
+    if (_user!.role != UserRole.coach && _user!.role != UserRole.school) {
+      return const SizedBox.shrink();
+    }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                if (isEditing && !readOnly)
-                  TextField(
-                    controller: controller,
-                    maxLines: maxLines,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.check, color: Colors.green),
-                            onPressed: () => _saveField(fieldKey),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.red),
-                            onPressed: () => _cancelEdit(fieldKey, value),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
+          Text(
+            'Informations Professionnelles',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
           ),
-          if (!readOnly && !isEditing)
-            IconButton(
-              icon: const Icon(Icons.edit, size: 18),
-              onPressed: () {
-                setState(() => _editingFields[fieldKey] = true);
+          const SizedBox(height: 16),
+          _buildReadOnlyField(label: 'Palmarès', value: _user!.palmares ?? 'Non renseigné', isLongText: true),
+          _buildListField(label: 'Diplômes', items: _user!.diplomas),
+          _buildListField(label: 'Certificats', items: _user!.certificates),
+          if (_user!.cvUrl != null)
+            ListTile(
+              leading: const Icon(Icons.description, color: Colors.white),
+              title: const Text('CV / Documentation', style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.open_in_new, color: Colors.white70),
+              onTap: () {
+                // Logic to open URL
               },
             ),
         ],
@@ -762,40 +248,79 @@ class _AutreDashboardState extends State<AutreDashboard> {
     );
   }
 
-  Widget _buildReadOnlyField({
-    required String label,
-    required String value,
-    required IconData icon,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
+  Widget _buildSystemInfo() {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+          Text(
+            'Données Système',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
           ),
+          const SizedBox(height: 16),
+          _buildReadOnlyField(label: 'ID Unique', value: _user!.uid),
+          _buildReadOnlyField(label: 'Créé le', value: _formatDateTime(_user!.createdAt)),
+          _buildReadOnlyField(label: 'Mis à jour le', value: _formatDateTime(_user!.updatedAt)),
+          _buildReadOnlyField(label: 'Statut', value: _user!.isActive ? 'Actif' : 'Inactif'),
+          _buildReadOnlyField(label: 'Profil complété', value: _user!.profileCompleted ? 'Oui' : 'Non'),
+          _buildImageInfo(
+            label: 'Photo de profil',
+            url: _user!.profileImages.profileImageSupabase,
+          ),
+          _buildImageInfo(
+            label: 'Image de couverture',
+            url: _user!.profileImages.coverImageSupabase,
+          ),
+          if (_user!.profileImages.lastUpdated != null)
+            _buildReadOnlyField(
+              label: 'Dernière mise à jour',
+              value: _formatDateTime(_user!.profileImages.lastUpdated!),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyField({required String label, required String value, bool isLongText = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+            maxLines: isLongText ? 5 : 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Divider(color: Colors.white12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListField({required String label, List<String>? items}) {
+    if (items == null || items.isEmpty) {
+      return _buildReadOnlyField(label: label, value: 'Aucun');
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            children: items.map((item) => Chip(
+              label: Text(item, style: const TextStyle(fontSize: 12)),
+              backgroundColor: Colors.white24,
+            )).toList(),
+          ),
+          const Divider(color: Colors.white12),
         ],
       ),
     );
@@ -803,61 +328,16 @@ class _AutreDashboardState extends State<AutreDashboard> {
 
   Widget _buildImageInfo({required String label, String? url}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                if (url != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: url,
-                      height: 80,
-                      width: 80,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        height: 80,
-                        width: 80,
-                        color: Colors.grey[200],
-                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                      ),
-                      errorWidget: (context, url, error) {
-                        return Container(
-                          height: 80,
-                          width: 80,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.broken_image),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    url,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ] else
-                  const Text(
-                    'Aucune image',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-              ],
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(
+            url != null ? 'Disponible' : 'Non disponible',
+            style: TextStyle(
+              color: url != null ? Colors.greenAccent : Colors.redAccent,
+              fontSize: 12,
             ),
           ),
         ],
@@ -865,192 +345,20 @@ class _AutreDashboardState extends State<AutreDashboard> {
     );
   }
 
-  // ============================================================================
-  // COMPTE DÉSACTIVÉ
-  // ============================================================================
-
-  Widget _buildDeactivatedWarning() {
-    final daysUntilDeletion = _user!.getDaysUntilDeletion();
-    final canReactivate = _user!.canReactivate();
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Card(
-          color: Colors.orange[50],
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  size: 80,
-                  color: Colors.orange[700],
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Compte Désactivé',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange[900],
-                      ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Votre compte a été désactivé le ${_formatDateTime(_user!.deactivatedAt!)}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
-                ),
-                if (daysUntilDeletion != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.red[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Suppression dans $daysUntilDeletion jours',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red[900],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Date de suppression: ${_formatDateTime(_user!.scheduledDeletionDate!)}',
-                          style: TextStyle(color: Colors.red[800]),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                if (canReactivate) ...[
-                  const SizedBox(height: 32),
-                  FilledButton.icon(
-                    onPressed: _reactivateAccount,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Réactiver mon compte'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+  Widget _buildLogoutButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => Provider.of<AuthProviderV2>(context, listen: false).logout(),
+        icon: const Icon(Icons.logout),
+        label: const Text('Se déconnecter'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.redAccent.withOpacity(0.8),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
-  }
-
-  // ============================================================================
-  // ACTIONS
-  // ============================================================================
-
-  Future<void> _saveField(String fieldKey) async {
-    final controller = _controllers[fieldKey];
-    if (controller == null) return;
-
-    final newValue = controller.text.trim();
-
-    try {
-      final authProvider = context.read<AuthProviderV2>();
-
-      Map<String, dynamic> updateData = {};
-
-      switch (fieldKey) {
-        case 'name':
-          updateData['name'] = newValue;
-          break;
-        case 'bio':
-          updateData['bio'] = newValue.isEmpty ? null : newValue;
-          break;
-        case 'phoneNumber':
-          updateData['phone_number'] = newValue.isEmpty ? null : newValue;
-          break;
-        // ... autres cas
-      }
-
-      // ✅ UTILISER LA VERSION SILENCIEUSE (à créer dans AuthProviderV2)
-      final result = await authProvider.updateUserProfileSilent(updateData);
-
-      if (result.success) {
-        // ✅ Mettre à jour UNIQUEMENT l'état local
-        if (mounted) {
-          setState(() {
-            _editingFields[fieldKey] = false;
-
-            // ✅ Mise à jour optimisée du modèle
-            _user = _user!.copyWith(
-              name: fieldKey == 'name' ? newValue : _user!.name,
-              bio: fieldKey == 'bio'
-                  ? (newValue.isEmpty ? null : newValue)
-                  : _user!.bio,
-              phoneNumber: fieldKey == 'phoneNumber'
-                  ? (newValue.isEmpty ? null : newValue)
-                  : _user!.phoneNumber,
-            );
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Modification enregistrée'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 1), // ✅ Réduire la durée
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur: ${result.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _cancelEdit(String fieldKey, String originalValue) {
-    setState(() {
-      _editingFields[fieldKey] = false;
-      _controllers[fieldKey]?.text = originalValue;
-    });
-  }
-
-  Future<void> _reactivateAccount() async {
-    // TODO: Implémenter la logique de réactivation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fonctionnalité de réactivation à implémenter'),
-      ),
-    );
-  }
-
-  // ============================================================================
-  // HELPERS
-  // ============================================================================
-
-  String _formatDateTime(DateTime dateTime) {
-    return DateFormat('dd/MM/yyyy à HH:mm').format(dateTime);
   }
 }
