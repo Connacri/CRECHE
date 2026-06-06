@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Creche"
-#define MyAppVersion "1.2.73"
+#define MyAppVersion "1.2.82"
 #define MyAppPublisher "Connacri"
 #define MyAppURL "https://github.com/Connacri/CRECHE"
 #define MyAppExeName "creche.exe"
