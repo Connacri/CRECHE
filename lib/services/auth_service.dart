@@ -450,33 +450,48 @@ class AuthService {
           .map((c) => c['id'] as String)
           .toList();
 
-      // 3. Supprimer les fichiers de stockage (photos de profil, enfants, cours)
+      // 3. Récupérer les IDs des événements créés par l'utilisateur
+      final eventsResponse = await _adminClient
+          .from('events')
+          .select('id')
+          .eq('created_by', userId);
+      final eventIds = (eventsResponse as List)
+          .map((e) => e['id'] as String)
+          .toList();
+
+      // 4. Supprimer les fichiers de stockage (photos de profil, enfants, cours)
       await ImageStorageService().deleteAllUserStorageData(userId, courseIds);
 
-      // 4. Supprimer les données dans les tables Supabase (ordre respectant les FK)
+      // 5. Supprimer les données dans les tables Supabase (ordre respectant les FK)
 
       // Activités quotidiennes des enfants
       if (childIds.isNotEmpty) {
         await _adminClient.from('daily_activities').delete().inFilter('child_id', childIds);
       }
 
-      // Inscriptions (liées à l'utilisateur ou aux cours)
+      // Inscriptions aux événements (liées à l'utilisateur, à ses enfants, ou à ses événements créés)
+      var eventRegFilter = 'registrant_id.eq.$userId';
+      if (childIds.isNotEmpty) {
+        eventRegFilter += ',child_id.in.(${childIds.join(",")})';
+      }
+      if (eventIds.isNotEmpty) {
+        eventRegFilter += ',event_id.in.(${eventIds.join(",")})';
+      }
+      await _adminClient.from('event_registrations').delete().or(eventRegFilter);
 
+      // Inscriptions aux cours (liées à l'utilisateur ou aux cours)
       if (courseIds.isNotEmpty) {
         await _adminClient.from('enrollments').delete().or('parent_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
       } else {
         await _adminClient.from('enrollments').delete().eq('parent_id', userId);
       }
 
-
       // Horaires de sessions (liés aux cours ou à l'école)
-
       if (courseIds.isNotEmpty) {
         await _adminClient.from('session_schedules').delete().or('school_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
       } else {
         await _adminClient.from('session_schedules').delete().eq('school_id', userId);
       }
-
 
       // Créneaux de disponibilité (écoles)
       await _adminClient.from('school_available_slots').delete().eq('school_id', userId);
@@ -484,13 +499,16 @@ class AuthService {
       // Enfants
       await _adminClient.from('children').delete().eq('parent_id', userId);
 
+      // Événements
+      await _adminClient.from('events').delete().eq('created_by', userId);
+
       // Cours
       await _adminClient.from('courses').delete().eq('created_by', userId);
 
       // Enfin, l'utilisateur lui-même
       await _adminClient.from('users').delete().eq('id', userId);
 
-      // 5. Supprimer l'utilisateur Firebase
+      // 6. Supprimer l'utilisateur Firebase
       final user = _firebaseAuth.currentUser;
       if (user != null && user.uid == userId) {
         await user.delete();
