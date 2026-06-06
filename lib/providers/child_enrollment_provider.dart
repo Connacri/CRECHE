@@ -33,6 +33,150 @@ class ChildEnrollmentProvider with ChangeNotifier {
   String? _error;
   String? get error => _error;
 
+  // Realtime Subscriptions
+  RealtimeChannel? _childrenChannel;
+  RealtimeChannel? _enrollmentsChannel;
+  RealtimeChannel? _activitiesChannel;
+  RealtimeChannel? _schedulesChannel;
+
+  @override
+  void dispose() {
+    _childrenChannel?.unsubscribe();
+    _enrollmentsChannel?.unsubscribe();
+    _activitiesChannel?.unsubscribe();
+    _schedulesChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void setupRealtimeListeners(String parentId) {
+    if (parentId.isEmpty) return;
+
+    // 1. Children Listener
+    _childrenChannel?.unsubscribe();
+    _childrenChannel = _supabaseChildService.adminClient
+        .channel('public:children:parent=$parentId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'children',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'parent_id',
+            value: parentId,
+          ),
+          callback: (payload) {
+            _handleChildChange(payload);
+          },
+        )
+        .subscribe();
+
+    // 2. Enrollments Listener
+    _enrollmentsChannel?.unsubscribe();
+    _enrollmentsChannel = _supabaseChildService.adminClient
+        .channel('public:enrollments:parent=$parentId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'enrollments',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'parent_id',
+            value: parentId,
+          ),
+          callback: (payload) {
+            _handleEnrollmentChange(payload);
+          },
+        )
+        .subscribe();
+
+    // 3. Daily Activities Listener
+    _activitiesChannel?.unsubscribe();
+    _activitiesChannel = _supabaseChildService.adminClient
+        .channel('public:daily_activities:parent=$parentId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'daily_activities',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'parent_id',
+            value: parentId,
+          ),
+          callback: (payload) {
+            _handleActivityChange(payload);
+          },
+        )
+        .subscribe();
+  }
+
+  void _handleChildChange(PostgresChangesPayload payload) {
+    final eventType = payload.eventType;
+    final Map<String, dynamic> data = payload.newRecord;
+    final Map<String, dynamic> oldData = payload.oldRecord;
+
+    if (eventType == PostgresChangeEvent.insert) {
+      final newChild = ChildModel.fromSupabase(data);
+      if (!_children.any((c) => c.id == newChild.id)) {
+        _children.add(newChild);
+      }
+    } else if (eventType == PostgresChangeEvent.update) {
+      final updatedChild = ChildModel.fromSupabase(data);
+      final index = _children.indexWhere((c) => c.id == updatedChild.id);
+      if (index != -1) {
+        _children[index] = updatedChild;
+      }
+    } else if (eventType == PostgresChangeEvent.delete) {
+      final id = oldData['id'];
+      _children.removeWhere((c) => c.id == id);
+    }
+    notifyListeners();
+  }
+
+  void _handleEnrollmentChange(PostgresChangesPayload payload) {
+    final eventType = payload.eventType;
+    final Map<String, dynamic> data = payload.newRecord;
+    final Map<String, dynamic> oldData = payload.oldRecord;
+
+    if (eventType == PostgresChangeEvent.insert) {
+      final newEnrollment = EnrollmentModel.fromSupabase(data);
+      if (!_enrollments.any((e) => e.id == newEnrollment.id)) {
+        _enrollments.add(newEnrollment);
+      }
+    } else if (eventType == PostgresChangeEvent.update) {
+      final updatedEnrollment = EnrollmentModel.fromSupabase(data);
+      final index = _enrollments.indexWhere((e) => e.id == updatedEnrollment.id);
+      if (index != -1) {
+        _enrollments[index] = updatedEnrollment;
+      }
+    } else if (eventType == PostgresChangeEvent.delete) {
+      final id = oldData['id'];
+      _enrollments.removeWhere((e) => e.id == id);
+    }
+    notifyListeners();
+  }
+
+  void _handleActivityChange(PostgresChangesPayload payload) {
+    final eventType = payload.eventType;
+    final Map<String, dynamic> data = payload.newRecord;
+    final Map<String, dynamic> oldData = payload.oldRecord;
+
+    if (eventType == PostgresChangeEvent.insert) {
+      final newActivity = DailyActivity.fromSupabase(data);
+      if (!_dailyActivities.any((a) => a.id == newActivity.id)) {
+        _dailyActivities.add(newActivity);
+      }
+    } else if (eventType == PostgresChangeEvent.update) {
+      final updatedActivity = DailyActivity.fromSupabase(data);
+      final index = _dailyActivities.indexWhere((a) => a.id == updatedActivity.id);
+      if (index != -1) {
+        _dailyActivities[index] = updatedActivity;
+      }
+    } else if (eventType == PostgresChangeEvent.delete) {
+      final id = oldData['id'];
+      _dailyActivities.removeWhere((a) => a.id == id);
+    }
+    notifyListeners();
+  }
 
   Future<bool> addChild({
     required String parentId,

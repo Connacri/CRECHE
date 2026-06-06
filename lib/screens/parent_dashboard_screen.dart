@@ -48,6 +48,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
       if (authProvider.userData != null) {
         final uid = authProvider.userData!['id'];
         final childProvider = context.read<ChildEnrollmentProvider>();
+        childProvider.setupRealtimeListeners(uid);
         await Future.wait([
           childProvider.loadChildren(uid),
           childProvider.loadEnrollments(uid),
