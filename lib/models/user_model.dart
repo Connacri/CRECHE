@@ -266,8 +266,8 @@ class UserModel {
       'metadata': metadata,
       'profile_completed': profileCompleted,
       'palmares': palmares,
-      'diplomas': diplomas,
-      'certificates': certificates,
+      'diplomas': diplomas ?? [],
+      'certificates': certificates ?? [],
       'cv_url': cvUrl,
     };
   }
