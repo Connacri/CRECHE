@@ -178,6 +178,95 @@ CREATE TABLE IF NOT EXISTS public.session_schedules (
     metadata JSONB
 );
 
+-- 10. Table: members (Club Members)
+CREATE TABLE IF NOT EXISTS public.members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    membership_number TEXT,
+    membership_type TEXT DEFAULT 'standard',
+    status TEXT DEFAULT 'active',
+    start_date DATE DEFAULT CURRENT_DATE,
+    end_date DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    metadata JSONB
+);
+
+-- 11. Table: coaching_history (Coach Assignments)
+CREATE TABLE IF NOT EXISTS public.coaching_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+    coach_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    role TEXT DEFAULT 'main',
+    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+    unassigned_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT TRUE,
+    metadata JSONB
+);
+
+-- 12. Table: invoices
+CREATE TABLE IF NOT EXISTS public.invoices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    member_id UUID REFERENCES public.members(id) ON DELETE CASCADE,
+    invoice_number TEXT UNIQUE NOT NULL,
+    total_amount NUMERIC NOT NULL,
+    status TEXT DEFAULT 'pending',
+    due_date DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    metadata JSONB
+);
+
+-- 13. Table: club_expenses
+CREATE TABLE IF NOT EXISTS public.club_expenses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    amount NUMERIC NOT NULL,
+    category TEXT,
+    date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 14. Table: payments
+CREATE TABLE IF NOT EXISTS public.payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID REFERENCES public.invoices(id) ON DELETE CASCADE,
+    amount NUMERIC NOT NULL,
+    payment_method TEXT,
+    transaction_id TEXT,
+    date TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 15. Table: inventory_items
+CREATE TABLE IF NOT EXISTS public.inventory_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    quantity INTEGER DEFAULT 0,
+    min_quantity INTEGER DEFAULT 0,
+    unit TEXT,
+    category TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 16. Table: inventory_transactions
+CREATE TABLE IF NOT EXISTS public.inventory_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id UUID REFERENCES public.inventory_items(id) ON DELETE CASCADE,
+    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    transaction_type TEXT NOT NULL, -- 'in', 'out', 'adjustment'
+    quantity INTEGER NOT NULL,
+    notes TEXT,
+    created_by UUID REFERENCES public.users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable RLS for all tables
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.children ENABLE ROW LEVEL SECURITY;
@@ -188,6 +277,13 @@ ALTER TABLE public.event_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_available_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.session_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.coaching_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.club_expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_transactions ENABLE ROW LEVEL SECURITY;
 
 -- Note: Policies depend on the specific access requirements.
 -- The app uses 'x-firebase-id' header which is NOT standard for Supabase RLS.
@@ -205,7 +301,7 @@ ALTER TABLE public.session_schedules ENABLE ROW LEVEL SECURITY;
 -- Then use it in policies:
 -- CREATE POLICY "Allow based on x-firebase-id" ON public.users FOR ALL USING (id::text = get_firebase_id());
 
--- 10. RPC Functions
+-- 17. RPC Functions
 
 -- RPC: get_schools
 CREATE OR REPLACE FUNCTION public.get_schools()
@@ -240,31 +336,57 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: get_club_financial_summary
-CREATE OR REPLACE FUNCTION public.get_club_financial_summary(p_club_id UUID)
+CREATE OR REPLACE FUNCTION public.get_club_financial_summary(p_club_id UUID, p_year INTEGER DEFAULT EXTRACT(YEAR FROM CURRENT_DATE))
 RETURNS JSONB AS $$
 DECLARE
     total_revenue NUMERIC;
+    total_expenses NUMERIC;
     total_enrollments INTEGER;
     active_courses INTEGER;
 BEGIN
+    -- Revenue from enrollments
     SELECT COALESCE(SUM(paid_amount), 0) INTO total_revenue
     FROM public.enrollments e
     JOIN public.courses c ON e.course_id = c.id
-    WHERE c.created_by = p_club_id;
+    WHERE c.created_by = p_club_id
+    AND EXTRACT(YEAR FROM e.enrolled_at) = p_year;
 
+    -- Expenses
+    SELECT COALESCE(SUM(amount), 0) INTO total_expenses
+    FROM public.club_expenses
+    WHERE club_id = p_club_id
+    AND EXTRACT(YEAR FROM date) = p_year;
+
+    -- Enrollments count
     SELECT COUNT(*) INTO total_enrollments
     FROM public.enrollments e
     JOIN public.courses c ON e.course_id = c.id
-    WHERE c.created_by = p_club_id;
+    WHERE c.created_by = p_club_id
+    AND EXTRACT(YEAR FROM e.enrolled_at) = p_year;
 
+    -- Active courses
     SELECT COUNT(*) INTO active_courses
     FROM public.courses
     WHERE created_by = p_club_id AND is_active = TRUE;
 
     RETURN jsonb_build_object(
         'total_revenue', total_revenue,
+        'total_expenses', total_expenses,
         'total_enrollments', total_enrollments,
-        'active_courses', active_courses
+        'active_courses', active_courses,
+        'net_income', total_revenue - total_expenses
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC: get_club_subscription_status (Placeholder)
+CREATE OR REPLACE FUNCTION public.get_club_subscription_status(p_club_id UUID)
+RETURNS JSONB AS $$
+BEGIN
+    RETURN jsonb_build_object(
+        'status', 'active',
+        'plan', 'premium',
+        'expires_at', (CURRENT_DATE + INTERVAL '1 year')
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
