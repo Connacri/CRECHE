@@ -1,3 +1,65 @@
+enum UserRole {
+  admin,
+  parent,
+  coach,
+  school,
+  transporteur,
+  fournisseur,
+  user,
+  autres,
+  unknown;
+
+  static UserRole fromJson(String json) {
+    switch (json.toLowerCase()) {
+      case 'admin':
+        return UserRole.admin;
+      case 'parent':
+        return UserRole.parent;
+      case 'coach':
+        return UserRole.coach;
+      case 'school':
+      case 'club':
+      case 'organisation':
+        return UserRole.school;
+      case 'transporteur':
+        return UserRole.transporteur;
+      case 'fournisseur':
+        return UserRole.fournisseur;
+      case 'user':
+        return UserRole.user;
+      case 'autres':
+        return UserRole.autres;
+      default:
+        return UserRole.unknown;
+    }
+  }
+
+  String toJson() => name;
+
+  String get displayName {
+    switch (this) {
+      case UserRole.admin:
+        return 'Administrateur';
+      case UserRole.parent:
+        return 'Parent';
+      case UserRole.coach:
+        return 'Coach';
+      case UserRole.school:
+        return 'École/Club';
+      case UserRole.transporteur:
+        return 'Transporteur';
+      case UserRole.fournisseur:
+        return 'Fournisseur';
+      case UserRole.user:
+        return 'Utilisateur';
+      case UserRole.autres:
+        return 'Autres';
+      case UserRole.unknown:
+        return 'Inconnu';
+    }
+  }
+}
+
 class AppLocation {
   final double latitude;
   final double longitude;
@@ -13,7 +75,7 @@ class AppLocation {
     this.country,
   });
 
-  bool get hasLocation => latitude != 0.0 && longitude != 0.0;
+  bool get hasLocation => latitude != 0.0 || longitude != 0.0;
 
   factory AppLocation.fromMap(Map<String, dynamic> map) {
     return AppLocation(
@@ -34,126 +96,49 @@ class AppLocation {
       'country': country,
     };
   }
-
-  AppLocation copyWith({
-    double? latitude,
-    double? longitude,
-    String? address,
-    String? city,
-    String? country,
-  }) {
-    return AppLocation(
-      latitude: latitude ?? this.latitude,
-      longitude: longitude ?? this.longitude,
-      address: address ?? this.address,
-      city: city ?? this.city,
-      country: country ?? this.country,
-    );
-  }
-}
-
-enum UserRole {
-  transporteur,
-  fournisseur,
-  user,
-  parent,
-  school,
-  coach,
-  autres;
-
-  String toJson() => name;
-
-  static UserRole fromJson(String json) {
-    return UserRole.values.firstWhere(
-      (role) => role.name == json,
-      orElse: () => UserRole.parent,
-    );
-  }
-
-  String get displayName {
-    switch (this) {
-      case UserRole.parent:
-        return 'Parent';
-      case UserRole.school:
-        return 'School';
-      case UserRole.coach:
-        return 'Coach';
-      case UserRole.transporteur:
-        return 'Transporteur';
-      case UserRole.fournisseur:
-        return 'Fournisseur';
-      case UserRole.user:
-        return 'Utilisateur';
-      case UserRole.autres:
-        return 'Autres';
-    }
-  }
 }
 
 class UserProfileImages {
   final String? profileImageSupabase;
+  final String? profileImageLocal;
   final String? coverImageSupabase;
+  final String? coverImageLocal;
   final DateTime? lastUpdated;
+  final bool isSynced;
 
   UserProfileImages({
     this.profileImageSupabase,
+    this.profileImageLocal,
     this.coverImageSupabase,
+    this.coverImageLocal,
     this.lastUpdated,
+    this.isSynced = false,
   });
+
+  String? get profileImage => profileImageSupabase ?? profileImageLocal;
+  String? get coverImage => coverImageSupabase ?? coverImageLocal;
 
   factory UserProfileImages.fromMap(Map<String, dynamic> map) {
     return UserProfileImages(
-      profileImageSupabase: map['profileImageSupabase'] ?? map['profileImage'],
-      coverImageSupabase: map['coverImageSupabase'] ?? map['coverImage'],
-      lastUpdated: map['lastUpdated'] != null
-          ? (map['lastUpdated'] is String
-              ? DateTime.parse(map['lastUpdated'])
-              : DateTime.fromMillisecondsSinceEpoch(0))
-          : null,
+      profileImageSupabase: map['profileImageSupabase'] ?? map['profile_image_supabase'],
+      profileImageLocal: map['profileImageLocal'] ?? map['profile_image_local'],
+      coverImageSupabase: map['coverImageSupabase'] ?? map['cover_image_supabase'],
+      coverImageLocal: map['coverImageLocal'] ?? map['cover_image_local'],
+      lastUpdated: map['lastUpdated'] != null ? DateTime.parse(map['lastUpdated'].toString()) :
+                  (map['last_updated'] != null ? DateTime.parse(map['last_updated'].toString()) : null),
+      isSynced: map['isSynced'] ?? map['is_synced'] ?? false,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'profileImageSupabase': profileImageSupabase,
+      'profileImageLocal': profileImageLocal,
       'coverImageSupabase': coverImageSupabase,
+      'coverImageLocal': coverImageLocal,
       'lastUpdated': lastUpdated?.toIso8601String(),
+      'isSynced': isSynced,
     };
-  }
-
-  static String? _withCacheVersion(String? url, DateTime? lastUpdated) {
-    if (url == null || url.isEmpty) {
-      return url;
-    }
-
-    if (lastUpdated == null) {
-      return url;
-    }
-
-    final separator = url.contains('?') ? '&' : '?';
-    return '$url${separator}v=${lastUpdated.millisecondsSinceEpoch}';
-  }
-
-  String? get profileImage => _withCacheVersion(
-        profileImageSupabase,
-        lastUpdated,
-      );
-
-  String? get coverImage => _withCacheVersion(
-        coverImageSupabase,
-        lastUpdated,
-      );
-
-  UserProfileImages copyWith({
-    String? profileImageSupabase,
-    String? coverImageSupabase,
-    DateTime? lastUpdated,
-  }) {
-    return UserProfileImages(
-      profileImageSupabase: profileImageSupabase ?? this.profileImageSupabase,
-      coverImageSupabase: coverImageSupabase ?? this.coverImageSupabase,
-      lastUpdated: lastUpdated ?? this.lastUpdated,
-    );
   }
 }
 
@@ -172,8 +157,7 @@ class UserModel {
   final String? bio;
   final String? phoneNumber;
   final Map<String, dynamic>? metadata;
-
-  // Coach specific fields
+  final bool profileCompleted;
   final String? palmares;
   final List<String>? diplomas;
   final List<String>? certificates;
@@ -186,19 +170,20 @@ class UserModel {
     required this.role,
     required this.createdAt,
     required this.updatedAt,
-    required this.isActive,
+    this.isActive = true,
     this.deactivatedAt,
     this.scheduledDeletionDate,
-    UserProfileImages? profileImages,
+    required this.profileImages,
     this.location,
     this.bio,
     this.phoneNumber,
     this.metadata,
+    this.profileCompleted = false,
     this.palmares,
     this.diplomas,
     this.certificates,
     this.cvUrl,
-  }) : profileImages = profileImages ?? UserProfileImages();
+  });
 
   static DateTime _parseDateTime(dynamic value) {
     if (value == null) return DateTime.now();
@@ -256,6 +241,7 @@ class UserModel {
       bio: data['bio'],
       phoneNumber: data['phone_number'] ?? data['phone'],
       metadata: data['metadata'],
+      profileCompleted: data['profile_completed'] ?? false,
       palmares: data['palmares'],
       diplomas: data['diplomas'] != null ? List<String>.from(data['diplomas']) : null,
       certificates: data['certificates'] != null ? List<String>.from(data['certificates']) : null,
@@ -278,6 +264,7 @@ class UserModel {
       'bio': bio,
       'phone_number': phoneNumber,
       'metadata': metadata,
+      'profile_completed': profileCompleted,
       'palmares': palmares,
       'diplomas': diplomas,
       'certificates': certificates,
@@ -300,6 +287,7 @@ class UserModel {
     String? bio,
     String? phoneNumber,
     Map<String, dynamic>? metadata,
+    bool? profileCompleted,
     String? palmares,
     List<String>? diplomas,
     List<String>? certificates,
@@ -321,6 +309,7 @@ class UserModel {
       bio: bio ?? this.bio,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       metadata: metadata ?? this.metadata,
+      profileCompleted: profileCompleted ?? this.profileCompleted,
       palmares: palmares ?? this.palmares,
       diplomas: diplomas ?? this.diplomas,
       certificates: certificates ?? this.certificates,

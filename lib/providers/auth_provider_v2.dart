@@ -7,8 +7,10 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../services/auth_service.dart';
 import '../services/image_storage_service.dart';
 import '../services/fcm_service.dart';
+import '../models/user_model.dart';
 
 class AuthProviderV2 with ChangeNotifier {
+  UserModel? get user => _userData != null ? UserModel.fromSupabase(_userData!) : null;
   final AuthService _authService = AuthService();
   final ImageStorageService _imageService = ImageStorageService();
   final FCMService _fcmService = FCMService();

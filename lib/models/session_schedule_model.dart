@@ -3,7 +3,7 @@
 class SessionSchedule {
   final String id;
   final String courseId;
-  final String enrollmentId;
+  final String? enrollmentId;
   final DayOfWeek dayOfWeek;
   final TimeSlot timeSlot;
   final DateTime startDate;
@@ -21,7 +21,7 @@ class SessionSchedule {
   SessionSchedule({
     required this.id,
     required this.courseId,
-    required this.enrollmentId,
+    this.enrollmentId,
     required this.dayOfWeek,
     required this.timeSlot,
     required this.startDate,
@@ -59,7 +59,7 @@ class SessionSchedule {
     return SessionSchedule(
       id: data['id'] ?? '',
       courseId: data['course_id'] ?? '',
-      enrollmentId: data['enrollment_id'] ?? '',
+      enrollmentId: data['enrollment_id'],
       dayOfWeek: DayOfWeek.values[data['day_of_week'] ?? 0],
       timeSlot: TimeSlot.fromMap(data['time_slot'] ?? {}),
       startDate: DateTime.parse(data['start_date']),

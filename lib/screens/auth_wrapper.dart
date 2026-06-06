@@ -83,7 +83,7 @@ class AuthWrapper extends StatelessWidget {
             case 'user':
               return const UserDashboard();
             case 'autres':
-              return const AutreDashboard();
+              return const AutresDashboardScreen();
             default:
               return _ErrorScreen(
                 message: 'Rôle utilisateur invalide',
