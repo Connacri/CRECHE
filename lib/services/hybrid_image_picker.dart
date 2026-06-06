@@ -5,9 +5,6 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:file_picker/file_picker.dart';
 
 class HybridImagePickerService {
-  static bool get _isWindowsDesktop => !kIsWeb && Platform.isWindows;
-  static bool get _isWeb => kIsWeb;
-
   /// Sélectionne une image en utilisant FilePicker (plus stable que ImagePicker sur certains appareils)
   static Future<File?> pickImage({
     bool crop = false,

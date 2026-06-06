@@ -155,7 +155,7 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
         role.displayName,
         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
-      backgroundColor: color.withOpacity(0.7),
+      backgroundColor: color.withValues(alpha: 0.7),
     );
   }
 
@@ -173,7 +173,7 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
             width: double.infinity,
             child: coverUrl != null
                 ? Image.network(coverUrl, fit: BoxFit.cover)
-                : Container(color: Colors.grey.withOpacity(0.3)),
+                : Container(color: Colors.grey.withValues(alpha: 0.3)),
           ),
         ),
         Positioned(
@@ -182,7 +182,7 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
           child: Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               shape: BoxShape.circle,
             ),
             child: CircleAvatar(
@@ -353,7 +353,7 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
         icon: const Icon(Icons.logout),
         label: const Text('Se déconnecter'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.redAccent.withOpacity(0.8),
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

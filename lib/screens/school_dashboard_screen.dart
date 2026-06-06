@@ -16,7 +16,6 @@ import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/add_session_dialog.dart';
 import '../widgets/enrollments_page.dart';
 import 'profile_screen.dart';
-import 'create_course_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
   const SchoolDashboard({super.key});

@@ -385,7 +385,7 @@ class _CalendarSectionState extends State<_CalendarSection> {
                 activeDayColor: Colors.white,
                 activeBackgroundDayColor: Theme.of(context).colorScheme.primary,
                 dotColor: const Color(0xFF333A47),
-                locale: 'fr_FR',
+                locale: Localizations.localeOf(context).languageCode,
               ),
               const SizedBox(height: 20),
               Consumer<ChildEnrollmentProvider>(
