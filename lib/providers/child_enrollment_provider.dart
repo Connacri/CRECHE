@@ -7,6 +7,7 @@ import '../models/session_schedule_model.dart';
 import '../services/supabase_service.dart';
 import '../services/image_storage_service.dart';
 import '../services/club_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChildEnrollmentProvider with ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
@@ -109,7 +110,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
         .subscribe();
   }
 
-  void _handleChildChange(PostgresChangesPayload payload) {
+  void _handleChildChange(RealtimePostgresChangesPayload payload) {
     final eventType = payload.eventType;
     final Map<String, dynamic> data = payload.newRecord;
     final Map<String, dynamic> oldData = payload.oldRecord;
@@ -132,7 +133,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void _handleEnrollmentChange(PostgresChangesPayload payload) {
+  void _handleEnrollmentChange(RealtimePostgresChangesPayload payload) {
     final eventType = payload.eventType;
     final Map<String, dynamic> data = payload.newRecord;
     final Map<String, dynamic> oldData = payload.oldRecord;
@@ -155,7 +156,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void _handleActivityChange(PostgresChangesPayload payload) {
+  void _handleActivityChange(RealtimePostgresChangesPayload payload) {
     final eventType = payload.eventType;
     final Map<String, dynamic> data = payload.newRecord;
     final Map<String, dynamic> oldData = payload.oldRecord;
