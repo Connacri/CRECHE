@@ -1,127 +1,37 @@
-import 'package:flutter/material.dart';
-import 'course_model_complete.dart'; // CourseLocation
-
-// ── ENUMS ──────────────────────────────────────────────────────────
+import 'course_model_complete.dart';
 
 enum EventType {
-  competition,
+  competiton,
   stage,
-  porteOuverte,
-  reunion,
-  examen,
-  tournoi,
-  gala,
+  formation,
+  social,
   autre;
 
-  String get displayName {
-    switch (this) {
-      case EventType.competition:   return 'Compétition';
-      case EventType.stage:         return 'Stage';
-      case EventType.porteOuverte:  return 'Porte Ouverte';
-      case EventType.reunion:       return 'Réunion';
-      case EventType.examen:        return 'Examen / Grade';
-      case EventType.tournoi:       return 'Tournoi';
-      case EventType.gala:          return 'Gala';
-      case EventType.autre:         return 'Autre';
-    }
-  }
-
-  IconData get icon {
-    switch (this) {
-      case EventType.competition:   return Icons.emoji_events;
-      case EventType.stage:         return Icons.fitness_center;
-      case EventType.porteOuverte:  return Icons.door_back_door_sharp;
-      case EventType.reunion:       return Icons.groups;
-      case EventType.examen:        return Icons.military_tech;
-      case EventType.tournoi:       return Icons.sports;
-      case EventType.gala:          return Icons.celebration;
-      case EventType.autre:         return Icons.event;
-    }
-  }
-
-  Color get color {
-    switch (this) {
-      case EventType.competition:   return const Color(0xFFE53935);
-      case EventType.stage:         return const Color(0xFF1E88E5);
-      case EventType.porteOuverte:  return const Color(0xFF43A047);
-      case EventType.reunion:       return const Color(0xFF8E24AA);
-      case EventType.examen:        return const Color(0xFFFB8C00);
-      case EventType.tournoi:       return const Color(0xFFD81B60);
-      case EventType.gala:          return const Color(0xFF6D4C41);
-      case EventType.autre:         return const Color(0xFF546E7A);
-    }
-  }
-
-  static EventType fromString(String v) => EventType.values.firstWhere(
-      (e) => e.name == v, orElse: () => EventType.autre);
+  static EventType fromString(String v) =>
+      EventType.values.firstWhere((e) => e.name == v, orElse: () => EventType.autre);
 }
 
 enum EventStatus {
   draft,
   published,
   registrationOpen,
-  ongoing,
+  registrationClosed,
+  inProgress,
   completed,
   cancelled;
 
-  String get displayName {
-    switch (this) {
-      case EventStatus.draft:            return 'Brouillon';
-      case EventStatus.published:        return 'Publié';
-      case EventStatus.registrationOpen: return 'Inscriptions ouvertes';
-      case EventStatus.ongoing:          return 'En cours';
-      case EventStatus.completed:        return 'Terminé';
-      case EventStatus.cancelled:        return 'Annulé';
-    }
-  }
+  static EventStatus fromString(String v) =>
+      EventStatus.values.firstWhere((e) => e.name == v, orElse: () => EventStatus.draft);
 
-  Color get color {
-    switch (this) {
-      case EventStatus.draft:            return Colors.grey;
-      case EventStatus.published:        return Colors.blue;
-      case EventStatus.registrationOpen: return Colors.green;
-      case EventStatus.ongoing:          return Colors.orange;
-      case EventStatus.completed:        return Colors.teal;
-      case EventStatus.cancelled:        return Colors.red;
-    }
-  }
-
-  static EventStatus fromString(String v) {
-    if (v == 'registration_open') return EventStatus.registrationOpen;
-    return EventStatus.values.firstWhere(
-        (e) => e.name == v, orElse: () => EventStatus.draft);
-  }
-
-  String get supabaseValue {
-    if (this == EventStatus.registrationOpen) return 'registration_open';
-    return name;
-  }
+  String get supabaseValue => name;
 }
 
 enum RegistrationStatus {
-  pending, confirmed, waitlisted, cancelled, attended, noShow;
-
-  String get displayName {
-    switch (this) {
-      case RegistrationStatus.pending:    return 'En attente';
-      case RegistrationStatus.confirmed:  return 'Confirmé';
-      case RegistrationStatus.waitlisted: return 'Liste d\'attente';
-      case RegistrationStatus.cancelled:  return 'Annulé';
-      case RegistrationStatus.attended:   return 'Présent';
-      case RegistrationStatus.noShow:     return 'Absent';
-    }
-  }
-
-  Color get color {
-    switch (this) {
-      case RegistrationStatus.pending:    return Colors.orange;
-      case RegistrationStatus.confirmed:  return Colors.blue;
-      case RegistrationStatus.waitlisted: return Colors.purple;
-      case RegistrationStatus.cancelled:  return Colors.red;
-      case RegistrationStatus.attended:   return Colors.green;
-      case RegistrationStatus.noShow:     return Colors.grey;
-    }
-  }
+  pending,
+  confirmed,
+  waitlist,
+  cancelled,
+  noShow;
 
   static RegistrationStatus fromString(String v) {
     if (v == 'no_show') return RegistrationStatus.noShow;
@@ -323,6 +233,7 @@ class EventRegistration {
   final String? notes;
   final DateTime registeredAt;
   final DateTime? confirmedAt;
+  final DateTime updatedAt;
 
   // Relations (joined)
   final EventModel? event;
@@ -343,6 +254,7 @@ class EventRegistration {
     this.notes,
     required this.registeredAt,
     this.confirmedAt,
+    required this.updatedAt,
     this.event,
     this.registrantData,
     this.childData,
@@ -369,6 +281,7 @@ class EventRegistration {
     notes: d['notes'],
     registeredAt: DateTime.parse(d['registered_at']),
     confirmedAt: d['confirmed_at'] != null ? DateTime.parse(d['confirmed_at']) : null,
+    updatedAt: DateTime.parse(d['updated_at'] ?? d['registered_at']),
     event: d['event'] != null ? EventModel.fromSupabase(d['event']) : null,
     registrantData: d['registrant'],
     childData: d['child'],
@@ -392,7 +305,7 @@ class EventRegistration {
     String? id, String? eventId, String? registrantId, String? childId,
     RegistrationStatus? status, String? paymentStatus, double? paidAmount,
     String? bibNumber, String? category, bool? medicalCertSubmitted, String? notes,
-    DateTime? registeredAt, DateTime? confirmedAt,
+    DateTime? registeredAt, DateTime? confirmedAt, DateTime? updatedAt,
   }) => EventRegistration(
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
@@ -407,5 +320,6 @@ class EventRegistration {
     notes: notes ?? this.notes,
     registeredAt: registeredAt ?? this.registeredAt,
     confirmedAt: confirmedAt ?? this.confirmedAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
 }

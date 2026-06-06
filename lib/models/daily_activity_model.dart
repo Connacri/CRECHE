@@ -23,6 +23,7 @@ class DailyActivity {
   final String status;
   final Map<String, dynamic>? metadata;
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   DailyActivity({
     required this.id,
@@ -34,6 +35,7 @@ class DailyActivity {
     this.status = 'pending',
     this.metadata,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   factory DailyActivity.fromSupabase(Map<String, dynamic> data) {
@@ -47,6 +49,7 @@ class DailyActivity {
       status: data['status'] ?? 'pending',
       metadata: data['metadata'],
       createdAt: DateTime.parse(data['created_at']),
+      updatedAt: DateTime.parse(data['updated_at'] ?? data['created_at']),
     );
   }
 
@@ -59,6 +62,7 @@ class DailyActivity {
       'description': description,
       'status': status,
       'metadata': metadata,
+      'updated_at': DateTime.now().toIso8601String(),
     };
   }
 }

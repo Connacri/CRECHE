@@ -1,5 +1,4 @@
 
-
 enum CourseCategory {
   mathematics,
   sciences,
@@ -192,7 +191,7 @@ class CourseModel {
   final CourseLocation location;
   final List<CourseImage> images;
   final String createdBy;
-  final String? clubId; // New field
+  final String? clubId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
@@ -200,6 +199,8 @@ class CourseModel {
   final int currentStudents;
   final List<String> tags;
   final Map<String, dynamic>? metadata;
+  final int? minAge;
+  final int? maxAge;
 
   CourseModel({
     required this.id,
@@ -221,6 +222,8 @@ class CourseModel {
     this.currentStudents = 0,
     this.tags = const [],
     this.metadata,
+    this.minAge,
+    this.maxAge,
   });
 
   factory CourseModel.fromSupabase(Map<String, dynamic> data) {
@@ -253,6 +256,8 @@ class CourseModel {
       currentStudents: data['current_students'] ?? 0,
       tags: List<String>.from(data['tags'] ?? []),
       metadata: data['metadata'],
+      minAge: data['min_age'],
+      maxAge: data['max_age'],
     );
   }
 
@@ -276,6 +281,8 @@ class CourseModel {
       'current_students': currentStudents,
       'tags': tags,
       'metadata': metadata,
+      'min_age': minAge,
+      'max_age': maxAge,
     };
   }
 
@@ -299,6 +306,8 @@ class CourseModel {
     int? currentStudents,
     List<String>? tags,
     Map<String, dynamic>? metadata,
+    int? minAge,
+    int? maxAge,
   }) {
     return CourseModel(
       id: id ?? this.id,
@@ -320,6 +329,8 @@ class CourseModel {
       currentStudents: currentStudents ?? this.currentStudents,
       tags: tags ?? this.tags,
       metadata: metadata ?? this.metadata,
+      minAge: minAge ?? this.minAge,
+      maxAge: maxAge ?? this.maxAge,
     );
   }
 
