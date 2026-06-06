@@ -190,13 +190,13 @@ class AuthProviderV2 with ChangeNotifier {
       await _authService.signOut();
     } catch (e) {
       debugPrint('Error during logout: $e');
+    } finally {
+      _currentUser = null;
+      _userData = null;
+      _needsEmailConfirmation = false;
+      _needsProfileCompletion = false;
+      _setState(AppAuthState.unauthenticated);
     }
-    _currentUser = null;
-    _userData = null;
-    _needsEmailConfirmation = false;
-    _needsProfileCompletion = false;
-    _setState(AppAuthState.unauthenticated);
-    notifyListeners();
   }
 
   Future<AuthResult> resendConfirmationEmail(String email) async {
