@@ -120,7 +120,7 @@ class ChildModel {
       'parent_id': parentId,
       'first_name': firstName,
       'last_name': lastName,
-      'date_of_birth': dateOfBirth.toIso8601String(),
+      'date_of_birth': dateOfBirth.toIso8601String().split('T')[0],
       'gender': gender.name,
       'photo_url': photoUrl,
       'birth_certificate_url': birthCertificateUrl,
