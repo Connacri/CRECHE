@@ -59,6 +59,12 @@ class HybridImagePickerService {
   }
 
   static Future<File?> _cropImage(File file, {CropAspectRatio? aspectRatio, required BuildContext context}) async {
+    // 🛡️ Le cropping n'est pas supporté nativement par image_cropper sur Windows
+    if (!kIsWeb && Platform.isWindows) {
+      debugPrint('ℹ️ [HybridPicker] Cropping non supporté sur Windows, retour du fichier original.');
+      return file;
+    }
+
     try {
       final croppedFile = await ImageCropper().cropImage(
         sourcePath: file.path,
