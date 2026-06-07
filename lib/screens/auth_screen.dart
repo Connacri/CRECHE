@@ -234,9 +234,20 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     return TextFormField(
       controller: _emailController,
       keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      autofillHints: const [AutofillHints.email],
       decoration: InputDecoration(
         labelText: 'Email',
         prefixIcon: const Icon(Icons.email_outlined),
+        suffixIcon: _emailController.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _emailController.clear();
+                },
+              )
+            : null,
       ),
       validator: (v) => v == null || !v.contains('@') ? 'Email invalide' : null,
     );
@@ -246,12 +257,18 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     return TextFormField(
       controller: _passwordController,
       obscureText: _obscurePassword,
+      textInputAction: TextInputAction.done,
+      autofillHints: const [AutofillHints.password],
+      onFieldSubmitted: (_) => _tabController.index == 0 ? _handleLogin() : _handleSignup(),
       decoration: InputDecoration(
         labelText: 'Mot de passe',
         prefixIcon: const Icon(Icons.lock_outline),
         suffixIcon: IconButton(
           icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            setState(() => _obscurePassword = !_obscurePassword);
+          },
         ),
       ),
       validator: (v) => v == null || v.length < 6 ? '6 caractères min.' : null,
@@ -344,6 +361,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }
 
   void _showSnackBar(String message, {required bool isError}) {
+    if (isError) HapticFeedback.vibrate();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
