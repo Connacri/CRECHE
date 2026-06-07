@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:math' show sqrt, asin, pi;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -79,19 +80,19 @@ class SupabaseCourseService {
   /// ✅ Crée un nouveau cours dans Supabase avec validation
   Future<String> createCourse(CourseModel course) async {
     try {
-      print('📝 [SupabaseService] Validation du titre...');
+      debugPrint('📝 [SupabaseService] Validation du titre...');
 
       // ✅ VALIDATION CRITIQUE : Vérifier le titre
       final titleError = _validateTitle(course.title);
       if (titleError != null) {
-        print('❌ [SupabaseService] Titre invalide: $titleError');
-        print('❌ [SupabaseService] Titre reçu: "${course.title}"');
-        print('❌ [SupabaseService] Titre trimmed: "${course.title.trim()}"');
-        print('❌ [SupabaseService] Longueur: ${course.title.trim().length}');
+        debugPrint('❌ [SupabaseService] Titre invalide: $titleError');
+        debugPrint('❌ [SupabaseService] Titre reçu: "${course.title}"');
+        debugPrint('❌ [SupabaseService] Titre trimmed: "${course.title.trim()}"');
+        debugPrint('❌ [SupabaseService] Longueur: ${course.title.trim().length}');
         throw Exception('Validation titre échouée: $titleError');
       }
 
-      print(
+      debugPrint(
           '✅ [SupabaseService] Titre valide: "${course.title}" (${course.title.trim().length} caractères)');
 
       final data = course.toSupabase();
@@ -99,24 +100,24 @@ class SupabaseCourseService {
       // Retirer l'ID car Supabase le génère automatiquement (UUID)
       data.remove('id');
 
-      print('📝 [SupabaseService] Envoi à Supabase...');
-      print('📝 [SupabaseService] Données: ${data.keys.join(", ")}');
+      debugPrint('📝 [SupabaseService] Envoi à Supabase...');
+      debugPrint('📝 [SupabaseService] Données: ${data.keys.join(", ")}');
 
       final response =
           await _supabase.from(_tableName).insert(data).select('id').single();
 
       final courseId = response['id'] as String;
-      print('✅ [SupabaseService] Cours créé avec ID: $courseId');
+      debugPrint('✅ [SupabaseService] Cours créé avec ID: $courseId');
 
       return courseId;
     } on PostgrestException catch (e) {
-      print('❌ [SupabaseService] PostgrestException: ${e.message}');
-      print('❌ [SupabaseService] Code: ${e.code}');
-      print('❌ [SupabaseService] Details: ${e.details}');
+      debugPrint('❌ [SupabaseService] PostgrestException: ${e.message}');
+      debugPrint('❌ [SupabaseService] Code: ${e.code}');
+      debugPrint('❌ [SupabaseService] Details: ${e.details}');
       throw Exception('Erreur Supabase createCourse: ${e.message}');
     } catch (e, stackTrace) {
-      print('❌ [SupabaseService] Erreur générale: $e');
-      print('❌ [SupabaseService] StackTrace: $stackTrace');
+      debugPrint('❌ [SupabaseService] Erreur générale: $e');
+      debugPrint('❌ [SupabaseService] StackTrace: $stackTrace');
       throw Exception('Erreur createCourse: $e');
     }
   }
@@ -143,9 +144,9 @@ class SupabaseCourseService {
       // Forcer la mise à jour de updated_at
       updates['updated_at'] = DateTime.now().toIso8601String();
 
-      print('📝 [SupabaseService] Mise à jour cours: $courseId');
+      debugPrint('📝 [SupabaseService] Mise à jour cours: $courseId');
       await _supabase.from(_tableName).update(updates).eq('id', courseId);
-      print('✅ [SupabaseService] Cours mis à jour');
+      debugPrint('✅ [SupabaseService] Cours mis à jour');
     } on PostgrestException catch (e) {
       throw Exception('Erreur Supabase updateCourse: ${e.message}');
     } catch (e) {
@@ -156,9 +157,9 @@ class SupabaseCourseService {
   /// Supprime un cours
   Future<void> deleteCourse(String courseId) async {
     try {
-      print('🗑️ [SupabaseService] Suppression cours: $courseId');
+      debugPrint('🗑️ [SupabaseService] Suppression cours: $courseId');
       await _supabase.from(_tableName).delete().eq('id', courseId);
-      print('✅ [SupabaseService] Cours supprimé');
+      debugPrint('✅ [SupabaseService] Cours supprimé');
     } on PostgrestException catch (e) {
       throw Exception('Erreur Supabase deleteCourse: ${e.message}');
     } catch (e) {

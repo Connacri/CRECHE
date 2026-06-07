@@ -52,6 +52,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
       setState(() => _birthCertificate = file);
     } else {
       // Fallback to pickDocument if it's not an image (PDF etc)
+      if (!mounted) return;
       final doc = await HybridImagePickerService.pickDocument(context: context);
       if (doc != null) setState(() => _birthCertificate = doc);
     }
@@ -62,6 +63,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     if (file != null) {
       setState(() => _medicalCertificate = file);
     } else {
+      if (!mounted) return;
       final doc = await HybridImagePickerService.pickDocument(context: context);
       if (doc != null) setState(() => _medicalCertificate = doc);
     }
@@ -232,7 +234,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: hasFile ? Colors.green.withOpacity(0.5) : Colors.grey[300]!),
+              border: Border.all(color: hasFile ? Colors.green.withValues(alpha: 0.5) : Colors.grey[300]!),
             ),
             child: hasFile
                 ? ClipRRect(

@@ -110,7 +110,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
         .subscribe();
   }
 
-  void _handleChildChange(RealtimePostgresChangesPayload payload) {
+  void _handleChildChange(PostgresChangePayload payload) {
     final eventType = payload.eventType;
     final Map<String, dynamic> data = payload.newRecord;
     final Map<String, dynamic> oldData = payload.oldRecord;
@@ -133,7 +133,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void _handleEnrollmentChange(RealtimePostgresChangesPayload payload) {
+  void _handleEnrollmentChange(PostgresChangePayload payload) {
     final eventType = payload.eventType;
     final Map<String, dynamic> data = payload.newRecord;
     final Map<String, dynamic> oldData = payload.oldRecord;
@@ -156,7 +156,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void _handleActivityChange(RealtimePostgresChangesPayload payload) {
+  void _handleActivityChange(PostgresChangePayload payload) {
     final eventType = payload.eventType;
     final Map<String, dynamic> data = payload.newRecord;
     final Map<String, dynamic> oldData = payload.oldRecord;
