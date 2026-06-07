@@ -21,6 +21,23 @@ abstract class AdminSupabaseService {
 class SupabaseCourseService extends AdminSupabaseService {
   static const String _tableName = 'courses';
 
+  Stream<List<CourseModel>> getCoursesStream() {
+    return adminClient
+        .from(_tableName)
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .map((data) => data.map((json) => CourseModel.fromSupabase(json)).toList());
+  }
+
+  Stream<List<CourseModel>> getUserCoursesStream(String userId) {
+    return adminClient
+        .from(_tableName)
+        .stream(primaryKey: ['id'])
+        .eq('created_by', userId)
+        .order('created_at', ascending: false)
+        .map((data) => data.map((json) => CourseModel.fromSupabase(json)).toList());
+  }
+
   Future<List<CourseModel>> getCourses({
     CourseCategory? category,
     CourseSeason? season,
@@ -172,6 +189,31 @@ class SupabaseCourseService extends AdminSupabaseService {
 }
 
 class SupabaseChildService extends AdminSupabaseService {
+  Stream<List<ChildModel>> getChildrenStream(String parentId) {
+    return adminClient
+        .from('children')
+        .stream(primaryKey: ['id'])
+        .eq('parent_id', parentId)
+        .map((data) => data.where((json) => json['is_active'] == true).map((json) => ChildModel.fromSupabase(json)).toList());
+  }
+
+  Stream<List<EnrollmentModel>> getEnrollmentsStream(String parentId) {
+    return adminClient
+        .from('enrollments')
+        .stream(primaryKey: ['id'])
+        .eq('parent_id', parentId)
+        .map((data) => data.map((json) => EnrollmentModel.fromSupabase(json)).toList());
+  }
+
+  Stream<List<DailyActivity>> getDailyActivitiesStream(String parentId, DateTime date) {
+    final dateStr = date.toIso8601String().split('T')[0];
+    return adminClient
+        .from('daily_activities')
+        .stream(primaryKey: ['id'])
+        .eq('date', dateStr)
+        .map((data) => data.map((json) => DailyActivity.fromSupabase(json)).toList());
+  }
+
   Future<List<ChildModel>> getChildren(String parentId) async {
     final response = await adminClient.from('children').select().eq('parent_id', parentId).eq('is_active', true);
     return response.map((data) => ChildModel.fromSupabase(data)).toList();
@@ -245,6 +287,13 @@ class SupabaseChildService extends AdminSupabaseService {
 }
 
 extension SupabaseChildServiceSchedules on SupabaseChildService {
+  Stream<List<SessionSchedule>> getSchedulesByOwnerStream(String ownerId) {
+    return adminClient
+        .from('session_schedules')
+        .stream(primaryKey: ['id'])
+        .map((data) => data.map((json) => SessionSchedule.fromSupabase(json)).toList());
+  }
+
   Future<List<SessionSchedule>> getSchedulesByOwner(String ownerId) async {
     final coursesResponse = await adminClient.from('courses').select('id').eq('created_by', ownerId);
     final courseIds = (coursesResponse as List).map((c) => c['id'] as String).toList();

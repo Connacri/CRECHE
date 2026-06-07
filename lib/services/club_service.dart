@@ -2,6 +2,15 @@ import 'supabase_service.dart';
 import '../models/user_model.dart';
 
 class ClubService extends AdminSupabaseService {
+  Stream<List<Map<String, dynamic>>> getClubMembersStream(String clubId) {
+    return adminClient
+        .from('members')
+        .stream(primaryKey: ['id'])
+        .eq('club_id', clubId)
+        .order('created_at', ascending: false)
+        .map((data) => data.cast<Map<String, dynamic>>());
+  }
+
   /// Récupère les cours créés par le club
   Future<List<Map<String, dynamic>>> getClubCourses(String clubId) async {
     final response = await adminClient

@@ -2,11 +2,44 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 
 class HybridImagePickerService {
-  /// Sélectionne une image en utilisant FilePicker (plus stable que ImagePicker sur certains appareils)
+  static final ImagePicker _picker = ImagePicker();
+
+  /// Sélectionne une image en utilisant ImagePicker (Standard pour Android/iOS)
   static Future<File?> pickImage({
+    bool crop = false,
+    CropAspectRatio? aspectRatio,
+    required BuildContext context,
+    ImageSource source = ImageSource.gallery,
+  }) async {
+    try {
+      final XFile? pickedXFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (pickedXFile == null) return null;
+
+      File pickedFile = File(pickedXFile.path);
+
+      if (crop) {
+        return await _cropImage(pickedFile, aspectRatio: aspectRatio, context: context);
+      }
+
+      return pickedFile;
+    } catch (e) {
+      debugPrint('❌ [HybridPicker] Erreur ImagePicker: $e');
+      // Fallback vers FilePicker si ImagePicker échoue (rare mais possible sur certains Android modifiés)
+      return await _fallbackPickImage(crop: crop, aspectRatio: aspectRatio, context: context);
+    }
+  }
+
+  static Future<File?> _fallbackPickImage({
     bool crop = false,
     CropAspectRatio? aspectRatio,
     required BuildContext context,
@@ -27,13 +60,37 @@ class HybridImagePickerService {
 
       return pickedFile;
     } catch (e) {
-      debugPrint('❌ [HybridPicker] Erreur: $e');
+      debugPrint('❌ [HybridPicker] Erreur Fallback: $e');
       return null;
     }
   }
 
   static Future<File?> pickProfileImage({required BuildContext context}) async {
+    // Proposer le choix entre Caméra et Galerie
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galerie'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Appareil photo'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return null;
+
     return await pickImage(
+      source: source,
       crop: true,
       aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
       context: context,
@@ -59,7 +116,6 @@ class HybridImagePickerService {
   }
 
   static Future<File?> _cropImage(File file, {CropAspectRatio? aspectRatio, required BuildContext context}) async {
-    // 🛡️ Le cropping n'est pas supporté nativement par image_cropper sur Windows
     if (!kIsWeb && Platform.isWindows) {
       debugPrint('ℹ️ [HybridPicker] Cropping non supporté sur Windows, retour du fichier original.');
       return file;
@@ -75,7 +131,7 @@ class HybridImagePickerService {
             toolbarColor: Theme.of(context).primaryColor,
             toolbarWidgetColor: Colors.white,
             initAspectRatio: CropAspectRatioPreset.original,
-            lockAspectRatio: false,
+            lockAspectRatio: aspectRatio != null,
           ),
           IOSUiSettings(title: 'Recadrer'),
         ],
@@ -83,7 +139,7 @@ class HybridImagePickerService {
       return croppedFile != null ? File(croppedFile.path) : null;
     } catch (e) {
       debugPrint('❌ [HybridPicker] Erreur crop: $e');
-      return file; // Retourner l'original si le crop échoue
+      return file;
     }
   }
 }

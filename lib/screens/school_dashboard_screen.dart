@@ -1,6 +1,3 @@
-
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider_v2.dart';
@@ -8,13 +5,13 @@ import '../providers/course_provider_complete.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../models/user_model.dart';
 import '../models/course_model_complete.dart';
-
-
 import '../models/session_schedule_model.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/add_session_dialog.dart';
 import '../widgets/enrollments_page.dart';
+import '../widgets/my_courses_page.dart';
+import '../widgets/attendance_management_page.dart';
 import 'profile_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
@@ -38,16 +35,18 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
   Widget _buildPage() {
     switch (_selectedIndex) {
       case 0: return const _DashboardOverview();
-      case 1: return const _PlanningManagementPage();
+      case 1: return const MyCoursesPage();
       case 2: return const EnrollmentsPage();
-      case 3: return const ProfileScreen();
+      case 3: return const _PlanningManagementPage();
+      case 4: return const AttendanceManagementPage();
+      case 5: return const ProfileScreen();
       default: return const _DashboardOverview();
     }
   }
 
   Widget _buildBottomNav() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: GlassCard(
         opacity: 0.8,
         borderRadius: BorderRadius.circular(30),
@@ -57,10 +56,16 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
           type: BottomNavigationBarType.fixed,
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() => _selectedIndex = index),
+          selectedItemColor: Theme.of(context).primaryColor,
+          unselectedItemColor: Colors.grey,
+          showSelectedLabels: true,
+          showUnselectedLabels: false,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Stats'),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: 'Planning'),
+            BottomNavigationBarItem(icon: Icon(Icons.school_outlined), activeIcon: Icon(Icons.school), label: 'Cours'),
             BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Inscrits'),
+            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: 'Planning'),
+            BottomNavigationBarItem(icon: Icon(Icons.how_to_reg_outlined), activeIcon: Icon(Icons.how_to_reg), label: 'Présence'),
             BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
           ],
         ),
@@ -213,10 +218,6 @@ class _PlanningManagementPageState extends State<_PlanningManagementPage> {
         } else if (result is SessionSchedule) {
           if (sessionToEdit != null) {
             await provider.updateSchedule(sessionToEdit.id, result.toSupabase());
-            if (context.mounted) {
-               final auth = context.read<AuthProviderV2>();
-               provider.loadOwnerSchedules(auth.currentUser!.uid);
-            }
           } else {
             await provider.createSchedule(result);
           }
@@ -270,6 +271,6 @@ class _TrendChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TrendChartPainter oldDelegate) {
-    return !listEquals(oldDelegate.data, data);
+    return true;
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../models/school_slot_model.dart';
@@ -19,6 +20,23 @@ class SchoolProvider extends ChangeNotifier {
   String? _error;
   String? get error => _error;
 
+  StreamSubscription? _slotsSubscription;
+
+  void subscribeToSchoolSlots(String schoolId) {
+    if (schoolId.isEmpty) return;
+    _slotsSubscription?.cancel();
+    _slotsSubscription = _schoolService.getSchoolSlotsStream(schoolId).listen((data) {
+      _currentSchoolSlots = data;
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _slotsSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> loadSchools() async {
     _setLoading(true);
     try {
@@ -33,7 +51,7 @@ class SchoolProvider extends ChangeNotifier {
   Future<void> loadSchoolSlots(String schoolId) async {
     _setLoading(true);
     try {
-      _currentSchoolSlots = await _schoolService.getAllSchoolSlots(schoolId);
+      subscribeToSchoolSlots(schoolId);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -49,7 +67,6 @@ class SchoolProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await _schoolService.createSlot(slot);
-      await loadSchoolSlots(slot.schoolId);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -61,7 +78,6 @@ class SchoolProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await _schoolService.deleteSlot(slotId);
-      await loadSchoolSlots(schoolId);
     } catch (e) {
       _error = e.toString();
     } finally {

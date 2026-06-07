@@ -1,21 +1,19 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/course_model_complete.dart';
-
-
-
 import '../models/session_schedule_model.dart';
 import '../providers/course_provider_complete.dart';
-
-
+import '../providers/auth_provider_v2.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/enrollments_page.dart';
+import '../widgets/my_courses_page.dart';
+import '../widgets/attendance_management_page.dart';
 import '../services/club_service.dart';
 import 'create_course_screen.dart';
 import 'profile_screen.dart';
-
 
 class CoachDashboardScreen extends StatefulWidget {
   const CoachDashboardScreen({super.key});
@@ -38,16 +36,18 @@ class _CoachDashboardScreenState extends State<CoachDashboardScreen> {
   Widget _buildPage() {
     switch (_selectedIndex) {
       case 0: return const _CoachOverview();
-      case 1: return const EnrollmentsPage();
-      case 2: return const _ClubTimetablePage();
-      case 3: return const ProfileScreen();
+      case 1: return const MyCoursesPage();
+      case 2: return const EnrollmentsPage();
+      case 3: return const _ClubTimetablePage();
+      case 4: return const AttendanceManagementPage();
+      case 5: return const ProfileScreen();
       default: return const _CoachOverview();
     }
   }
 
   Widget _buildBottomNav() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: GlassCard(
         opacity: 0.8,
         borderRadius: BorderRadius.circular(30),
@@ -57,10 +57,16 @@ class _CoachDashboardScreenState extends State<CoachDashboardScreen> {
           type: BottomNavigationBarType.fixed,
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() => _selectedIndex = index),
+          selectedItemColor: Theme.of(context).primaryColor,
+          unselectedItemColor: Colors.grey,
+          showSelectedLabels: true,
+          showUnselectedLabels: false,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Stats'),
+            BottomNavigationBarItem(icon: Icon(Icons.school_outlined), activeIcon: Icon(Icons.school), label: 'Cours'),
             BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Inscrits'),
             BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: 'Planning'),
+            BottomNavigationBarItem(icon: Icon(Icons.how_to_reg_outlined), activeIcon: Icon(Icons.how_to_reg), label: 'Présence'),
             BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
           ],
         ),
@@ -86,7 +92,7 @@ class _CoachOverview extends StatelessWidget {
           children: [
             Expanded(child: _buildStatCard('Mes Cours', courses.length.toString(), Icons.school, Colors.blue)),
             const SizedBox(width: 16),
-            Expanded(child: _buildStatCard('Sessions', '12', Icons.event, Colors.orange)),
+            Expanded(child: _buildStatCard('Sessions', '${provider.schedules.length}', Icons.event, Colors.orange)),
           ],
         ),
         const SizedBox(height: 24),
@@ -127,6 +133,7 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
   final ClubService _clubService = ClubService();
   List<Map<String, dynamic>> _schools = [];
   String? _selectedSchoolId;
+  StreamSubscription? _schedulesSub;
   List<SessionSchedule> _schedules = [];
   List<CourseModel> _allCourses = [];
   bool _isLoading = false;
@@ -138,31 +145,48 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
   }
 
   Future<void> _loadSchools() async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
     try {
       _schools = await _clubService.getSchools();
       if (_schools.isNotEmpty) {
         _selectedSchoolId = _schools.first['id'];
-        await _loadSchedules();
+        _initRealtime();
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _loadSchedules() async {
+  void _initRealtime() {
     final schoolId = _selectedSchoolId;
     if (schoolId == null) return;
-    setState(() => _isLoading = true);
-    try {
-      final response = await _clubService.adminClient.from('session_schedules').select().eq('school_id', schoolId);
-      _schedules = (response as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
 
-      final courseResponse = await _clubService.adminClient.from('courses').select().eq('club_id', schoolId);
-      _allCourses = (courseResponse as List).map((data) => CourseModel.fromSupabase(data)).toList();
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    _schedulesSub?.cancel();
+    _schedulesSub = _clubService.adminClient
+        .from('session_schedules')
+        .stream(primaryKey: ['id'])
+        .eq('school_id', schoolId)
+        .listen((data) {
+          if (mounted) {
+            setState(() {
+              _schedules = data.map((d) => SessionSchedule.fromSupabase(d)).toList();
+            });
+          }
+        });
+
+    _clubService.adminClient.from('courses').select().eq('club_id', schoolId).then((res) {
+      if (mounted) {
+        setState(() {
+          _allCourses = (res as List).map((d) => CourseModel.fromSupabase(d)).toList();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _schedulesSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -172,11 +196,13 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
         Padding(
           padding: const EdgeInsets.all(24),
           child: DropdownButtonFormField<String>(
-            initialValue: _selectedSchoolId,
+            value: _selectedSchoolId,
             items: _schools.map((s) => DropdownMenuItem<String>(value: s["id"].toString(), child: Text(s["name"]?.toString() ?? "Inconnu"))).toList(),
             onChanged: (val) {
-              _selectedSchoolId = val;
-              _loadSchedules();
+              setState(() {
+                _selectedSchoolId = val;
+                _initRealtime();
+              });
             },
             decoration: const InputDecoration(labelText: 'Sélectionner un Club'),
           ),

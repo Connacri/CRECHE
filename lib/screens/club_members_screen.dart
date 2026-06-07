@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -18,31 +19,48 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
   bool _isLoading = true;
   String? _error;
   String _filter = 'all';
+  StreamSubscription? _membersSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadMembers();
+    _initRealtime();
   }
 
-  Future<void> _loadMembers() async {
-    setState(() => _isLoading = true);
-    try {
-      final auth = context.read<AuthProviderV2>();
-      final userId = auth.currentUser!.uid;
+  void _initRealtime() {
+    final auth = context.read<AuthProviderV2>();
+    final clubId = auth.currentUser!.uid;
 
-      final members = await _clubService.getClubMembers(userId);
+    _membersSubscription?.cancel();
+    _membersSubscription = _clubService.getClubMembersStream(clubId).listen((data) async {
+       // Since the stream only returns 'members' table, and we need user details,
+       // in a real app we might use a more complex stream or join in a view.
+       // For this expert fix, we'll fetch full details when the list changes.
+       try {
+         final fullDetails = await _clubService.getClubMembers(clubId);
+         if (mounted) {
+           setState(() {
+             _members = fullDetails;
+             _isLoading = false;
+           });
+         }
+       } catch (e) {
+          if (mounted) setState(() => _error = e.toString());
+       }
+    }, onError: (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    });
+  }
 
-      setState(() {
-        _members = members;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-    }
+  @override
+  void dispose() {
+    _membersSubscription?.cancel();
+    super.dispose();
   }
 
   List<Map<String, dynamic>> get _filteredMembers {
@@ -53,10 +71,9 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
   String _statusLabel(String status) {
     switch (status) {
       case 'active': return 'Actif';
-      case 'expired': return 'Expiré';
-      case 'suspended': return 'Suspendu';
+      case 'inactive': return 'Inactif';
       case 'pending': return 'En attente';
-      case 'cancelled': return 'Annulé';
+      case 'suspended': return 'Suspendu';
       default: return status;
     }
   }
@@ -64,10 +81,9 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
   Color _statusColor(String status) {
     switch (status) {
       case 'active': return Colors.green;
-      case 'expired': return Colors.red;
-      case 'suspended': return Colors.orange;
-      case 'pending': return Colors.blue;
-      case 'cancelled': return Colors.grey;
+      case 'inactive': return Colors.grey;
+      case 'pending': return Colors.orange;
+      case 'suspended': return Colors.red;
       default: return Colors.grey;
     }
   }
@@ -76,10 +92,8 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
     switch (type) {
       case 'standard': return 'Standard';
       case 'premium': return 'Premium';
-      case 'family': return 'Famille';
+      case 'vip': return 'VIP';
       case 'trial': return 'Essai';
-      case 'honorary': return 'Honoraire';
-      case 'reduced': return 'Réduit';
       default: return type;
     }
   }
@@ -88,7 +102,7 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Adhérents (${_members.length})'),
+        title: const Text('Adhérents du club'),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add),
@@ -106,8 +120,8 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
   }
 
   Widget _buildFilterBar() {
-    final filters = ['all', 'active', 'pending', 'expired'];
-    final labels = ['Tous', 'Actifs', 'En attente', 'Expirés'];
+    final filters = ['all', 'active', 'pending', 'inactive'];
+    final labels = ['Tous', 'Actifs', 'En attente', 'Inactifs'];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: SingleChildScrollView(
@@ -140,7 +154,7 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
             const SizedBox(height: 16),
             Text('Erreur: $_error'),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadMembers, child: const Text('Réessayer')),
+            ElevatedButton(onPressed: _initRealtime, child: const Text('Réessayer')),
           ],
         ),
       );
@@ -159,11 +173,10 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _loadMembers,
+      onRefresh: () async => _initRealtime(),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: members.length,
-        prototypeItem: _buildMemberPrototype(),
         itemBuilder: (context, index) {
           final member = members[index];
           final user = member['user'] as Map<String, dynamic>?;
@@ -247,59 +260,6 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
     );
   }
 
-  /// Prototype used by ListView.builder to pre-calculate scroll extent.
-  /// Performance Metric: Reduces layout time for long lists from O(N) to O(1) for scroll extent calculation.
-  Widget _buildMemberPrototype() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const CircleAvatar(
-                  radius: 24,
-                  child: Icon(Icons.person),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Prototype Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text('N° 000000', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'Statut',
-                    style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _chip(Icons.card_membership, 'Standard'),
-                const SizedBox(width: 8),
-                _chip(Icons.event, 'Fin: 2024-01-01'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showAddMemberDialog() {
     List<Map<String, dynamic>> searchResults = [];
     bool isSearching = false;
@@ -352,7 +312,6 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
                               );
                               if (context.mounted) {
                                 Navigator.pop(context);
-                                _loadMembers();
                               }
                             },
                           ),
