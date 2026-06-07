@@ -124,13 +124,13 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedCourseId,
+                initialValue: _selectedCourseId,
                 items: widget.courses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.title))).toList(),
                 onChanged: (val) => setState(() => _selectedCourseId = val!),
                 decoration: const InputDecoration(labelText: 'Cours'),
               ),
               DropdownButtonFormField<DayOfWeek>(
-                value: _selectedDay,
+                initialValue: _selectedDay,
                 items: DayOfWeek.values.map((d) => DropdownMenuItem(value: d, child: Text(d.displayName))).toList(),
                 onChanged: (val) => setState(() => _selectedDay = val!),
                 decoration: const InputDecoration(labelText: 'Jour'),
@@ -155,7 +155,7 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
                 ],
               ),
               DropdownButtonFormField<String?>(
-                value: _selectedCoachId,
+                initialValue: _selectedCoachId,
                 items: [
                   const DropdownMenuItem(value: null, child: Text('Non assigné')),
                   ...widget.coaches.map((c) => DropdownMenuItem(value: c.uid, child: Text(c.name))),
