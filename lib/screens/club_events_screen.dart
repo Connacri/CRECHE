@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../providers/auth_provider_v2.dart';
 import '../services/event_service.dart';
 import '../widgets/glass_card.dart';
-import '../providers/auth_provider_v2.dart';
 import 'create_event_screen.dart';
 import 'event_detail_screen.dart';
 
@@ -14,34 +16,45 @@ class ClubEventsScreen extends StatefulWidget {
 }
 
 class _ClubEventsScreenState extends State<ClubEventsScreen> {
-  final _eventService = EventService();
+  final EventService _eventService = EventService();
   List<Map<String, dynamic>> _events = [];
   bool _isLoading = true;
   String? _error;
   String _filter = 'all';
+  StreamSubscription? _eventsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadEvents();
+    _initRealtime();
   }
 
-  Future<void> _loadEvents() async {
-    setState(() => _isLoading = true);
-    try {
-      final auth = context.read<AuthProviderV2>();
-      final userId = auth.currentUser!.uid;
-      final events = await _eventService.getClubEvents(userId);
-      setState(() {
-        _events = events;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-    }
+  void _initRealtime() {
+    final auth = context.read<AuthProviderV2>();
+    final userId = auth.currentUser!.uid;
+
+    _eventsSubscription?.cancel();
+    _eventsSubscription = _eventService.getClubEventsStream(userId).listen((data) {
+      if (mounted) {
+        setState(() {
+          _events = data;
+          _isLoading = false;
+        });
+      }
+    }, onError: (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _eventsSubscription?.cancel();
+    super.dispose();
   }
 
   List<Map<String, dynamic>> get _filteredEvents {
@@ -92,11 +105,11 @@ class _ClubEventsScreenState extends State<ClubEventsScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () async {
-              final result = await Navigator.push<bool>(
+              await Navigator.push<bool>(
                 context,
                 MaterialPageRoute(builder: (_) => const CreateEventScreen()),
               );
-              if (result == true) _loadEvents();
+              // Pas besoin de recharger manuellement car Realtime s'en charge
             },
           ),
         ],
@@ -145,7 +158,7 @@ class _ClubEventsScreenState extends State<ClubEventsScreen> {
             const SizedBox(height: 16),
             Text('Erreur: $_error'),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadEvents, child: const Text('Réessayer')),
+            ElevatedButton(onPressed: _initRealtime, child: const Text('Réessayer')),
           ],
         ),
       );
@@ -162,11 +175,10 @@ class _ClubEventsScreenState extends State<ClubEventsScreen> {
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () async {
-                final result = await Navigator.push<bool>(
+                await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(builder: (_) => const CreateEventScreen()),
                 );
-                if (result == true) _loadEvents();
               },
               icon: const Icon(Icons.add),
               label: const Text('Créer un événement'),
@@ -176,7 +188,7 @@ class _ClubEventsScreenState extends State<ClubEventsScreen> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _loadEvents,
+      onRefresh: () async => _initRealtime(),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: events.length,
@@ -193,7 +205,6 @@ class _ClubEventsScreenState extends State<ClubEventsScreen> {
                   builder: (_) => EventDetailScreen(eventId: event['id']),
                 ),
               );
-              _loadEvents();
             },
           );
         },

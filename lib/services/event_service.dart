@@ -1,6 +1,14 @@
 import 'supabase_service.dart';
 
 class EventService extends AdminSupabaseService {
+  Stream<List<Map<String, dynamic>>> getClubEventsStream(String clubId) {
+    return adminClient
+        .from('events')
+        .stream(primaryKey: ['id'])
+        .order('start_date', ascending: false)
+        .map((data) => data.where((e) => e['club_id'] == clubId || e['created_by'] == clubId).toList());
+  }
+
   Future<List<Map<String, dynamic>>> getClubEvents(String clubId) async {
     final response = await adminClient
         .from('events')

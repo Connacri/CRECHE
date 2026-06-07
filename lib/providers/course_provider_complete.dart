@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/course_model_complete.dart';
@@ -42,6 +43,46 @@ class CourseProvider extends ChangeNotifier {
   bool _hasMoreCourses = true;
   bool get hasMoreCourses => _hasMoreCourses;
 
+  StreamSubscription? _coursesSubscription;
+  StreamSubscription? _userCoursesSubscription;
+  StreamSubscription? _schedulesSubscription;
+
+  CourseProvider() {
+    _initRealtime();
+  }
+
+  void _initRealtime() {
+    _coursesSubscription?.cancel();
+    _coursesSubscription = _courseService.getCoursesStream().listen((data) {
+      _courses = data;
+      notifyListeners();
+    });
+  }
+
+  void subscribeToUserCourses(String userId) {
+    _userCoursesSubscription?.cancel();
+    _userCoursesSubscription = _courseService.getUserCoursesStream(userId).listen((data) {
+      _userCourses = data;
+      notifyListeners();
+    });
+  }
+
+  void subscribeToOwnerSchedules(String ownerId) {
+    _schedulesSubscription?.cancel();
+    _schedulesSubscription = _childService.getSchedulesByOwnerStream(ownerId).listen((data) {
+      _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _coursesSubscription?.cancel();
+    _userCoursesSubscription?.cancel();
+    _schedulesSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> loadCourses({bool refresh = false}) async {
     if (_isLoading) return;
     if (refresh) {
@@ -62,7 +103,6 @@ class CourseProvider extends ChangeNotifier {
         _hasMoreCourses = false;
       }
       if (newCourses.isNotEmpty) {
-        _courses.addAll(newCourses);
         _lastDocumentTimestamp = newCourses.last.createdAt;
       }
       _setLoading(false);
@@ -108,14 +148,16 @@ class CourseProvider extends ChangeNotifier {
         location: location,
         images: [],
         createdBy: currentUserId,
-        clubId: clubId,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: true,
+        clubId: clubId,
         maxStudents: maxStudents,
-        currentStudents: 0,
         tags: tags,
-        metadata: metadata,
+        metadata: {
+           ...?metadata,
+           'currency': currency,
+        },
       );
 
       final courseId = await _courseService.createCourse(newCourse);
@@ -141,15 +183,8 @@ class CourseProvider extends ChangeNotifier {
         );
       }
 
-      final createdCourse = await _courseService.getCourse(courseId);
-      if (createdCourse != null) {
-        _courses.insert(0, createdCourse);
-        _userCourses.insert(0, createdCourse);
-      }
-
       _setLoading(false);
       _setUploadProgress(0.0);
-      notifyListeners();
       return true;
     } catch (e) {
       _setError('Erreur lors de la création: $e');
@@ -218,14 +253,8 @@ class CourseProvider extends ChangeNotifier {
 
       await _courseService.updateCourse(courseId, updates);
 
-      final updatedCourse = await _courseService.getCourse(courseId);
-      if (updatedCourse != null) {
-        _updateLocalCourse(updatedCourse);
-      }
-
       _setLoading(false);
       _setUploadProgress(0.0);
-      notifyListeners();
       return true;
     } catch (e) {
       _setError('Erreur lors de la mise à jour: $e');
@@ -242,11 +271,7 @@ class CourseProvider extends ChangeNotifier {
         await _imageService.deleteMultipleImages(course.images, courseId);
       }
       await _courseService.deleteCourse(courseId);
-      _courses.removeWhere((c) => c.id == courseId);
-      _userCourses.removeWhere((c) => c.id == courseId);
-      if (_selectedCourse?.id == courseId) _selectedCourse = null;
       _setLoading(false);
-      notifyListeners();
       return true;
     } catch (e) {
       _setError('Erreur lors de la suppression: $e');
@@ -258,7 +283,7 @@ class CourseProvider extends ChangeNotifier {
   Future<void> loadUserCourses(String userId) async {
     try {
       _setLoading(true);
-      _userCourses = await _courseService.getUserCourses(userId);
+      subscribeToUserCourses(userId);
       _setLoading(false);
     } catch (e) {
       _setError('Erreur lors du chargement des cours utilisateur: $e');
@@ -287,7 +312,6 @@ class CourseProvider extends ChangeNotifier {
           courseId,
           {'images': updatedImages.map((img) => img.toMap()).toList()},
         );
-        _updateLocalCourse(course.copyWith(images: updatedImages));
       }
       return true;
     } catch (e) {
@@ -369,7 +393,7 @@ class CourseProvider extends ChangeNotifier {
   Future<void> loadOwnerSchedules(String ownerId) async {
     try {
       _setLoading(true);
-      _schedules = await _childService.getSchedulesByOwner(ownerId);
+      subscribeToOwnerSchedules(ownerId);
       _setLoading(false);
     } catch (e) {
       _setError("Erreur chargement planning: $e");
@@ -380,11 +404,8 @@ class CourseProvider extends ChangeNotifier {
   Future<bool> createSchedule(SessionSchedule schedule) async {
     try {
       _setLoading(true);
-      final id = await _childService.createSchedule(schedule);
-      final newSchedule = schedule.copyWith(id: id);
-      _schedules.add(newSchedule);
+      await _childService.createSchedule(schedule);
       _setLoading(false);
-      notifyListeners();
       return true;
     } catch (e) {
       _setError("Erreur création session: $e");
@@ -410,9 +431,7 @@ class CourseProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       await _childService.deleteSchedule(id);
-      _schedules.removeWhere((s) => s.id == id);
       _setLoading(false);
-      notifyListeners();
       return true;
     } catch (e) {
       _setError("Erreur suppression session: $e");
@@ -422,6 +441,9 @@ class CourseProvider extends ChangeNotifier {
   }
 
   void clearCourses() {
+    _coursesSubscription?.cancel();
+    _userCoursesSubscription?.cancel();
+    _schedulesSubscription?.cancel();
     _schedules.clear();
     _coaches.clear();
     _courses.clear();
@@ -448,12 +470,5 @@ class CourseProvider extends ChangeNotifier {
 
   void _setUploadProgress(double progress) {
     uploadProgressNotifier.value = progress;
-  }
-
-  void _updateLocalCourse(CourseModel updatedCourse) {
-    final index = _courses.indexWhere((c) => c.id == updatedCourse.id);
-    if (index != -1) _courses[index] = updatedCourse;
-    final userIndex = _userCourses.indexWhere((c) => c.id == updatedCourse.id);
-    if (userIndex != -1) _userCourses[userIndex] = updatedCourse;
   }
 }

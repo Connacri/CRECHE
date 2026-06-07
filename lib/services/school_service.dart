@@ -4,6 +4,15 @@ import '../models/session_schedule_model.dart';
 import 'supabase_service.dart';
 
 class SupabaseSchoolService extends AdminSupabaseService {
+  Stream<List<SchoolSlotModel>> getSchoolSlotsStream(String schoolId) {
+    return adminClient
+        .from('school_available_slots')
+        .stream(primaryKey: ['id'])
+        .eq('school_id', schoolId)
+        .order('day_of_week', ascending: true)
+        .map((data) => data.map((json) => SchoolSlotModel.fromSupabase(json)).toList());
+  }
+
   Future<List<UserModel>> getSchools() async {
     try {
       final response = await adminClient.rpc('get_schools');

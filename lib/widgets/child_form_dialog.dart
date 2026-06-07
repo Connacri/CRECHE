@@ -8,10 +8,10 @@ import '../providers/child_enrollment_provider.dart';
 import '../services/hybrid_image_picker.dart';
 
 class ChildFormDialog extends StatefulWidget {
-  final ChildModel? child;
   final String parentId;
+  final ChildModel? child;
 
-  const ChildFormDialog({super.key, this.child, required this.parentId});
+  const ChildFormDialog({super.key, required this.parentId, this.child});
 
   @override
   State<ChildFormDialog> createState() => _ChildFormDialogState();
@@ -23,7 +23,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   late TextEditingController _lastNameController;
   late TextEditingController _schoolGradeController;
   DateTime? _dateOfBirth;
-  ChildGender _gender = ChildGender.other;
+  ChildGender _gender = ChildGender.male;
   File? _photo;
   File? _birthCertificate;
   File? _medicalCertificate;
@@ -36,7 +36,15 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     _lastNameController = TextEditingController(text: widget.child?.lastName);
     _schoolGradeController = TextEditingController(text: widget.child?.schoolGrade);
     _dateOfBirth = widget.child?.dateOfBirth;
-    _gender = widget.child?.gender ?? ChildGender.other;
+    if (widget.child != null) _gender = widget.child!.gender;
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _schoolGradeController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
@@ -47,12 +55,10 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   }
 
   Future<void> _pickBirthCertificate() async {
-    final file = await HybridImagePickerService.pickImage(context: context, crop: false); // Use pickImage to have preview
+    final file = await HybridImagePickerService.pickImage(context: context, crop: false);
     if (file != null) {
       setState(() => _birthCertificate = file);
     } else {
-      // Fallback to pickDocument if it's not an image (PDF etc)
-      if (!mounted) return;
       final doc = await HybridImagePickerService.pickDocument(context: context);
       if (doc != null) setState(() => _birthCertificate = doc);
     }
@@ -98,6 +104,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     } else {
       success = await provider.updateChild(
         childId: widget.child!.id,
+        parentId: widget.parentId,
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         dateOfBirth: _dateOfBirth,
@@ -170,7 +177,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<ChildGender>(
-                initialValue: _gender,
+                value: _gender,
                 decoration: const InputDecoration(labelText: 'Genre'),
                 items: ChildGender.values.map((g) => DropdownMenuItem(
                   value: g,

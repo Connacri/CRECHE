@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/child_model_complete.dart';
@@ -7,7 +8,6 @@ import '../models/session_schedule_model.dart';
 import '../services/supabase_service.dart';
 import '../services/image_storage_service.dart';
 import '../services/club_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChildEnrollmentProvider with ChangeNotifier {
   final SupabaseChildService _supabaseChildService = SupabaseChildService();
@@ -26,6 +26,9 @@ class ChildEnrollmentProvider with ChangeNotifier {
   List<DailyActivity> _dailyActivities = [];
   List<DailyActivity> get dailyActivities => _dailyActivities;
 
+  List<Map<String, dynamic>> _ownerEnrollmentsDetailed = [];
+  List<Map<String, dynamic>> get ownerEnrollmentsDetailed => _ownerEnrollmentsDetailed;
+
   final Map<String, Map<String, dynamic>> _childrenLocations = {};
 
   bool _isLoading = false;
@@ -34,256 +37,158 @@ class ChildEnrollmentProvider with ChangeNotifier {
   String? _error;
   String? get error => _error;
 
-  // Realtime Subscriptions
-  RealtimeChannel? _childrenChannel;
-  RealtimeChannel? _enrollmentsChannel;
-  RealtimeChannel? _activitiesChannel;
-  RealtimeChannel? _schedulesChannel;
+  StreamSubscription? _childrenSubscription;
+  StreamSubscription? _enrollmentsSubscription;
+  StreamSubscription? _activitiesSubscription;
+  StreamSubscription? _ownerSchedulesSubscription;
+  StreamSubscription? _ownerEnrollmentsSubscription;
+
+  void subscribeToParentData(String parentId) {
+    if (parentId.isEmpty) return;
+
+    _childrenSubscription?.cancel();
+    _childrenSubscription = _supabaseChildService.getChildrenStream(parentId).listen((data) {
+      _children = data;
+      notifyListeners();
+    });
+
+    _enrollmentsSubscription?.cancel();
+    _enrollmentsSubscription = _supabaseChildService.getEnrollmentsStream(parentId).listen((data) {
+      _enrollments = data;
+      notifyListeners();
+    });
+  }
+
+  void subscribeToDailyActivities(String parentId, DateTime date) {
+    _activitiesSubscription?.cancel();
+    _activitiesSubscription = _supabaseChildService.getDailyActivitiesStream(parentId, date).listen((data) {
+      _dailyActivities = data;
+      notifyListeners();
+    });
+  }
+
+  void subscribeToOwnerSchedules(String ownerId) {
+    _ownerSchedulesSubscription?.cancel();
+    _ownerSchedulesSubscription = _supabaseChildService.getSchedulesByOwnerStream(ownerId).listen((data) {
+       _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
+       notifyListeners();
+    });
+  }
+
+  void subscribeToOwnerEnrollments(String ownerId) {
+    if (ownerId.isEmpty) return;
+    _ownerEnrollmentsSubscription?.cancel();
+    _ownerEnrollmentsSubscription = _supabaseChildService.adminClient
+        .from('enrollments')
+        .stream(primaryKey: ['id'])
+        .listen((_) {
+          loadOwnerEnrollmentsDetailed(ownerId);
+        });
+  }
 
   @override
   void dispose() {
-    _childrenChannel?.unsubscribe();
-    _enrollmentsChannel?.unsubscribe();
-    _activitiesChannel?.unsubscribe();
-    _schedulesChannel?.unsubscribe();
+    _childrenSubscription?.cancel();
+    _enrollmentsSubscription?.cancel();
+    _activitiesSubscription?.cancel();
+    _ownerSchedulesSubscription?.cancel();
+    _ownerEnrollmentsSubscription?.cancel();
     super.dispose();
   }
 
-  void setupRealtimeListeners(String parentId) {
-    if (parentId.isEmpty) return;
-
-    // 1. Children Listener
-    _childrenChannel?.unsubscribe();
-    _childrenChannel = _supabaseChildService.adminClient
-        .channel('public:children:parent=$parentId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'children',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'parent_id',
-            value: parentId,
-          ),
-          callback: (payload) {
-            _handleChildChange(payload);
-          },
-        )
-        .subscribe();
-
-    // 2. Enrollments Listener
-    _enrollmentsChannel?.unsubscribe();
-    _enrollmentsChannel = _supabaseChildService.adminClient
-        .channel('public:enrollments:parent=$parentId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'enrollments',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'parent_id',
-            value: parentId,
-          ),
-          callback: (payload) {
-            _handleEnrollmentChange(payload);
-          },
-        )
-        .subscribe();
-
-    // 3. Daily Activities Listener
-    _activitiesChannel?.unsubscribe();
-    _activitiesChannel = _supabaseChildService.adminClient
-        .channel('public:daily_activities:parent=$parentId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'daily_activities',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'parent_id',
-            value: parentId,
-          ),
-          callback: (payload) {
-            _handleActivityChange(payload);
-          },
-        )
-        .subscribe();
-  }
-
-  void _handleChildChange(PostgresChangePayload payload) {
-    final eventType = payload.eventType;
-    final Map<String, dynamic> data = payload.newRecord;
-    final Map<String, dynamic> oldData = payload.oldRecord;
-
-    if (eventType == PostgresChangeEvent.insert) {
-      final newChild = ChildModel.fromSupabase(data);
-      if (!_children.any((c) => c.id == newChild.id)) {
-        _children.add(newChild);
-      }
-    } else if (eventType == PostgresChangeEvent.update) {
-      final updatedChild = ChildModel.fromSupabase(data);
-      final index = _children.indexWhere((c) => c.id == updatedChild.id);
-      if (index != -1) {
-        _children[index] = updatedChild;
-      }
-    } else if (eventType == PostgresChangeEvent.delete) {
-      final id = oldData['id'];
-      _children.removeWhere((c) => c.id == id);
-    }
-    notifyListeners();
-  }
-
-  void _handleEnrollmentChange(PostgresChangePayload payload) {
-    final eventType = payload.eventType;
-    final Map<String, dynamic> data = payload.newRecord;
-    final Map<String, dynamic> oldData = payload.oldRecord;
-
-    if (eventType == PostgresChangeEvent.insert) {
-      final newEnrollment = EnrollmentModel.fromSupabase(data);
-      if (!_enrollments.any((e) => e.id == newEnrollment.id)) {
-        _enrollments.add(newEnrollment);
-      }
-    } else if (eventType == PostgresChangeEvent.update) {
-      final updatedEnrollment = EnrollmentModel.fromSupabase(data);
-      final index = _enrollments.indexWhere((e) => e.id == updatedEnrollment.id);
-      if (index != -1) {
-        _enrollments[index] = updatedEnrollment;
-      }
-    } else if (eventType == PostgresChangeEvent.delete) {
-      final id = oldData['id'];
-      _enrollments.removeWhere((e) => e.id == id);
-    }
-    notifyListeners();
-  }
-
-  void _handleActivityChange(PostgresChangePayload payload) {
-    final eventType = payload.eventType;
-    final Map<String, dynamic> data = payload.newRecord;
-    final Map<String, dynamic> oldData = payload.oldRecord;
-
-    if (eventType == PostgresChangeEvent.insert) {
-      final newActivity = DailyActivity.fromSupabase(data);
-      if (!_dailyActivities.any((a) => a.id == newActivity.id)) {
-        _dailyActivities.add(newActivity);
-      }
-    } else if (eventType == PostgresChangeEvent.update) {
-      final updatedActivity = DailyActivity.fromSupabase(data);
-      final index = _dailyActivities.indexWhere((a) => a.id == updatedActivity.id);
-      if (index != -1) {
-        _dailyActivities[index] = updatedActivity;
-      }
-    } else if (eventType == PostgresChangeEvent.delete) {
-      final id = oldData['id'];
-      _dailyActivities.removeWhere((a) => a.id == id);
-    }
-    notifyListeners();
-  }
+  void setupRealtimeListeners(String parentId) => subscribeToParentData(parentId);
 
   Future<bool> addChild({
-    required String parentId,
     required String firstName,
     required String lastName,
     required DateTime dateOfBirth,
     required ChildGender gender,
-    String? schoolGrade,
-    MedicalInfo? medicalInfo,
+    required String parentId,
     File? photoFile,
     File? birthCertificateFile,
     File? medicalCertificateFile,
+    String? schoolGrade,
+    String? medicalInfo,
   }) async {
     try {
       _setLoading(true);
-      String? finalPhotoUrl;
-      if (photoFile != null) finalPhotoUrl = await _imageService.uploadImage(photoFile, 'children_photos');
+      String? photoUrl;
+      String? birthCertUrl;
+      String? medicalCertUrl;
 
-      String? birthCertificateUrl;
-      if (birthCertificateFile != null) birthCertificateUrl = await _imageService.uploadFile(birthCertificateFile, 'certificates');
+      final tempChildId = 'temp_\${DateTime.now().millisecondsSinceEpoch}';
 
-      String? medicalCertificateUrl;
-      if (medicalCertificateFile != null) medicalCertificateUrl = await _imageService.uploadFile(medicalCertificateFile, 'certificates');
+      if (photoFile != null) photoUrl = await _imageService.uploadChildPhoto(imageFile: photoFile, userId: parentId, childId: tempChildId);
+      if (birthCertificateFile != null) birthCertUrl = await _imageService.uploadFile(birthCertificateFile, '\$parentId/children/certs');
+      if (medicalCertificateFile != null) medicalCertUrl = await _imageService.uploadFile(medicalCertificateFile, '\$parentId/children/certs');
 
-      final child = ChildModel(
+      final newChild = ChildModel(
         id: '',
-        parentId: parentId,
         firstName: firstName,
         lastName: lastName,
         dateOfBirth: dateOfBirth,
         gender: gender,
-        photoUrl: finalPhotoUrl,
-        birthCertificateUrl: birthCertificateUrl,
-        medicalCertificateUrl: medicalCertificateUrl,
+        parentId: parentId,
+        photoUrl: photoUrl,
+        birthCertificateUrl: birthCertUrl,
+        medicalCertificateUrl: medicalCertUrl,
         schoolGrade: schoolGrade,
-        medicalInfo: medicalInfo ?? MedicalInfo(),
+        medicalInfo: MedicalInfo(additionalNotes: medicalInfo),
+        isActive: true,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now()
       );
-      await _supabaseChildService.createChild(child);
-      await loadChildren(parentId);
+
+      final realId = await _supabaseChildService.createChild(newChild);
+
+      if (photoUrl != null && photoUrl.contains(tempChildId)) {
+        final finalPhotoUrl = await _imageService.uploadChildPhoto(imageFile: photoFile!, userId: parentId, childId: realId);
+        await _supabaseChildService.updateChild(realId, {'photo_url': finalPhotoUrl});
+      }
+
       _setLoading(false);
       return true;
     } catch (e) {
-      _error = 'Erreur lors de l\'ajout: $e'; _setLoading(false);
+      _setLoading(false);
+      _setError('Erreur lors de la création: \$e');
       return false;
     }
   }
 
   Future<bool> updateChild({
     required String childId,
+    required String parentId,
     String? firstName,
     String? lastName,
     DateTime? dateOfBirth,
     ChildGender? gender,
+    String? schoolGrade,
+    String? medicalInfo,
     File? newPhoto,
     File? newBirthCertificate,
     File? newMedicalCertificate,
-    String? schoolGrade,
-    MedicalInfo? medicalInfo,
   }) async {
     try {
       _setLoading(true);
-      final childIndex = _children.indexWhere((c) => c.id == childId);
-      if (childIndex == -1) throw 'Enfant non trouvé';
+      final Map<String, dynamic> updates = {'updated_at': DateTime.now().toIso8601String()};
 
-      String? finalPhotoUrl = _children[childIndex].photoUrl;
-      if (newPhoto != null) finalPhotoUrl = await _imageService.uploadImage(newPhoto, 'children_photos');
+      if (firstName != null) updates['first_name'] = firstName;
+      if (lastName != null) updates['last_name'] = lastName;
+      if (dateOfBirth != null) updates['date_of_birth'] = dateOfBirth.toIso8601String();
+      if (gender != null) updates['gender'] = gender.name;
+      if (schoolGrade != null) updates['school_grade'] = schoolGrade;
+      if (medicalInfo != null) updates['medical_info'] = MedicalInfo(additionalNotes: medicalInfo).toMap();
 
-      String? finalBirthCertUrl = _children[childIndex].birthCertificateUrl;
-      if (newBirthCertificate != null) finalBirthCertUrl = await _imageService.uploadFile(newBirthCertificate, 'certificates');
+      if (newPhoto != null) updates['photo_url'] = await _imageService.uploadChildPhoto(imageFile: newPhoto, userId: parentId, childId: childId);
+      if (newBirthCertificate != null) updates['birth_certificate_url'] = await _imageService.uploadFile(newBirthCertificate, '\$parentId/children/certs');
+      if (newMedicalCertificate != null) updates['medical_certificate_url'] = await _imageService.uploadFile(newMedicalCertificate, '\$parentId/children/certs');
 
-      String? finalMedicalCertUrl = _children[childIndex].medicalCertificateUrl;
-      if (newMedicalCertificate != null) finalMedicalCertUrl = await _imageService.uploadFile(newMedicalCertificate, 'certificates');
-
-      final Map<String, dynamic> updates = {
-        if (firstName != null) 'first_name': firstName,
-        if (lastName != null) 'last_name': lastName,
-        if (dateOfBirth != null) 'date_of_birth': dateOfBirth.toIso8601String(),
-        if (gender != null) 'gender': gender.name,
-        if (finalPhotoUrl != null) 'photo_url': finalPhotoUrl,
-        if (finalBirthCertUrl != null) 'birth_certificate_url': finalBirthCertUrl,
-        if (finalMedicalCertUrl != null) 'medical_certificate_url': finalMedicalCertUrl,
-        if (schoolGrade != null) 'school_grade': schoolGrade,
-        if (medicalInfo != null) 'medical_info': medicalInfo.toMap(),
-        'updated_at': DateTime.now().toIso8601String(),
-      };
       await _supabaseChildService.updateChild(childId, updates);
-
-      _children[childIndex] = _children[childIndex].copyWith(
-        firstName: firstName,
-        lastName: lastName,
-        dateOfBirth: dateOfBirth,
-        gender: gender,
-        photoUrl: finalPhotoUrl,
-        birthCertificateUrl: finalBirthCertUrl,
-        medicalCertificateUrl: finalMedicalCertUrl,
-        schoolGrade: schoolGrade,
-        medicalInfo: medicalInfo,
-        updatedAt: DateTime.now()
-      );
       _setLoading(false);
       return true;
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
+      _setError('Erreur lors de la mise à jour: \$e');
       return false;
     }
   }
@@ -292,7 +197,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
     try {
       _setLoading(true);
       await _supabaseChildService.softDeleteChild(childId);
-      _children.removeWhere((c) => c.id == childId);
       _setLoading(false);
       return true;
     } catch (e) {
@@ -305,11 +209,11 @@ class ChildEnrollmentProvider with ChangeNotifier {
     if (parentId.isEmpty) return;
     try {
       _setLoading(true);
-      _children = await _supabaseChildService.getChildren(parentId);
+      subscribeToParentData(parentId);
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
-      _setError('Erreur lors du chargement des enfants: $e');
+      _setError('Erreur lors du chargement des enfants: \$e');
     }
   }
 
@@ -328,8 +232,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     if (ownerId.isEmpty) return;
     try {
       _setLoading(true);
-      _enrollments = await _supabaseChildService.getEnrollmentsForOwner(ownerId);
-      await loadOwnerEnrollmentsDetailed(ownerId);
+      subscribeToOwnerEnrollments(ownerId);
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
@@ -369,6 +272,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     EnrollmentStatus? status,
     PaymentStatus? paymentStatus,
     double? paidAmount,
+    dynamic attendanceHistory,
   }) async {
     try {
       _setLoading(true);
@@ -379,17 +283,9 @@ class ChildEnrollmentProvider with ChangeNotifier {
       }
       if (paymentStatus != null) updates['payment_status'] = paymentStatus.name;
       if (paidAmount != null) updates['paid_amount'] = paidAmount;
+      if (attendanceHistory != null) updates['attendance_history'] = attendanceHistory;
 
       await _supabaseChildService.updateEnrollment(enrollmentId, updates);
-
-      final index = _enrollments.indexWhere((e) => e.id == enrollmentId);
-      if (index != -1) {
-        _enrollments[index] = _enrollments[index].copyWith(
-          status: status,
-          paymentStatus: paymentStatus,
-          paidAmount: paidAmount
-        );
-      }
       _setLoading(false);
       return true;
     } catch (e) {
@@ -437,7 +333,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     if (ownerId.isEmpty) return;
     try {
       _setLoading(true);
-      _schedules = await _supabaseChildService.getSchedulesByOwner(ownerId);
+      subscribeToOwnerSchedules(ownerId);
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
@@ -468,7 +364,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
     try {
       _setLoading(true);
       await _supabaseChildService.deleteSchedule(scheduleId);
-      _schedules.removeWhere((s) => s.id == scheduleId);
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
@@ -538,13 +433,13 @@ class ChildEnrollmentProvider with ChangeNotifier {
       final now = DateTime.now();
       for (int i = 0; i < 6; i++) {
         final monthDate = DateTime(now.year, now.month - i, 1);
-        final key = "${monthDate.year}-${monthDate.month.toString().padLeft(2, '0')}";
+        final key = "\${monthDate.year}-\${monthDate.month.toString().padLeft(2, '0')}";
         stats[key] = 0;
       }
 
       for (var e in enrollments) {
         final date = e.enrolledAt;
-        final key = "${date.year}-${date.month.toString().padLeft(2, '0')}";
+        final key = "\${date.year}-\${date.month.toString().padLeft(2, '0')}";
         if (stats.containsKey(key)) {
           stats[key] = stats[key]! + 1;
         }
@@ -561,16 +456,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
     }
   }
 
-  List<Map<String, dynamic>> _ownerEnrollmentsDetailed = [];
-  List<Map<String, dynamic>> get ownerEnrollmentsDetailed => _ownerEnrollmentsDetailed;
-
   Future<void> loadOwnerEnrollmentsDetailed(String ownerId) async {
     try {
-      _setLoading(true);
-      _ownerEnrollmentsDetailed = await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
-      _setLoading(false);
+      final data = await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
+      _ownerEnrollmentsDetailed = data;
+      notifyListeners();
     } catch (e) {
-      _setLoading(false);
     }
   }
 
@@ -581,7 +472,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
   Future<void> loadDailyActivities(String parentId, DateTime date) async {
     try {
       _setLoading(true);
-      _dailyActivities = await _supabaseChildService.getDailyActivities(parentId, date);
+      subscribeToDailyActivities(parentId, date);
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
