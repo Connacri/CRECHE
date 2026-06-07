@@ -49,12 +49,12 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
       _selectedAddress = widget.initialLocation!.address;
       _initialLocationSet = true;
 
-      print('🔵 [LocationPicker] Position initiale fournie: ${initialPosition
+      debugPrint('🔵 [LocationPicker] Position initiale fournie: ${initialPosition
           .latitude}, ${initialPosition.longitude}');
     } else {
       // Position par défaut (Mascara, Algérie) - sera remplacée par la position actuelle
       initialPosition = GeoPoint(latitude: 35.3967, longitude: 0.1403);
-      print('🔵 [LocationPicker] Position par défaut temporaire');
+      debugPrint('🔵 [LocationPicker] Position par défaut temporaire');
     }
 
     // Initialiser le contrôleur de carte
@@ -83,14 +83,14 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
   Future<void> _loadCurrentLocation() async {
     if (!mounted) return;
 
-    print('🔵 [LocationPicker] _loadCurrentLocation - DÉBUT');
+    debugPrint('🔵 [LocationPicker] _loadCurrentLocation - DÉBUT');
     setState(() => _isLoadingCurrentLocation = true);
 
     try {
       final position = await _locationService.getCurrentPosition();
 
       if (position != null && mounted) {
-        print('✅ [LocationPicker] Position obtenue: ${position
+        debugPrint('✅ [LocationPicker] Position obtenue: ${position
             .latitude}, ${position.longitude}');
 
         setState(() {
@@ -110,38 +110,38 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
 
         if (mounted) {
           setState(() => _selectedAddress = address);
-          print('✅ [LocationPicker] Adresse: $address');
+          debugPrint('✅ [LocationPicker] Adresse: $address');
         }
       } else {
-        print(
+        debugPrint(
             '⚠️ [LocationPicker] Position NULL, utilisation position par défaut');
       }
     } catch (e, stackTrace) {
-      print('❌ [LocationPicker] Erreur chargement position: $e');
-      print('❌ [LocationPicker] StackTrace: $stackTrace');
+      debugPrint('❌ [LocationPicker] Erreur chargement position: $e');
+      debugPrint('❌ [LocationPicker] StackTrace: $stackTrace');
     } finally {
       if (mounted) {
         setState(() => _isLoadingCurrentLocation = false);
       }
     }
 
-    print('🔵 [LocationPicker] _loadCurrentLocation - FIN');
+    debugPrint('🔵 [LocationPicker] _loadCurrentLocation - FIN');
   }
 
   Future<void> _centerMapAndAddMarker(GeoPoint position) async {
     if (!_mapReady) return;
 
     try {
-      print('🔵 [LocationPicker] Centrage carte sur: ${position
+      debugPrint('🔵 [LocationPicker] Centrage carte sur: ${position
           .latitude}, ${position.longitude}');
 
       await _mapController.changeLocation(position);
       await _mapController.setZoom(zoomLevel: 15);
       await _addMarkerAtPosition(position);
 
-      print('✅ [LocationPicker] Carte centrée et marqueur ajouté');
+      debugPrint('✅ [LocationPicker] Carte centrée et marqueur ajouté');
     } catch (e) {
-      print('❌ [LocationPicker] Erreur centrage carte: $e');
+      debugPrint('❌ [LocationPicker] Erreur centrage carte: $e');
     }
   }
 
@@ -168,7 +168,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         });
       }
     } catch (e) {
-      print('❌ [LocationPicker] Erreur recherche: $e');
+      debugPrint('❌ [LocationPicker] Erreur recherche: $e');
       if (mounted) {
         setState(() {
           _searchResults = [];
@@ -237,10 +237,10 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         ),
       );
 
-      print('✅ [LocationPicker] Marqueur ajouté à: ${position
+      debugPrint('✅ [LocationPicker] Marqueur ajouté à: ${position
           .latitude}, ${position.longitude}');
     } catch (e) {
-      print('❌ [LocationPicker] Erreur ajout marqueur: $e');
+      debugPrint('❌ [LocationPicker] Erreur ajout marqueur: $e');
     }
   }
 
@@ -490,18 +490,18 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
       ),
       onMapIsReady: (isReady) async {
         if (isReady && mounted) {
-          print('✅ [LocationPicker] Carte prête');
+          debugPrint('✅ [LocationPicker] Carte prête');
           setState(() => _mapReady = true);
 
           // Si on a une position initiale fournie, ajouter le marqueur
           if (_initialLocationSet && _selectedPosition != null) {
             await _addMarkerAtPosition(_selectedPosition!);
-            print('✅ [LocationPicker] Marqueur initial ajouté');
+            debugPrint('✅ [LocationPicker] Marqueur initial ajouté');
           }
           // Sinon, si on a déjà récupéré la position actuelle, centrer dessus
           else if (_selectedPosition != null && !_isLoadingCurrentLocation) {
             await _centerMapAndAddMarker(_selectedPosition!);
-            print('✅ [LocationPicker] Carte centrée sur position actuelle');
+            debugPrint('✅ [LocationPicker] Carte centrée sur position actuelle');
           }
         }
       },

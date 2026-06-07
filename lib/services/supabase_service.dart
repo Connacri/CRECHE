@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/child_model_complete.dart';
@@ -41,7 +42,7 @@ class SupabaseCourseService extends AdminSupabaseService {
           .map((json) => CourseModel.fromSupabase(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      throw Exception('Erreur getCourses: $e');
+      throw Exception('Échec de la récupération des cours. Veuillez vérifier votre connexion. Détails: $e');
     }
   }
 
@@ -52,7 +53,7 @@ class SupabaseCourseService extends AdminSupabaseService {
       final response = await adminClient.from(_tableName).insert(data).select('id').single();
       return response['id'] as String;
     } catch (e) {
-      throw Exception('Erreur createCourse: $e');
+      throw Exception('Impossible de créer le cours. Assurez-vous que tous les champs sont valides. Détails: $e');
     }
   }
 
@@ -63,7 +64,7 @@ class SupabaseCourseService extends AdminSupabaseService {
       updates['updated_at'] = DateTime.now().toIso8601String();
       await adminClient.from(_tableName).update(updates).eq('id', courseId);
     } catch (e) {
-      throw Exception('Erreur updateCourse: $e');
+      throw Exception('Mise à jour du cours échouée. Détails: $e');
     }
   }
 
@@ -98,7 +99,7 @@ class SupabaseCourseService extends AdminSupabaseService {
           .map((json) => CourseModel.fromSupabase(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      throw Exception('Erreur searchCourses: $e');
+      throw Exception('La recherche a échoué. Détails: $e');
     }
   }
 

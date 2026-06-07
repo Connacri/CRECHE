@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -53,7 +53,7 @@ class LocationService {
 
       return false;
     } catch (e) {
-      print('⚠️ [LocationService] Erreur permission: $e');
+      debugPrint('⚠️ [LocationService] Erreur permission: $e');
       return !kIsWeb && Platform.isWindows;
     }
   }
@@ -76,24 +76,24 @@ class LocationService {
   /// ============================================================================
 
   Future<GeoPoint?> getCurrentPosition() async {
-    print('🔍 [LocationService] getCurrentPosition - DÉBUT');
+    debugPrint('🔍 [LocationService] getCurrentPosition - DÉBUT');
 
     // ========================================================================
     // SUR WINDOWS : Utiliser UNIQUEMENT la géolocalisation IP
     // ========================================================================
     if (!kIsWeb && Platform.isWindows) {
-      print('💻 [LocationService] Windows détecté - Géolocalisation IP');
+      debugPrint('💻 [LocationService] Windows détecté - Géolocalisation IP');
 
       // Essayer ipapi.co (gratuit, sans clé API)
       final ipPosition = await _getPositionFromIPApi();
       if (ipPosition != null) {
-        print('✅ [LocationService] Position IP obtenue: ${ipPosition
+        debugPrint('✅ [LocationService] Position IP obtenue: ${ipPosition
             .latitude}, ${ipPosition.longitude}');
         return ipPosition;
       }
 
       // Fallback : Position par défaut
-      print(
+      debugPrint(
           '⚠️ [LocationService] Géolocalisation IP échouée, position par défaut');
       return GeoPoint(latitude: defaultLatitude, longitude: defaultLongitude);
     }
@@ -104,13 +104,13 @@ class LocationService {
     try {
       final hasPermission = await checkLocationPermission();
       if (!hasPermission) {
-        print('❌ [LocationService] Permission refusée');
+        debugPrint('❌ [LocationService] Permission refusée');
         return null;
       }
 
       final serviceEnabled = await isLocationServiceEnabled();
       if (!serviceEnabled) {
-        print('❌ [LocationService] Service désactivé');
+        debugPrint('❌ [LocationService] Service désactivé');
         return null;
       }
 
@@ -118,24 +118,24 @@ class LocationService {
       if (_mapController != null) {
         try {
           final position = await _mapController!.myLocation();
-          print('✅ [LocationService] Position via MapController');
+          debugPrint('✅ [LocationService] Position via MapController');
           return position;
         } catch (e) {
-          print('⚠️ [LocationService] MapController échoué: $e');
+          debugPrint('⚠️ [LocationService] MapController échoué: $e');
         }
       }
 
       // Fallback : Geolocator
       return await _getPositionUsingGeolocator();
     } catch (e) {
-      print('❌ [LocationService] Erreur: $e');
+      debugPrint('❌ [LocationService] Erreur: $e');
       return null;
     }
   }
 
   /// NOUVELLE MÉTHODE : Géolocalisation via IP (ipapi.co - 100% gratuit)
   Future<GeoPoint?> _getPositionFromIPApi() async {
-    print('🌐 [LocationService] Géolocalisation IP en cours...');
+    debugPrint('🌐 [LocationService] Géolocalisation IP en cours...');
 
     try {
       // API ipapi.co : 1000 requêtes/jour gratuites, pas de clé nécessaire
@@ -154,21 +154,21 @@ class LocationService {
         final country = data['country_name'] as String?;
 
         if (latitude != null && longitude != null) {
-          print('✅ [IP] Position: $latitude, $longitude');
-          print('📍 [IP] Lieu: $city, $country');
+          debugPrint('✅ [IP] Position: $latitude, $longitude');
+          debugPrint('📍 [IP] Lieu: $city, $country');
 
           return GeoPoint(latitude: latitude, longitude: longitude);
         }
       } else {
-        print('⚠️ [IP] Status code: ${response.statusCode}');
+        debugPrint('⚠️ [IP] Status code: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ [IP] Erreur: $e');
+      debugPrint('❌ [IP] Erreur: $e');
     }
 
     // Fallback : Essayer une API alternative (ip-api.com)
     try {
-      print('🌐 [LocationService] Tentative API alternative...');
+      debugPrint('🌐 [LocationService] Tentative API alternative...');
       final url = Uri.parse('http://ip-api.com/json/');
 
       final response = await http.get(url).timeout(
@@ -183,13 +183,13 @@ class LocationService {
           final longitude = data['lon'] as double?;
 
           if (latitude != null && longitude != null) {
-            print('✅ [IP-API] Position: $latitude, $longitude');
+            debugPrint('✅ [IP-API] Position: $latitude, $longitude');
             return GeoPoint(latitude: latitude, longitude: longitude);
           }
         }
       }
     } catch (e) {
-      print('❌ [IP-API] Erreur: $e');
+      debugPrint('❌ [IP-API] Erreur: $e');
     }
 
     return null;
@@ -205,7 +205,7 @@ class LocationService {
         ),
       ).timeout(const Duration(seconds: 8));
 
-      print('✅ [Geolocator] Position: ${position.latitude}, ${position
+      debugPrint('✅ [Geolocator] Position: ${position.latitude}, ${position
           .longitude}');
 
       return GeoPoint(
@@ -213,7 +213,7 @@ class LocationService {
         longitude: position.longitude,
       );
     } catch (e) {
-      print('❌ [Geolocator] Erreur: $e');
+      debugPrint('❌ [Geolocator] Erreur: $e');
       return null;
     }
   }
@@ -224,17 +224,17 @@ class LocationService {
 
   Future<String> getAddressFromCoordinates(double latitude,
       double longitude,) async {
-    print('🔍 [LocationService] Géocodage inverse: $latitude, $longitude');
+    debugPrint('🔍 [LocationService] Géocodage inverse: $latitude, $longitude');
 
     // Essayer Nominatim (fonctionne sur TOUTES les plateformes)
     try {
       final address = await _getAddressFromNominatim(latitude, longitude);
       if (address != null) {
-        print('✅ [Nominatim] Adresse: $address');
+        debugPrint('✅ [Nominatim] Adresse: $address');
         return address;
       }
     } catch (e) {
-      print('⚠️ [Nominatim] Erreur: $e');
+      debugPrint('⚠️ [Nominatim] Erreur: $e');
     }
 
     // Fallback : Coordonnées formatées
@@ -264,12 +264,11 @@ class LocationService {
         if (address != null) {
           final addressParts = <String>[];
 
-          if (address['road'] != null) addressParts.add(address['road']);
-          if (address['postcode'] != null) addressParts.add(
-              address['postcode']);
-          if (address['city'] != null) addressParts.add(address['city']);
-          if (address['town'] != null) addressParts.add(address['town']);
-          if (address['village'] != null) addressParts.add(address['village']);
+          if (address['road'] != null) { addressParts.add(address['road']); }
+          if (address['postcode'] != null) { addressParts.add(address['postcode']); }
+          if (address['city'] != null) { addressParts.add(address['city']); }
+          if (address['town'] != null) { addressParts.add(address['town']); }
+          if (address['village'] != null) { addressParts.add(address['village']); }
 
           if (addressParts.isNotEmpty) {
             return addressParts.join(', ');
@@ -279,7 +278,7 @@ class LocationService {
 
       return null;
     } catch (e) {
-      print('❌ [Nominatim] Erreur: $e');
+      debugPrint('❌ [Nominatim] Erreur: $e');
       return null;
     }
   }
@@ -293,13 +292,13 @@ class LocationService {
   /// ============================================================================
 
   Future<CourseLocation?> getCurrentCourseLocation() async {
-    print('🔍 [LocationService] getCurrentCourseLocation - DÉBUT');
+    debugPrint('🔍 [LocationService] getCurrentCourseLocation - DÉBUT');
 
     try {
       final position = await getCurrentPosition();
 
       if (position == null) {
-        print(
+        debugPrint(
             '⚠️ [LocationService] Position NULL - Retour position par défaut');
 
         // Retourner position par défaut au lieu de null
@@ -312,7 +311,7 @@ class LocationService {
         );
       }
 
-      print(
+      debugPrint(
           '✅ [LocationService] Position reçue: ${position.latitude}, ${position
               .longitude}');
 
@@ -343,11 +342,11 @@ class LocationService {
         country: country,
       );
 
-      print('✅ [LocationService] CourseLocation créé avec succès');
+      debugPrint('✅ [LocationService] CourseLocation créé avec succès');
       return courseLocation;
     } catch (e, stackTrace) {
-      print('❌ [LocationService] ERREUR: $e');
-      print('❌ [LocationService] StackTrace: $stackTrace');
+      debugPrint('❌ [LocationService] ERREUR: $e');
+      debugPrint('❌ [LocationService] StackTrace: $stackTrace');
 
       // En cas d'erreur, retourner position par défaut
       return CourseLocation(
@@ -361,13 +360,13 @@ class LocationService {
   }
 
   Future<AppLocation?> getCurrentUserLocation() async {
-    print('🔍 [LocationService] getCurrentUserLocation - DÉBUT');
+    debugPrint('🔍 [LocationService] getCurrentUserLocation - DÉBUT');
 
     try {
       final position = await getCurrentPosition();
 
       if (position == null) {
-        print(
+        debugPrint(
             '⚠️ [LocationService] Position NULL - Retour position par défaut');
 
         return AppLocation(
@@ -406,7 +405,7 @@ class LocationService {
         country: country,
       );
     } catch (e) {
-      print('❌ [LocationService] ERREUR: $e');
+      debugPrint('❌ [LocationService] ERREUR: $e');
 
       return AppLocation(
         latitude: defaultLatitude,
@@ -423,7 +422,7 @@ class LocationService {
   /// ============================================================================
 
   Future<List<LocationSearchResult>> searchLocation(String query) async {
-    print('🔍 [LocationService] searchLocation: "$query"');
+    debugPrint('🔍 [LocationService] searchLocation: "$query"');
     if (query.trim().isEmpty) {
       return [];
     }
@@ -441,14 +440,14 @@ class LocationService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        print('✅ [LocationService] ${data.length} résultats trouvés');
+        debugPrint('✅ [LocationService] ${data.length} résultats trouvés');
         return data.map((json) => LocationSearchResult.fromJson(json)).toList();
       } else {
-        print('❌ [LocationService] Status code: ${response.statusCode}');
+        debugPrint('❌ [LocationService] Status code: ${response.statusCode}');
         throw Exception('Erreur recherche: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ [LocationService] ERREUR searchLocation: $e');
+      debugPrint('❌ [LocationService] ERREUR searchLocation: $e');
       return [];
     }
   }
@@ -567,7 +566,7 @@ class LocationService {
     try {
       await openAppSettings();
     } catch (e) {
-      print('❌ [LocationService] ERREUR openLocationSettings: $e');
+      debugPrint('❌ [LocationService] ERREUR openLocationSettings: $e');
     }
   }
 
@@ -576,6 +575,18 @@ class LocationService {
   }
 
   bool get hasMapController => _mapController != null;
+
+  /// Vérifie si une position est à l'intérieur d'un périmètre (Geofencing)
+  bool isInsideGeofence(
+    double userLat,
+    double userLon,
+    double targetLat,
+    double targetLon,
+    double radiusKm,
+  ) {
+    final distance = calculateDistance(userLat, userLon, targetLat, targetLon);
+    return distance <= radiusKm;
+  }
 }
 
 /// ============================================================================
