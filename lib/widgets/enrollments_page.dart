@@ -65,8 +65,13 @@ class _EnrollmentList extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<ChildEnrollmentProvider>();
     final enrollments = provider.ownerEnrollmentsDetailed.where((e) {
-      final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
-      return enrollment.status == status;
+      if (e['enrollment'] == null) return false;
+      try {
+        final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
+        return enrollment.status == status;
+      } catch (_) {
+        return false;
+      }
     }).toList();
 
     if (provider.isLoading && enrollments.isEmpty) {
@@ -82,64 +87,72 @@ class _EnrollmentList extends StatelessWidget {
       itemCount: enrollments.length,
       itemBuilder: (context, index) {
         final item = enrollments[index];
-        final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
-        final child = ChildModel.fromSupabase(item['child']);
-        final course = CourseModel.fromSupabase(item['course']);
+        if (item['enrollment'] == null || item['child'] == null || item['course'] == null) {
+          return const SizedBox.shrink();
+        }
+        
+        try {
+          final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
+          final child = ChildModel.fromSupabase(item['child']);
+          final course = CourseModel.fromSupabase(item['course']);
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: GlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                      child: child.photoUrl == null ? Text(child.firstName[0]) : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(course.title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        ],
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
+                        child: child.photoUrl == null ? Text(child.firstName[0]) : null,
                       ),
-                    ),
-                    _buildStatusBadge(enrollment.status),
-                  ],
-                ),
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Inscrit le: ${enrollment.enrolledAt.day}/${enrollment.enrolledAt.month}/${enrollment.enrolledAt.year}', style: const TextStyle(fontSize: 11)),
-                    if (status == EnrollmentStatus.pending)
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.check_circle, color: Colors.green),
-                            onPressed: () => provider.updateEnrollment(enrollmentId: enrollment.id, status: EnrollmentStatus.approved),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            onPressed: () => provider.updateEnrollment(enrollmentId: enrollment.id, status: EnrollmentStatus.rejected),
-                          ),
-                        ],
-                      )
-                    else
-                       IconButton(
-                        icon: const Icon(Icons.info_outline),
-                        onPressed: () => _showDetails(context, child, enrollment, course),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(course.title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
                       ),
-                  ],
-                ),
-              ],
+                      _buildStatusBadge(enrollment.status),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Inscrit le: ${enrollment.enrolledAt.day}/${enrollment.enrolledAt.month}/${enrollment.enrolledAt.year}', style: const TextStyle(fontSize: 11)),
+                      if (status == EnrollmentStatus.pending)
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.check_circle, color: Colors.green),
+                              onPressed: () => provider.updateEnrollment(enrollmentId: enrollment.id, status: EnrollmentStatus.approved),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.cancel, color: Colors.red),
+                              onPressed: () => provider.updateEnrollment(enrollmentId: enrollment.id, status: EnrollmentStatus.rejected),
+                            ),
+                          ],
+                        )
+                      else
+                         IconButton(
+                          icon: const Icon(Icons.info_outline),
+                          onPressed: () => _showDetails(context, child, enrollment, course),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
+          );
+        } catch (e) {
+          return const SizedBox.shrink();
+        }
       },
     );
   }

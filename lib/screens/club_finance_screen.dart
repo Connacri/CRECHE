@@ -87,9 +87,12 @@ class _FinanceOverview extends StatelessWidget {
     double pendingRevenue = 0;
 
     for (var item in enrollments) {
-      final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
-      totalRevenue += enrollment.paidAmount ?? 0;
-      pendingRevenue += enrollment.remainingAmount;
+      if (item['enrollment'] == null) continue;
+      try {
+        final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
+        totalRevenue += enrollment.paidAmount ?? 0;
+        pendingRevenue += enrollment.remainingAmount;
+      } catch (_) {}
     }
 
     return ListView(
@@ -133,64 +136,72 @@ class _EnrollmentsManagement extends StatelessWidget {
       itemCount: enrollments.length,
       itemBuilder: (context, index) {
         final item = enrollments[index];
-        final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
-        final child = ChildModel.fromSupabase(item['child']);
-        final course = CourseModel.fromSupabase(item['course']);
+        if (item['enrollment'] == null || item['child'] == null || item['course'] == null) {
+          return const SizedBox.shrink();
+        }
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: GlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                      child: child.photoUrl == null ? Text(child.firstName[0]) : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+        try {
+          final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
+          final child = ChildModel.fromSupabase(item['child']);
+          final course = CourseModel.fromSupabase(item['course']);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
+                        child: child.photoUrl == null ? Text(child.firstName[0]) : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(course.title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      _buildStatusBadge(enrollment.status),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${child.firstName} ${child.lastName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(course.title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          const Text('Paiement', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('${enrollment.paidAmount?.toStringAsFixed(0) ?? "0"} / ${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA',
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
-                    ),
-                    _buildStatusBadge(enrollment.status),
-                  ],
-                ),
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Paiement', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        Text('${enrollment.paidAmount?.toStringAsFixed(0) ?? "0"} / ${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA',
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    if (enrollment.paymentStatus != PaymentStatus.paid)
-                      ElevatedButton(
-                        onPressed: () => _confirmPayment(context, provider, enrollment.id),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(0, 32),
+                      if (enrollment.paymentStatus != PaymentStatus.paid)
+                        ElevatedButton(
+                          onPressed: () => _confirmPayment(context, provider, enrollment.id),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            minimumSize: const Size(0, 32),
+                          ),
+                          child: const Text('Valider paiement', style: TextStyle(fontSize: 11)),
                         ),
-                        child: const Text('Valider paiement', style: TextStyle(fontSize: 11)),
-                      ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
+          );
+        } catch (e) {
+          return const SizedBox.shrink();
+        }
       },
     );
   }

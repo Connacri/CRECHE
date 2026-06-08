@@ -106,8 +106,13 @@ class _AttendanceList extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<ChildEnrollmentProvider>();
     final enrolledItems = provider.ownerEnrollmentsDetailed.where((e) {
-      final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
-      return enrollment.courseId == courseId && enrollment.status == EnrollmentStatus.approved;
+      if (e['enrollment'] == null) return false;
+      try {
+        final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
+        return enrollment.courseId == courseId && enrollment.status == EnrollmentStatus.approved;
+      } catch (_) {
+        return false;
+      }
     }).toList();
 
     if (enrolledItems.isEmpty) return const Center(child: Text('Aucun inscrit actif.'));
@@ -117,47 +122,55 @@ class _AttendanceList extends StatelessWidget {
       itemCount: enrolledItems.length,
       itemBuilder: (context, index) {
         final item = enrolledItems[index];
-        final child = ChildModel.fromSupabase(item['child']);
-        final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
+        if (item['enrollment'] == null || item['child'] == null) {
+          return const SizedBox.shrink();
+        }
 
-        final dateOnly = DateTime(date.year, date.month, date.day);
-        final bool isPresent = enrollment.attendanceHistory.any((r) =>
-          r.date.year == dateOnly.year && r.date.month == dateOnly.month && r.date.day == dateOnly.day && r.isPresent);
+        try {
+          final child = ChildModel.fromSupabase(item['child']);
+          final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: GlassCard(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundImage: child.photoUrl != null ? NetworkImage(child.photoUrl!) : null,
-                  child: child.photoUrl == null ? Text(child.firstName[0]) : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(child.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text('Taux de présence: ${enrollment.attendanceRate.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                    ],
+          final dateOnly = DateTime(date.year, date.month, date.day);
+          final bool isPresent = enrollment.attendanceHistory.any((r) =>
+            r.date.year == dateOnly.year && r.date.month == dateOnly.month && r.date.day == dateOnly.day && r.isPresent);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: GlassCard(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundImage: child.photoUrl != null ? NetworkImage(child.photoUrl!) : null,
+                    child: child.photoUrl == null ? Text(child.firstName[0]) : null,
                   ),
-                ),
-                Transform.scale(
-                  scale: 1.2,
-                  child: Checkbox(
-                    value: isPresent,
-                    activeColor: Colors.green,
-                    onChanged: (val) {
-                      _toggleAttendance(context, provider, enrollment, dateOnly, val ?? false);
-                    },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(child.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text('Taux de présence: ${enrollment.attendanceRate.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  Transform.scale(
+                    scale: 1.2,
+                    child: Checkbox(
+                      value: isPresent,
+                      activeColor: Colors.green,
+                      onChanged: (val) {
+                        _toggleAttendance(context, provider, enrollment, dateOnly, val ?? false);
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
+          );
+        } catch (e) {
+          return const SizedBox.shrink();
+        }
       },
     );
   }
