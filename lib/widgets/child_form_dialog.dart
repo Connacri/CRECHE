@@ -133,32 +133,6 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
       title: Text(widget.child == null ? 'Ajouter un enfant' : 'Modifier l\'enfant'),
       content: SingleChildScrollView(
         child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-          children: [
-            // Barre de progression affichée pendant le chargement
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8.0),
-                child: LinearProgressIndicator(minHeight: 4),
-              ),
-            GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 40,
-                backgroundImage: _photo != null
-                    ? FileImage(_photo!)
-                    : (widget.child?.photoUrl != null ? CachedNetworkImageProvider(widget.child!.photoUrl!) : null) as ImageProvider?,
-                child: _photo == null && widget.child?.photoUrl == null ? const Icon(Icons.camera_alt, size: 30) : null,
-              ),
-            ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _firstNameController,
-                decoration: const InputDecoration(labelText: 'Prénom'),
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-              ),
               TextFormField(
                 controller: _lastNameController,
                 decoration: const InputDecoration(labelText: 'Nom'),
@@ -246,7 +220,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: hasFile ? Colors.green.withValues(alpha: 0.5) : Colors.grey[300]!),
+              border: Border.all(color: hasFile ? Colors.green.withAlpha(128) : Colors.grey[300]!),
             ),
             child: hasFile
                 ? ClipRRect(
@@ -256,19 +230,25 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                         if (isImage)
                           Positioned.fill(
                             child: file != null
-                              ? Image.file(file, fit: BoxFit.cover)
-                              : CachedNetworkImage(imageUrl: currentUrl!, fit: BoxFit.cover, placeholder: (c,u) => const Center(child: CircularProgressIndicator()), errorWidget: (c,u,e) => const Icon(Icons.error)),
+                                ? Image.file(file, fit: BoxFit.cover)
+                                : CachedNetworkImage(
+                                    imageUrl: currentUrl!,
+                                    fit: BoxFit.cover,
+                                    placeholder: (c, u) => const Center(child: CircularProgressIndicator()),
+                                    errorWidget: (c, u, e) => const Icon(Icons.error),
+                                  ),
                           )
                         else
-                          const Center(child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.description, size: 40, color: Colors.blue),
-                              Text("Fichier PDF/Doc", style: TextStyle(fontSize: 10)),
-                            ],
-                          )),
-                        Container(color: Colors.black26),
-                        const Center(child: Icon(Icons.refresh, color: Colors.white, size: 30)),
+                          const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.description, size: 40, color: Colors.blue),
+                                Text("Fichier PDF/Doc", style: TextStyle(fontSize: 10)),
+                              ],
+                            ),
+                          ),
+                        // Check overlay to indicate file selected
                         Positioned(
                           top: 8,
                           right: 8,
