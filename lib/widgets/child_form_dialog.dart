@@ -69,12 +69,14 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   }
 
   Future<void> _save() async {
+    debugPrint('🔍 Starting child save operation');
     if (!_formKey.currentState!.validate() || (_dateOfBirth == null && widget.child == null)) {
       if (_dateOfBirth == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Veuillez sélectionner une date de naissance')),
         );
       }
+      debugPrint('⚠️ Validation failed or missing date of birth');
       return;
     }
 
@@ -83,6 +85,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
 
     bool success;
     if (widget.child == null) {
+      debugPrint('📤 Adding new child with photo: ${_photo?.path}');
       success = await provider.addChild(
         parentId: widget.parentId,
         firstName: _firstNameController.text,
@@ -95,6 +98,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
         schoolGrade: _schoolGradeController.text,
       );
     } else {
+      debugPrint('✏️ Updating child ${widget.child!.id} with new photo: ${_photo?.path}');
       success = await provider.updateChild(
         childId: widget.child!.id,
         parentId: widget.parentId,
@@ -112,8 +116,10 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
+        debugPrint('✅ Child saved successfully');
         Navigator.pop(context);
       } else {
+        debugPrint('❌ Error saving child: ${provider.error}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(provider.error ?? 'Une erreur est survenue')),
         );
@@ -130,17 +136,23 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundImage: _photo != null
-                      ? FileImage(_photo!)
-                      : (widget.child?.photoUrl != null ? CachedNetworkImageProvider(widget.child!.photoUrl!) : null) as ImageProvider?,
-                  child: _photo == null && widget.child?.photoUrl == null ? const Icon(Icons.camera_alt, size: 30) : null,
-                ),
+          children: [
+            // Barre de progression affichée pendant le chargement
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8.0),
+                child: LinearProgressIndicator(minHeight: 4),
               ),
+            GestureDetector(
+              onTap: _pickImage,
+              child: CircleAvatar(
+                radius: 40,
+                backgroundImage: _photo != null
+                    ? FileImage(_photo!)
+                    : (widget.child?.photoUrl != null ? CachedNetworkImageProvider(widget.child!.photoUrl!) : null) as ImageProvider?,
+                child: _photo == null && widget.child?.photoUrl == null ? const Icon(Icons.camera_alt, size: 30) : null,
+              ),
+            ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _firstNameController,

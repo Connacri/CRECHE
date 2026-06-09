@@ -116,11 +116,25 @@ class ChildEnrollmentProvider with ChangeNotifier {
       String? birthCertUrl;
       String? medicalCertUrl;
 
-      final tempChildId = 'temp_\${DateTime.now().millisecondsSinceEpoch}';
+      final tempChildId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
 
-      if (photoFile != null) photoUrl = await _imageService.uploadChildPhoto(imageFile: photoFile, userId: parentId, childId: tempChildId);
-      if (birthCertificateFile != null) birthCertUrl = await _imageService.uploadFile(birthCertificateFile, '\$parentId/children/certs');
-      if (medicalCertificateFile != null) medicalCertUrl = await _imageService.uploadFile(medicalCertificateFile, '\$parentId/children/certs');
+      debugPrint('🔍 Starting addChild operation');
+      debugPrint('🆔 Temp child ID: $tempChildId');
+      if (photoFile != null) {
+        debugPrint('📤 Uploading child photo: ${photoFile.path}');
+        photoUrl = await _imageService.uploadChildPhoto(imageFile: photoFile, userId: parentId, childId: tempChildId);
+        debugPrint('✅ Photo upload URL: $photoUrl');
+      }
+      if (birthCertificateFile != null) {
+        debugPrint('📄 Uploading birth certificate: ${birthCertificateFile.path}');
+        birthCertUrl = await _imageService.uploadFile(birthCertificateFile, '\$parentId/children/certs');
+        debugPrint('✅ Birth certificate URL: $birthCertUrl');
+      }
+      if (medicalCertificateFile != null) {
+        debugPrint('📄 Uploading medical certificate: ${medicalCertificateFile.path}');
+        medicalCertUrl = await _imageService.uploadFile(medicalCertificateFile, '\$parentId/children/certs');
+        debugPrint('✅ Medical certificate URL: $medicalCertUrl');
+      }
 
       final newChild = ChildModel(
         id: '',
@@ -138,18 +152,23 @@ class ChildEnrollmentProvider with ChangeNotifier {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now()
       );
-
+      debugPrint('🛠️ Created ChildModel, now inserting into Supabase');
       final realId = await _supabaseChildService.createChild(newChild);
+      debugPrint('✅ Child created with real ID: $realId');
 
       if (photoUrl != null && photoUrl.contains(tempChildId)) {
+        debugPrint('🔄 Re‑uploading photo with real child ID');
         final finalPhotoUrl = await _imageService.uploadChildPhoto(imageFile: photoFile!, userId: parentId, childId: realId);
         await _supabaseChildService.updateChild(realId, {'photo_url': finalPhotoUrl});
+        debugPrint('✅ Updated child photo URL: $finalPhotoUrl');
       }
 
       _setLoading(false);
+      debugPrint('✅ addChild operation completed successfully');
       return true;
     } catch (e) {
       _setLoading(false);
+      debugPrint('❌ Error in addChild: $e');
       _setError('Erreur lors de la création: \$e');
       return false;
     }
