@@ -50,6 +50,12 @@ jobs:
           BUILD="${{ steps.set_version.outputs.build_number }}"
           sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
 
+      - name: Update README version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          VERSION="${{ steps.set_version.outputs.version }}"
+          sed -i "s/✨ CRÈCHE V.* ✨/✨ CRÈCHE V${VERSION} ✨/" README.md
+
       - name: Commit version bump
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
