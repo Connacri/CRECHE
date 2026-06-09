@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
@@ -25,12 +27,20 @@ class AuthWrapper extends StatelessWidget {
         // 1. État de chargement initial
         if (authProvider.state == AppAuthState.initial ||
             authProvider.state == AppAuthState.loading) {
+          // Sur desktop, on force l'affichage de la fenêtre dès le début du chargement
+          // car sinon la fenêtre reste invisible tant que remove() n'est pas appelé.
+          if (!kIsWeb &&
+              (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+            FlutterNativeSplash.remove();
+          }
           return const _LoadingScreen();
         }
 
+        // On s'assure que le splash est retiré pour tous les autres états (authenticated, error, etc.)
+        FlutterNativeSplash.remove();
+
         // 2. Non authentifié → AuthScreen
         if (authProvider.state == AppAuthState.unauthenticated) {
-          FlutterNativeSplash.remove();
           return const AuthScreen();
         }
 
@@ -68,7 +78,6 @@ class AuthWrapper extends StatelessWidget {
 
           // Router vers le dashboard approprié selon le rôle
           final role = userData['role'] as String?;
-          FlutterNativeSplash.remove();
           switch (role) {
             case 'parent':
               return const ParentDashboard();

@@ -372,14 +372,14 @@ class _AddCoachDialogState extends State<_AddCoachDialog> {
                 const Divider(),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: _selectedCourseId,
+                  initialValue: _selectedCourseId,
                   decoration: const InputDecoration(labelText: 'Assigner au cours'),
                   items: widget.courses.map((c) => DropdownMenuItem(value: c['id'] as String, child: Text(c['title'] ?? ''))).toList(),
                   onChanged: (v) => setState(() => _selectedCourseId = v),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _selectedRole,
+                  initialValue: _selectedRole,
                   decoration: const InputDecoration(labelText: 'Rôle'),
                   items: const [
                     DropdownMenuItem(value: 'assistant', child: Text('Assistant')),

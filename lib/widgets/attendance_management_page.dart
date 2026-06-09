@@ -64,7 +64,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> wit
           child: Column(
             children: [
               DropdownButtonFormField<CourseModel>(
-                value: courses.contains(_selectedCourse) ? _selectedCourse : null,
+                initialValue: courses.contains(_selectedCourse) ? _selectedCourse : null,
                 items: courses.map((c) => DropdownMenuItem(value: c, child: Text(c.title))).toList(),
                 onChanged: (val) => setState(() => _selectedCourse = val),
                 decoration: const InputDecoration(labelText: 'Choisir un cours', border: OutlineInputBorder()),

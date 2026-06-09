@@ -55,23 +55,16 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   }
 
   Future<void> _pickBirthCertificate() async {
-    final file = await HybridImagePickerService.pickImage(context: context, crop: false);
+    final file = await HybridImagePickerService.pickBirthCertificate(context: context);
     if (file != null) {
       setState(() => _birthCertificate = file);
-    } else {
-      final doc = await HybridImagePickerService.pickDocument(context: context);
-      if (doc != null) setState(() => _birthCertificate = doc);
     }
   }
 
   Future<void> _pickMedicalCertificate() async {
-    final file = await HybridImagePickerService.pickImage(context: context, crop: false);
+    final file = await HybridImagePickerService.pickMedicalCertificate(context: context);
     if (file != null) {
       setState(() => _medicalCertificate = file);
-    } else {
-      if (!mounted) return;
-      final doc = await HybridImagePickerService.pickDocument(context: context);
-      if (doc != null) setState(() => _medicalCertificate = doc);
     }
   }
 
@@ -177,7 +170,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<ChildGender>(
-                value: _gender,
+                initialValue: _gender,
                 decoration: const InputDecoration(labelText: 'Genre'),
                 items: ChildGender.values.map((g) => DropdownMenuItem(
                   value: g,

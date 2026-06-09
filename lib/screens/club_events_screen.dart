@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/auth_provider_v2.dart';
 import '../services/event_service.dart';
 import '../widgets/glass_card.dart';

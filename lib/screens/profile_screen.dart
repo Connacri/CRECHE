@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:file_picker/file_picker.dart';
 
 import '../providers/auth_provider_v2.dart';
 import '../models/user_model.dart';
@@ -86,17 +85,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickFile(bool isCV, {bool isDiploma = false}) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'png', 'jpeg'],
-    );
+    File? pickedFile;
+    if (isCV) {
+      pickedFile = await HybridImagePickerService.pickDocument(context: context);
+    } else if (isDiploma) {
+      pickedFile = await HybridImagePickerService.pickDiploma(context: context);
+    } else {
+      pickedFile = await HybridImagePickerService.pickMedicalCertificate(context: context);
+    }
 
-    if (result != null && result.files.single.path != null) {
+    if (pickedFile != null) {
       setState(() => _isSaving = true);
       try {
         final auth = context.read<AuthProviderV2>();
-        final file = File(result.files.single.path!);
-        final url = await ImageStorageService().uploadFile(file, '${auth.currentUser!.uid}/coach_docs');
+        final url = await ImageStorageService().uploadFile(pickedFile, '${auth.currentUser!.uid}/coach_docs');
 
         if (url != null) {
           setState(() {
@@ -193,7 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CircleAvatar(
                 key: ValueKey(photoUrl ?? 'no-avatar'),
                 radius: 60,
-                backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                 backgroundImage: photoUrl != null ? CachedNetworkImageProvider(photoUrl) : null,
                 child: photoUrl == null ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : "?", style: const TextStyle(fontSize: 40)) : null,
               ),
@@ -375,7 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         decoration: BoxDecoration(
           color: Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: hasFile ? Colors.green.withOpacity(0.5) : Colors.grey[300]!),
+          border: Border.all(color: hasFile ? Colors.green.withValues(alpha: 0.5) : Colors.grey[300]!),
         ),
         child: hasFile
             ? ClipRRect(

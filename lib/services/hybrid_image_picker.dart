@@ -8,14 +8,22 @@ import 'package:file_picker/file_picker.dart';
 class HybridImagePickerService {
   static final ImagePicker _picker = ImagePicker();
 
-  /// Sélectionne une image en utilisant ImagePicker (Standard pour Android/iOS)
+  /// Sélectionne une image en fonction de la plateforme
   static Future<File?> pickImage({
     bool crop = false,
     CropAspectRatio? aspectRatio,
     required BuildContext context,
     ImageSource source = ImageSource.gallery,
   }) async {
+    final bool isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+    if (isDesktop) {
+      debugPrint('ℹ️ [HybridPicker] Utilisation de FilePicker sur Desktop');
+      return await _pickImageWithFilePicker(crop: crop, aspectRatio: aspectRatio, context: context);
+    }
+
     try {
+      debugPrint('ℹ️ [HybridPicker] Utilisation de ImagePicker sur Mobile');
       final XFile? pickedXFile = await _picker.pickImage(
         source: source,
         maxWidth: 1920,
@@ -34,12 +42,12 @@ class HybridImagePickerService {
       return pickedFile;
     } catch (e) {
       debugPrint('❌ [HybridPicker] Erreur ImagePicker: $e');
-      // Fallback vers FilePicker si ImagePicker échoue (rare mais possible sur certains Android modifiés)
-      return await _fallbackPickImage(crop: crop, aspectRatio: aspectRatio, context: context);
+      return await _pickImageWithFilePicker(crop: crop, aspectRatio: aspectRatio, context: context);
     }
   }
 
-  static Future<File?> _fallbackPickImage({
+  /// Méthode interne pour picking d'image via FilePicker (Desktop ou Fallback)
+  static Future<File?> _pickImageWithFilePicker({
     bool crop = false,
     CropAspectRatio? aspectRatio,
     required BuildContext context,
@@ -60,13 +68,28 @@ class HybridImagePickerService {
 
       return pickedFile;
     } catch (e) {
-      debugPrint('❌ [HybridPicker] Erreur Fallback: $e');
+      debugPrint('❌ [HybridPicker] Erreur FilePicker Image: $e');
       return null;
     }
   }
 
+  /// Alias pour _pickImageWithFilePicker gardé pour compatibilité si besoin
+  static Future<File?> _fallbackPickImage({
+    bool crop = false,
+    CropAspectRatio? aspectRatio,
+    required BuildContext context,
+  }) async {
+    return _pickImageWithFilePicker(crop: crop, aspectRatio: aspectRatio, context: context);
+  }
+
   static Future<File?> pickProfileImage({required BuildContext context}) async {
-    // Proposer le choix entre Caméra et Galerie
+    final bool isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+    if (isDesktop) {
+      return await pickImage(context: context, crop: true, aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1));
+    }
+
+    // Proposer le choix entre Caméra et Galerie sur mobile
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (context) => SafeArea(
@@ -114,6 +137,12 @@ class HybridImagePickerService {
       return null;
     }
   }
+
+  /// Alias sémantiques pour les documents demandés
+  static Future<File?> pickBirthCertificate({required BuildContext context}) => pickDocument(context: context);
+  static Future<File?> pickMedicalCertificate({required BuildContext context}) => pickDocument(context: context);
+  static Future<File?> pickAchievement({required BuildContext context}) => pickDocument(context: context); // Palmarès
+  static Future<File?> pickDiploma({required BuildContext context}) => pickDocument(context: context);
 
   static Future<File?> _cropImage(File file, {CropAspectRatio? aspectRatio, required BuildContext context}) async {
     if (!kIsWeb && Platform.isWindows) {

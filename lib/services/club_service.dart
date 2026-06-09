@@ -71,7 +71,7 @@ class ClubService extends AdminSupabaseService {
     final response = await adminClient
         .from('users')
         .select('id, name, email, role, profile_images, phone_number')
-        .or('name.ilike.%${query}%,email.ilike.%${query}%')
+        .or('name.ilike.%$query%,email.ilike.%$query%')
         .eq('role', 'coach')
         .limit(20);
     return (response as List).cast<Map<String, dynamic>>();
@@ -82,7 +82,7 @@ class ClubService extends AdminSupabaseService {
     final response = await adminClient
         .from('users')
         .select('id, name, email, profile_images')
-        .or('name.ilike.%${query}%,email.ilike.%${query}%')
+        .or('name.ilike.%$query%,email.ilike.%$query%')
         .limit(20);
     return (response as List).cast<Map<String, dynamic>>();
   }

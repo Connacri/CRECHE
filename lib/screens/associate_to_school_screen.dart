@@ -72,7 +72,7 @@ class _AssociateToSchoolScreenState extends State<AssociateToSchoolScreen> {
                 }
 
                 return DropdownButtonFormField<UserModel>(
-                  value: selectedSchool,
+                  initialValue: selectedSchool,
                   hint: const Text('Choisir un club / école'),
                   items: provider.schools.map((school) => DropdownMenuItem(
                     value: school,

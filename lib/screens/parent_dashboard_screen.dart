@@ -860,12 +860,12 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
   }
 
   Future<void> _pickBirthCertificate() async {
-    final file = await HybridImagePickerService.pickDocument(context: context);
+    final file = await HybridImagePickerService.pickBirthCertificate(context: context);
     if (file != null) setState(() => _birthCertificate = file);
   }
 
   Future<void> _pickMedicalCertificate() async {
-    final file = await HybridImagePickerService.pickDocument(context: context);
+    final file = await HybridImagePickerService.pickMedicalCertificate(context: context);
     if (file != null) setState(() => _medicalCertificate = file);
   }
 

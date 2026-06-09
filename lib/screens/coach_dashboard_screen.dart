@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../models/course_model_complete.dart';
 import '../models/session_schedule_model.dart';
 import '../providers/course_provider_complete.dart';
-import '../providers/auth_provider_v2.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/enrollments_page.dart';
@@ -196,7 +195,7 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
         Padding(
           padding: const EdgeInsets.all(24),
           child: DropdownButtonFormField<String>(
-            value: _selectedSchoolId,
+            initialValue: _selectedSchoolId,
             items: _schools.map((s) => DropdownMenuItem<String>(value: s["id"].toString(), child: Text(s["name"]?.toString() ?? "Inconnu"))).toList(),
             onChanged: (val) {
               setState(() {

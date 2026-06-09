@@ -14,6 +14,7 @@ import '../services/responsive_layout_helper.dart';
 import '../services/club_service.dart';
 import '../widgets/location_picker_dialog_widget.dart';
 import '../widgets/location_picker_windows.dart';
+import '../services/hybrid_image_picker.dart';
 
 class CreateCourseScreen extends StatefulWidget {
   final CourseModel? courseToEdit;
@@ -36,7 +37,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   DateTime _seasonStartDate = DateTime.now();
   DateTime _seasonEndDate = DateTime.now().add(const Duration(days: 365));
   CourseLocation? _selectedLocation;
-  List<File> _selectedImages = [];
+  final List<File> _selectedImages = [];
   bool _isLoadingLocation = false;
 
   List<UserModel> _availableClubs = [];
@@ -157,14 +158,11 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   }
 
   Future<void> _pickImages() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-    );
+    final image = await HybridImagePickerService.pickImage(context: context);
 
-    if (result != null) {
+    if (image != null) {
       setState(() {
-        _selectedImages.addAll(result.paths.map((path) => File(path!)).toList());
+        _selectedImages.add(image);
       });
     }
   }
@@ -308,7 +306,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
             _isLoadingClubs
               ? const LinearProgressIndicator()
               : DropdownButtonFormField<UserModel>(
-                  value: _selectedClub,
+                  initialValue: _selectedClub,
                   decoration: const InputDecoration(
                     labelText: 'Club partenaire (Optionnel)',
                     prefixIcon: Icon(Icons.business),
@@ -328,7 +326,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<CourseCategory>(
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     decoration: const InputDecoration(labelText: 'Catégorie', prefixIcon: Icon(Icons.category)),
                     items: CourseCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.displayName))).toList(),
                     onChanged: (val) => setState(() => _selectedCategory = val!),
@@ -337,7 +335,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: DropdownButtonFormField<CourseSeason>(
-                    value: _selectedSeason,
+                    initialValue: _selectedSeason,
                     decoration: const InputDecoration(labelText: 'Saison', prefixIcon: Icon(Icons.calendar_today)),
                     items: CourseSeason.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName))).toList(),
                     onChanged: (val) {
