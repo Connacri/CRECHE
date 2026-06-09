@@ -988,13 +988,15 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
                 file: _birthCertificate,
                 currentUrl: widget.child?.birthCertificateUrl,
                 onTap: _pickBirthCertificate,
+                onRemove: () => setState(() => _birthCertificate = null),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               _buildDocumentPicker(
                 label: "Certificat médical",
                 file: _medicalCertificate,
                 currentUrl: widget.child?.medicalCertificateUrl,
                 onTap: _pickMedicalCertificate,
+                onRemove: () => setState(() => _medicalCertificate = null),
               ),
             ],
           ),
@@ -1015,33 +1017,73 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
     File? file,
     String? currentUrl,
     required VoidCallback onTap,
+    required VoidCallback onRemove,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(file != null || currentUrl != null ? Icons.check_circle : Icons.upload_file,
-                 color: file != null || currentUrl != null ? Colors.green : Colors.grey),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  Text(file != null ? file.path.split("/").last : (currentUrl != null ? "Déjà téléchargé" : "Facultatif"),
-                       style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-                ],
+    final bool hasFile = file != null || currentUrl != null;
+    final bool isImage = (file != null && (file.path.toLowerCase().endsWith('.jpg') || file.path.toLowerCase().endsWith('.png') || file.path.toLowerCase().endsWith('.jpeg'))) ||
+                        (currentUrl != null && (currentUrl.toLowerCase().contains('.jpg') || currentUrl.toLowerCase().contains('.png') || currentUrl.toLowerCase().contains('.jpeg')));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        if (hasFile)
+          Stack(
+            children: [
+              Container(
+                height: 150,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: isImage
+                      ? (file != null
+                          ? Image.file(file, fit: BoxFit.cover)
+                          : CachedNetworkImage(imageUrl: currentUrl!, fit: BoxFit.cover, placeholder: (c, u) => const Center(child: CircularProgressIndicator())))
+                      : Container(
+                          color: Colors.grey[100],
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.description, size: 50, color: Colors.blue),
+                                const SizedBox(height: 8),
+                                Text(file != null ? file.path.split('/').last : "Document existant", style: const TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ),
+                ),
               ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: onRemove,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    child: const Icon(Icons.close, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: onTap,
+            icon: const Icon(Icons.upload_file),
+            label: const Text("Télécharger le document"),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }

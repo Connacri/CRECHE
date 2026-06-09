@@ -133,6 +133,26 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
       title: Text(widget.child == null ? 'Ajouter un enfant' : 'Modifier l\'enfant'),
       content: SingleChildScrollView(
         child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _pickImage,
+                child: CircleAvatar(
+                  radius: 40,
+                  backgroundImage: _photo != null
+                      ? FileImage(_photo!)
+                      : (widget.child?.photoUrl != null ? CachedNetworkImageProvider(widget.child!.photoUrl!) : null) as ImageProvider?,
+                  child: _photo == null && widget.child?.photoUrl == null ? const Icon(Icons.camera_alt, size: 30) : null,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _firstNameController,
+                decoration: const InputDecoration(labelText: 'Prénom'),
+                validator: (v) => v!.isEmpty ? 'Requis' : null,
+              ),
               TextFormField(
                 controller: _lastNameController,
                 decoration: const InputDecoration(labelText: 'Nom'),
@@ -174,6 +194,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                 file: _birthCertificate,
                 currentUrl: widget.child?.birthCertificateUrl,
                 onTap: _pickBirthCertificate,
+                onRemove: () => setState(() => _birthCertificate = null),
               ),
               const SizedBox(height: 16),
               _buildDocumentPicker(
@@ -181,6 +202,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                 file: _medicalCertificate,
                 currentUrl: widget.child?.medicalCertificateUrl,
                 onTap: _pickMedicalCertificate,
+                onRemove: () => setState(() => _medicalCertificate = null),
               ),
             ],
           ),
@@ -201,9 +223,10 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     File? file,
     String? currentUrl,
     required VoidCallback onTap,
+    required VoidCallback onRemove,
   }) {
     final bool hasFile = file != null || currentUrl != null;
-    final bool isImage = file != null && (file.path.endsWith('.jpg') || file.path.endsWith('.png') || file.path.endsWith('.jpeg')) ||
+    final bool isImage = (file != null && (file.path.toLowerCase().endsWith('.jpg') || file.path.toLowerCase().endsWith('.png') || file.path.toLowerCase().endsWith('.jpeg'))) ||
                         (currentUrl != null && (currentUrl.toLowerCase().contains('.jpg') || currentUrl.toLowerCase().contains('.png') || currentUrl.toLowerCase().contains('.jpeg')));
 
     return Column(
@@ -211,66 +234,61 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            height: 120,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: hasFile ? Colors.green.withAlpha(128) : Colors.grey[300]!),
-            ),
-            child: hasFile
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      children: [
-                        if (isImage)
-                          Positioned.fill(
-                            child: file != null
-                                ? Image.file(file, fit: BoxFit.cover)
-                                : CachedNetworkImage(
-                                    imageUrl: currentUrl!,
-                                    fit: BoxFit.cover,
-                                    placeholder: (c, u) => const Center(child: CircularProgressIndicator()),
-                                    errorWidget: (c, u, e) => const Icon(Icons.error),
-                                  ),
-                          )
-                        else
-                          const Center(
+        if (hasFile)
+          Stack(
+            children: [
+              Container(
+                height: 150,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: isImage
+                      ? (file != null
+                          ? Image.file(file, fit: BoxFit.cover)
+                          : CachedNetworkImage(imageUrl: currentUrl!, fit: BoxFit.cover, placeholder: (c, u) => const Center(child: CircularProgressIndicator())))
+                      : Container(
+                          color: Colors.grey[100],
+                          child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.description, size: 40, color: Colors.blue),
-                                Text("Fichier PDF/Doc", style: TextStyle(fontSize: 10)),
+                                const Icon(Icons.description, size: 50, color: Colors.blue),
+                                const SizedBox(height: 8),
+                                Text(file != null ? file.path.split('/').last : "Document existant", style: const TextStyle(fontSize: 12)),
                               ],
                             ),
                           ),
-                        // Check overlay to indicate file selected
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                            child: const Icon(Icons.check, color: Colors.white, size: 16),
-                          ),
                         ),
-                      ],
-                    ),
-                  )
-                : const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.upload_file, size: 32, color: Colors.grey),
-                      SizedBox(height: 4),
-                      Text("Cliquez pour télécharger", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    ],
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: onRemove,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    child: const Icon(Icons.close, color: Colors.white, size: 20),
                   ),
+                ),
+              ),
+            ],
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: onTap,
+            icon: const Icon(Icons.upload_file),
+            label: const Text("Télécharger le document"),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-        ),
       ],
     );
   }
