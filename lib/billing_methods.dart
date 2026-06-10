@@ -5,7 +5,7 @@ import 'providers/child_enrollment_provider.dart';
 import 'models/child_model_complete.dart';
 import 'models/enrollment_model_complete.dart';
 import 'widgets/glass_card.dart';
-///
+
 class BillingMethods {
   static Widget buildChildBillingCard(BuildContext context, ChildEnrollmentProvider provider, ChildModel child) {
     final enrollments = provider.getEnrollmentsForChild(child.id);
