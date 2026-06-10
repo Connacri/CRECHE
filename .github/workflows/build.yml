@@ -139,7 +139,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path release-artifacts
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "release-artifacts/creche-windows-v${version}.zip"
           
-          # Create installer if Inno Setup exists
+#          Create installer if Inno Setup exists
           if (Test-Path "C:\Program Files (x86)\Inno Setup 6\iscc.exe") {
             & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows/inno-setup.iss
             if (Test-Path "build/windows/installer/creche-windows-installer.exe") {
@@ -201,7 +201,7 @@ jobs:
           VERSION="${{ needs.version.outputs.version }}"
           BUILD="${{ needs.version.outputs.build_number }}"
           
-          # Check if Android or Windows release succeeded
+#          Check if Android or Windows release succeeded
           ANDROID_SUCCESS="${{ needs.release-android.result }}"
           WINDOWS_SUCCESS="${{ needs.release-windows.result }}"
           
@@ -235,7 +235,7 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           
-          # Only commit if there are changes
+#          Only commit if there are changes
           if [[ -n "$(git status --porcelain)" ]]; then
             git add pubspec.yaml README.md
             git commit -m "chore: update metadata to v${{ needs.version.outputs.version }}
