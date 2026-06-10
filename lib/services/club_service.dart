@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'supabase_service.dart';
 import '../models/user_model.dart';
 
@@ -8,6 +9,10 @@ class ClubService extends AdminSupabaseService {
         .stream(primaryKey: ['id'])
         .eq('club_id', clubId)
         .order('created_at', ascending: false)
+        .handleError((error) {
+          debugPrint('❌ [ClubService] Error in getClubMembersStream: $error');
+          return <Map<String, dynamic>>[];
+        })
         .map((data) => data.cast<Map<String, dynamic>>());
   }
 

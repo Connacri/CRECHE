@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../models/school_slot_model.dart';
 import '../models/session_schedule_model.dart';
@@ -10,6 +11,10 @@ class SupabaseSchoolService extends AdminSupabaseService {
         .stream(primaryKey: ['id'])
         .eq('school_id', schoolId)
         .order('day_of_week', ascending: true)
+        .handleError((error) {
+          debugPrint('❌ [SupabaseSchoolService] Error in getSchoolSlotsStream: $error');
+          return <Map<String, dynamic>>[];
+        })
         .map((data) => data.map((json) => SchoolSlotModel.fromSupabase(json)).toList());
   }
 

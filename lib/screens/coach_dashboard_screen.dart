@@ -165,6 +165,10 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
         .from('session_schedules')
         .stream(primaryKey: ['id'])
         .eq('school_id', schoolId)
+        .handleError((error) {
+          debugPrint('❌ [CoachDashboard] Error in schedules stream: $error');
+          return <Map<String, dynamic>>[];
+        })
         .listen((data) {
           if (mounted) {
             setState(() {

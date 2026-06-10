@@ -81,6 +81,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     _ownerEnrollmentsSubscription = _supabaseChildService.adminClient
         .from('enrollments')
         .stream(primaryKey: ['id'])
+        .handleError((e) => debugPrint('❌ [ChildEnrollmentProvider] Error: $e'))
         .listen((_) {
           loadOwnerEnrollmentsDetailed(ownerId);
         });

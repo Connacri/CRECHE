@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'supabase_service.dart';
 
 class EventService extends AdminSupabaseService {
@@ -6,6 +7,10 @@ class EventService extends AdminSupabaseService {
         .from('events')
         .stream(primaryKey: ['id'])
         .order('start_date', ascending: false)
+        .handleError((error) {
+          debugPrint('❌ [EventService] Error in getClubEventsStream: $error');
+          return <Map<String, dynamic>>[];
+        })
         .map((data) => data.where((e) => e['club_id'] == clubId || e['created_by'] == clubId).toList());
   }
 
