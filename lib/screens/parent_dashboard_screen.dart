@@ -462,14 +462,23 @@ class _ChildProfileDialog extends StatelessWidget {
                   pinned: true,
                   flexibleSpace: FlexibleSpaceBar(
                     title: Text('${child.firstName} ${child.lastName}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    background: child.photoUrl != null
-                        ? CachedNetworkImage(imageUrl: child.photoUrl!, fit: BoxFit.cover)
-                        : Container(
-                            color: colorScheme.primary,
-                            child: Center(child: Text(child.firstName[0],
-                              style: const TextStyle(fontSize: 80, color: Colors.white))),
-                          ),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black45, blurRadius: 10)])),
+                    background: InkWell(
+                      onTap: child.photoUrl != null 
+                        ? () => _openFullScreenImage(context, child.photoUrl!, 'child-photo-${child.id}', '${child.firstName} ${child.lastName}')
+                        : null,
+                      child: Hero(
+                        tag: 'child-photo-${child.id}',
+                        child: child.photoUrl != null
+                            ? CachedNetworkImage(imageUrl: child.photoUrl!, fit: BoxFit.cover)
+                            : Container(
+                                color: colorScheme.primary,
+                                child: Center(child: Text(child.firstName[0],
+                                  style: const TextStyle(fontSize: 80, color: Colors.white))),
+                              ),
+                      ),
+                    ),
                   ),
                   actions: [
                     IconButton(
@@ -491,15 +500,53 @@ class _ChildProfileDialog extends StatelessWidget {
                         const Text('Informations Personnelles',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
-                        _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(child.dateOfBirth)),
-                        _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo.bloodType ?? 'Non spécifié'),
-                        _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo.allergies.isEmpty ? 'Aucune' : child.medicalInfo.allergies.join(", ")),
+                        Row(
+                          children: [
+                            Expanded(child: _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(child.dateOfBirth))),
+                            Expanded(child: _buildInfoRow(context, Icons.hourglass_empty, 'Âge', '${child.age} ans')),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(child: _buildInfoRow(context, child.gender == ChildGender.male ? Icons.male : Icons.female, 'Genre', child.gender == ChildGender.male ? 'Garçon' : child.gender == ChildGender.female ? 'Fille' : 'Autre')),
+                            Expanded(child: _buildInfoRow(context, Icons.school, 'Niveau', child.schoolGrade ?? 'Non spécifié')),
+                          ],
+                        ),
+                        const Divider(height: 32),
+                        Row(
+                          children: [
+                            Expanded(child: _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo.bloodType ?? 'Non spécifié')),
+                            Expanded(child: _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo.allergies.isEmpty ? 'Aucune' : child.medicalInfo.allergies.join(", "))),
+                          ],
+                        ),
                         
+                        const SizedBox(height: 32),
+                        const Text('Documents Administratifs',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            _buildDocumentPreview(
+                              context, 
+                              "Extrait de naissance", 
+                              child.birthCertificateUrl, 
+                              'child-birth-${child.id}'
+                            ),
+                            const SizedBox(width: 16),
+                            _buildDocumentPreview(
+                              context, 
+                              "Certificat médical", 
+                              child.medicalCertificateUrl, 
+                              'child-medical-${child.id}'
+                            ),
+                          ],
+                        ),
+
                         const SizedBox(height: 32),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Inscriptions',
+                            const Text('Inscriptions aux Cours',
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                             ElevatedButton.icon(
                               onPressed: () => _showCourseSelectionDialog(context, child),
@@ -732,6 +779,63 @@ class _ChildProfileDialog extends StatelessWidget {
             child: const Text("Confirmer l'annulation", style: TextStyle(color: Colors.red)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openFullScreenImage(BuildContext context, String imageUrl, String heroTag, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _FullScreenImageViewer(
+          imageUrl: imageUrl,
+          heroTag: heroTag,
+          title: title,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentPreview(BuildContext context, String title, String? url, String heroTag) {
+    return Expanded(
+      child: InkWell(
+        onTap: url != null ? () => _openFullScreenImage(context, url, heroTag, title) : null,
+        child: Column(
+          children: [
+            Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Hero(
+              tag: heroTag,
+              child: Container(
+                height: 120,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                  color: Colors.grey.withValues(alpha: 0.1),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: url != null
+                      ? CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                          errorWidget: (context, url, error) => const Icon(Icons.error),
+                        )
+                      : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.document_scanner, color: Colors.grey, size: 40),
+                            SizedBox(height: 4),
+                            Text("Non fourni", style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1558,5 +1662,49 @@ class _CourseSelectionDialogState extends State<_CourseSelectionDialog> {
         SnackBar(content: Text(allSuccess ? 'Inscriptions réussies' : 'Certaines inscriptions ont échoué')),
       );
     }
+  }
+}
+
+class _FullScreenImageViewer extends StatelessWidget {
+  final String imageUrl;
+  final String heroTag;
+  final String title;
+
+  const _FullScreenImageViewer({
+    required this.imageUrl,
+    required this.heroTag,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
+      ),
+      body: Center(
+        child: Hero(
+          tag: heroTag,
+          child: InteractiveViewer(
+            panEnabled: true,
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              height: double.infinity,
+              placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+              errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white, size: 50),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
