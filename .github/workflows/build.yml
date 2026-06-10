@@ -15,13 +15,12 @@ on:
 
 jobs:
   version:
-    name: Determine & Update Version
+    name: Determine Version
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       version: ${{ steps.set_version.outputs.version }}
       build_number: ${{ steps.set_version.outputs.build_number }}
+      should_release: ${{ steps.set_version.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,49 +33,26 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/v}"
             echo "version=$TAG" >> "$GITHUB_OUTPUT"
             echo "build_number=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == 'push' && "${{ github.ref }}" == 'refs/heads/main' ]]; then
             LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.2.82")
             LATEST_VERSION="${LATEST_TAG#v}"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
             NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
             echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
             echo "build_number=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Update pubspec.yaml version (Main Branch Only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          VERSION="${{ steps.set_version.outputs.version }}"
-          BUILD="${{ steps.set_version.outputs.build_number }}"
-          sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
-
-      - name: Update README version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          VERSION="${{ steps.set_version.outputs.version }}"
-          sed -i "s/✨ CRÈCHE V.* ✨/✨ CRÈCHE V${VERSION} ✨/" README.md
-
-      - name: Commit version bump
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add pubspec.yaml
-          git commit -m "chore: bump version to ${{ steps.set_version.outputs.version }}+${{ steps.set_version.outputs.build_number }}"
-          git push
 
   build-android:
     name: Build Android
     needs: version
+    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Apply Version to pubspec.yaml
-        run: |
-          VERSION="${{ needs.version.outputs.version }}"
-          BUILD="${{ needs.version.outputs.build_number }}"
-          sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -100,27 +76,48 @@ jobs:
       - name: Rename APK
         run: |
           VERSION="${{ needs.version.outputs.version }}"
-          mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/creche-android-v${VERSION}.apk"
+          mkdir -p release-artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk "release-artifacts/creche-android-v${VERSION}.apk"
 
-      - name: Upload APK
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/creche-android-v*.apk
+          name: android-release
+          path: release-artifacts/
+          retention-days: 7
+
+  release-android:
+    name: Release Android
+    needs: [version, build-android]
+    if: needs.version.outputs.should_release == 'true' && success()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: android-artifacts
+
+      - name: Create Android Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ needs.version.outputs.version }}
+          name: "Android Release v${{ needs.version.outputs.version }}"
+          files: android-artifacts/*.apk
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
 
   build-windows:
     name: Build Windows
     needs: version
+    if: needs.version.outputs.should_release == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Apply Version to pubspec.yaml
-        shell: pwsh
-        run: |
-          $version = "${{ needs.version.outputs.version }}"
-          $build = "${{ needs.version.outputs.build_number }}"
-          (Get-Content pubspec.yaml) -replace '^version:.*', "version: $version+$build" | Set-Content pubspec.yaml
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -135,47 +132,145 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Create Installer (Inno Setup)
+      - name: Create Windows artifacts
         shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows/inno-setup.iss
+          $version = "${{ needs.version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path release-artifacts
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "release-artifacts/creche-windows-v${version}.zip"
+          
+          # Create installer if Inno Setup exists
+          if (Test-Path "C:\Program Files (x86)\Inno Setup 6\iscc.exe") {
+            & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows/inno-setup.iss
+            if (Test-Path "build/windows/installer/creche-windows-installer.exe") {
+              Copy-Item "build/windows/installer/creche-windows-installer.exe" -Destination "release-artifacts/creche-windows-installer-v${version}.exe"
+            }
+          }
 
-      - name: Package Windows Zip
-        shell: pwsh
-        run: |
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath creche-windows-x64.zip
-
-      - name: Upload Windows Zip
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-zip
-          path: creche-windows-x64.zip
+          name: windows-release
+          path: release-artifacts/
+          retention-days: 7
 
-      - name: Upload Windows Installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: build/windows/installer/creche-windows-installer.exe
-
-  release:
-    name: Create Release
-    needs: [version, build-android, build-windows]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+  release-windows:
+    name: Release Windows
+    needs: [version, build-windows]
+    if: needs.version.outputs.should_release == 'true' && success()
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: windows-artifacts
 
-      - name: Create GitHub Release
+      - name: Create Windows Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.version.outputs.version }}
-          name: Release v${{ needs.version.outputs.version }}
-          files: |
-            android-apk/creche-android-v*.apk
-            windows-installer/creche-windows-installer.exe
-            windows-zip/creche-windows-x64.zip
+          tag_name: windows-v${{ needs.version.outputs.version }}
+          name: "Windows Release v${{ needs.version.outputs.version }}"
+          files: windows-artifacts/*
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: true
+          draft: false
+          prerelease: false
+
+  update-metadata:
+    name: Update README and pubspec
+    needs: [version, release-android, release-windows]
+    if: |
+      needs.version.outputs.should_release == 'true' && 
+      (success() || failure()) &&  # Run even if one platform fails
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update pubspec.yaml
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          BUILD="${{ needs.version.outputs.build_number }}"
+          
+          # Check if Android or Windows release succeeded
+          ANDROID_SUCCESS="${{ needs.release-android.result }}"
+          WINDOWS_SUCCESS="${{ needs.release-windows.result }}"
+          
+          echo "Android release status: $ANDROID_SUCCESS"
+          echo "Windows release status: $WINDOWS_SUCCESS"
+          
+          # Only update if at least one platform succeeded
+          if [[ "$ANDROID_SUCCESS" == "success" ]] || [[ "$WINDOWS_SUCCESS" == "success" ]]; then
+            sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
+            echo "Updated pubspec.yaml to version $VERSION+$BUILD"
+          else
+            echo "No successful releases, skipping pubspec update"
+            exit 1
+          fi
+
+      - name: Update README version
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          sed -i "s/✨ CRÈCHE V.* ✨/✨ CRÈCHE V${VERSION} ✨/" README.md
+          echo "Updated README.md badge to version $VERSION"
+
+      - name: Update badge URLs (optional)
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          # Update download badges if they exist
+          sed -i "s|creche-android-v.*.apk|creche-android-v${VERSION}.apk|g" README.md 2>/dev/null || true
+          sed -i "s|creche-windows-v.*.zip|creche-windows-v${VERSION}.zip|g" README.md 2>/dev/null || true
+
+      - name: Commit metadata updates
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          
+          # Only commit if there are changes
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add pubspec.yaml README.md
+            git commit -m "chore: update metadata to v${{ needs.version.outputs.version }}
+          
+            Build number: ${{ needs.version.outputs.build_number }}
+            Android release status: ${{ needs.release-android.result }}
+            Windows release status: ${{ needs.release-windows.result }}"
+            git push
+          else
+            echo "No changes to commit"
+          fi
+
+  summary:
+    name: Build Summary
+    needs: [version, release-android, release-windows, update-metadata]
+    if: always() && needs.version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number:** ${{ needs.version.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Platform Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Android:** ${{ needs.release-android.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Windows:** ${{ needs.release-windows.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Metadata Update:** ${{ needs.update-metadata.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.release-android.result }}" == "success" ]]; then
+            echo "✅ Android release available: [android-v${{ needs.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/android-v${{ needs.version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ needs.release-windows.result }}" == "success" ]]; then
+            echo "✅ Windows release available: [windows-v${{ needs.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/windows-v${{ needs.version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          fi
