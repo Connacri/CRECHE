@@ -69,7 +69,8 @@ class _EnrollmentList extends StatelessWidget {
       try {
         final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
         return enrollment.status == status;
-      } catch (_) {
+      } catch (err) {
+        debugPrint('❌ [EnrollmentsPage] Error parsing enrollment: $err');
         return false;
       }
     }).toList();

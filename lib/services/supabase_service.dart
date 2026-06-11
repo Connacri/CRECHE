@@ -263,9 +263,15 @@ class SupabaseChildService extends AdminSupabaseService {
   }
 
   Future<List<EnrollmentModel>> getEnrollmentsForOwner(String ownerId) async {
-    final coursesResponse = await adminClient.from('courses').select('id').eq('created_by', ownerId);
+    // Chercher les cours créés par l'utilisateur OU appartenant à son club
+    final coursesResponse = await adminClient
+        .from('courses')
+        .select('id')
+        .or('created_by.eq.$ownerId,club_id.eq.$ownerId');
+    
     final courseIds = (coursesResponse as List).map((c) => c['id'] as String).toList();
     if (courseIds.isEmpty) return [];
+    
     final response = await adminClient.from('enrollments').select().inFilter('course_id', courseIds);
     return response.map((data) => EnrollmentModel.fromSupabase(data)).toList();
   }

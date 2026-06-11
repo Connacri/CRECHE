@@ -107,12 +107,17 @@ class ChildEnrollmentProvider with ChangeNotifier {
 
   void subscribeToOwnerEnrollments(String ownerId) {
     if (ownerId.isEmpty) return;
+    
+    // Charger immédiatement les données initiales
+    loadOwnerEnrollmentsDetailed(ownerId);
+    
     _ownerEnrollmentsSubscription?.cancel();
     _ownerEnrollmentsSubscription = _supabaseChildService.adminClient
         .from('enrollments')
         .stream(primaryKey: ['id'])
-        .handleError((e) => debugPrint('❌ [ChildEnrollmentProvider] Error: $e'))
+        .handleError((e) => debugPrint('❌ [ChildEnrollmentProvider] Stream Error: $e'))
         .listen((_) {
+          debugPrint('🔄 [ChildEnrollmentProvider] Enrollments changed, reloading...');
           loadOwnerEnrollmentsDetailed(ownerId);
         });
   }

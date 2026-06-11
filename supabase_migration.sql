@@ -3,7 +3,7 @@
 
 -- 1. Table: users
 CREATE TABLE IF NOT EXISTS public.users (
-    id UUID PRIMARY KEY, -- Matches Firebase UID
+    id TEXT PRIMARY KEY, -- Matches Firebase UID
     email TEXT UNIQUE NOT NULL,
     name TEXT,
     role TEXT DEFAULT 'parent',
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- 2. Table: children
 CREATE TABLE IF NOT EXISTS public.children (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    parent_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    parent_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     date_of_birth DATE NOT NULL,
@@ -54,8 +54,8 @@ CREATE TABLE IF NOT EXISTS public.courses (
     season_end_date TIMESTAMPTZ,
     location JSONB,
     images JSONB DEFAULT '[]'::jsonb,
-    created_by UUID REFERENCES public.users(id),
-    club_id UUID,
+    created_by TEXT REFERENCES public.users(id),
+    club_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     is_active BOOLEAN DEFAULT TRUE,
@@ -72,11 +72,11 @@ CREATE TABLE IF NOT EXISTS public.enrollments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
     child_id UUID REFERENCES public.children(id) ON DELETE CASCADE,
-    parent_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    parent_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     status TEXT DEFAULT 'pending',
     enrolled_at TIMESTAMPTZ DEFAULT NOW(),
     approved_at TIMESTAMPTZ,
-    approved_by UUID REFERENCES public.users(id),
+    approved_by TEXT REFERENCES public.users(id),
     rejection_reason TEXT,
     payment_status TEXT DEFAULT 'pending',
     total_amount NUMERIC,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS public.enrollments (
 -- 5. Table: events
 CREATE TABLE IF NOT EXISTS public.events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    club_id UUID,
+    club_id TEXT,
     title TEXT NOT NULL,
     description TEXT,
     type TEXT DEFAULT 'autre',
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS public.events (
     allowed_categories TEXT[],
     tags TEXT[],
     metadata JSONB,
-    created_by UUID REFERENCES public.users(id),
+    created_by TEXT REFERENCES public.users(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS public.events (
 CREATE TABLE IF NOT EXISTS public.event_registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID REFERENCES public.events(id) ON DELETE CASCADE,
-    registrant_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    registrant_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     child_id UUID REFERENCES public.children(id) ON DELETE CASCADE,
     status TEXT DEFAULT 'pending',
     payment_status TEXT DEFAULT 'not_required',
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS public.daily_activities (
 -- 8. Table: school_available_slots
 CREATE TABLE IF NOT EXISTS public.school_available_slots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    school_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    school_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     day_of_week INTEGER NOT NULL, -- 0=Monday, etc.
     time_slot JSONB NOT NULL,
     is_occupied BOOLEAN DEFAULT FALSE,
@@ -172,17 +172,17 @@ CREATE TABLE IF NOT EXISTS public.session_schedules (
     current_enrollment INTEGER DEFAULT 0,
     max_capacity INTEGER DEFAULT 30,
     location TEXT,
-    coach_id UUID REFERENCES public.users(id),
+    coach_id TEXT REFERENCES public.users(id),
     room_name TEXT,
-    school_id UUID REFERENCES public.users(id),
+    school_id TEXT REFERENCES public.users(id),
     metadata JSONB
 );
 
 -- 10. Table: members (Club Members)
 CREATE TABLE IF NOT EXISTS public.members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    club_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+    user_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     membership_number TEXT,
     membership_type TEXT DEFAULT 'standard',
     status TEXT DEFAULT 'active',
@@ -197,7 +197,7 @@ CREATE TABLE IF NOT EXISTS public.members (
 CREATE TABLE IF NOT EXISTS public.coaching_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
-    coach_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    coach_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     role TEXT DEFAULT 'main',
     assigned_at TIMESTAMPTZ DEFAULT NOW(),
     unassigned_at TIMESTAMPTZ,
@@ -208,7 +208,7 @@ CREATE TABLE IF NOT EXISTS public.coaching_history (
 -- 12. Table: invoices
 CREATE TABLE IF NOT EXISTS public.invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    club_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     member_id UUID REFERENCES public.members(id) ON DELETE CASCADE,
     invoice_number TEXT UNIQUE NOT NULL,
     total_amount NUMERIC NOT NULL,
@@ -222,7 +222,7 @@ CREATE TABLE IF NOT EXISTS public.invoices (
 -- 13. Table: club_expenses
 CREATE TABLE IF NOT EXISTS public.club_expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    club_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     description TEXT NOT NULL,
     amount NUMERIC NOT NULL,
     category TEXT,
@@ -239,13 +239,14 @@ CREATE TABLE IF NOT EXISTS public.payments (
     payment_method TEXT,
     transaction_id TEXT,
     date TIMESTAMPTZ DEFAULT NOW(),
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by TEXT REFERENCES public.users(id)
 );
 
 -- 15. Table: inventory_items
 CREATE TABLE IF NOT EXISTS public.inventory_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    club_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
     quantity INTEGER DEFAULT 0,
@@ -259,11 +260,11 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
 CREATE TABLE IF NOT EXISTS public.inventory_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     item_id UUID REFERENCES public.inventory_items(id) ON DELETE CASCADE,
-    club_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    club_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     transaction_type TEXT NOT NULL, -- 'in', 'out', 'adjustment'
     quantity INTEGER NOT NULL,
     notes TEXT,
-    created_by UUID REFERENCES public.users(id),
+    created_by TEXT REFERENCES public.users(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -314,7 +315,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: get_owner_enrollments_with_details
-CREATE OR REPLACE FUNCTION public.get_owner_enrollments_with_details(owner_id UUID)
+CREATE OR REPLACE FUNCTION public.get_owner_enrollments_with_details(owner_id TEXT)
 RETURNS JSONB AS $$
 DECLARE
     result JSONB;
@@ -328,7 +329,7 @@ BEGIN
         FROM public.enrollments e
         JOIN public.courses c ON e.course_id = c.id
         JOIN public.children ch ON e.child_id = ch.id
-        WHERE c.created_by = owner_id
+        WHERE c.created_by = owner_id OR c.club_id = owner_id
     ) e_data;
     
     RETURN COALESCE(result, '[]'::jsonb);
@@ -336,7 +337,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: get_club_financial_summary
-CREATE OR REPLACE FUNCTION public.get_club_financial_summary(p_club_id UUID, p_year INTEGER DEFAULT EXTRACT(YEAR FROM CURRENT_DATE))
+CREATE OR REPLACE FUNCTION public.get_club_financial_summary(p_club_id TEXT, p_year INTEGER DEFAULT EXTRACT(YEAR FROM CURRENT_DATE))
 RETURNS JSONB AS $$
 DECLARE
     total_revenue NUMERIC;
@@ -348,7 +349,7 @@ BEGIN
     SELECT COALESCE(SUM(paid_amount), 0) INTO total_revenue
     FROM public.enrollments e
     JOIN public.courses c ON e.course_id = c.id
-    WHERE c.created_by = p_club_id
+    WHERE (c.created_by = p_club_id OR c.club_id = p_club_id)
     AND EXTRACT(YEAR FROM e.enrolled_at) = p_year;
 
     -- Expenses
@@ -361,13 +362,13 @@ BEGIN
     SELECT COUNT(*) INTO total_enrollments
     FROM public.enrollments e
     JOIN public.courses c ON e.course_id = c.id
-    WHERE c.created_by = p_club_id
+    WHERE (c.created_by = p_club_id OR c.club_id = p_club_id)
     AND EXTRACT(YEAR FROM e.enrolled_at) = p_year;
 
     -- Active courses
     SELECT COUNT(*) INTO active_courses
     FROM public.courses
-    WHERE created_by = p_club_id AND is_active = TRUE;
+    WHERE (created_by = p_club_id OR club_id = p_club_id) AND is_active = TRUE;
 
     RETURN jsonb_build_object(
         'total_revenue', total_revenue,
@@ -380,7 +381,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: get_club_subscription_status (Placeholder)
-CREATE OR REPLACE FUNCTION public.get_club_subscription_status(p_club_id UUID)
+CREATE OR REPLACE FUNCTION public.get_club_subscription_status(p_club_id TEXT)
 RETURNS JSONB AS $$
 BEGIN
     RETURN jsonb_build_object(
