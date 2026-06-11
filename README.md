@@ -3,7 +3,7 @@
 <div align="center">
   <img src="assets/images/creche_logo.png" width="200" alt="Crèche Logo" style="border-radius: 50%; box-shadow: 0 0 30px rgba(138, 43, 226, 0.6); border: 4px solid #8A2BE2;"/>
   <br/>
-  <h1 style="font-family: 'Oswald', sans-serif; letter-spacing: 2px;">✨ CRÈCHE V1.2.96 ✨</h1>
+  <h1 style="font-family: 'Oswald', sans-serif; letter-spacing: 2px;">✨ CRÈCHE V1.2.97 ✨</h1>
   <p><i>Un écosystème intelligent, connecté et sécurisé pour l'épanouissement de vos enfants.</i></p>
   
   <br/>
