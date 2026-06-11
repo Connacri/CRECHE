@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -663,7 +664,7 @@ class _ChildProfileDialog extends StatelessWidget {
                                                   const Text("Paiement requis",
                                                     style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500, fontSize: 13)),
                                                   ElevatedButton.icon(
-                                                    onPressed: () => _showPaymentQR(context, enrollment),
+                                                    onPressed: () => _showPaymentQR(context, enrollment, child),
                                                     icon: const Icon(Icons.qr_code, size: 18),
                                                     label: const Text("Payer", style: TextStyle(fontSize: 12)),
                                                     style: ElevatedButton.styleFrom(
@@ -698,7 +699,7 @@ class _ChildProfileDialog extends StatelessWidget {
     );
   }
 
-  void _showPaymentQR(BuildContext context, EnrollmentModel enrollment) {
+  void _showPaymentQR(BuildContext context, EnrollmentModel enrollment, ChildModel child) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1365,7 +1366,7 @@ class _BillingPage extends StatelessWidget {
                       children: [
                         if (idx > 0)
                           const Divider(height: 28, thickness: 0.5),
-                        _buildEnrollmentRow(context, e, course),
+                        _buildEnrollmentRow(context, e, course, child),
                       ],
                     );
                   }),
@@ -1399,7 +1400,7 @@ class _BillingPage extends StatelessWidget {
   }
 
   Widget _buildEnrollmentRow(
-      BuildContext context, EnrollmentModel enrollment, CourseModel course) {
+      BuildContext context, EnrollmentModel enrollment, CourseModel course, ChildModel child) {
     final colorScheme = Theme.of(context).colorScheme;
     final isPaid = enrollment.paymentStatus == PaymentStatus.paid;
     final isPartial = enrollment.paymentStatus == PaymentStatus.partial;
@@ -1496,7 +1497,7 @@ class _BillingPage extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => _showPaymentQR(context, enrollment),
+              onPressed: () => _showPaymentQR(context, enrollment, child),
               icon: const Icon(Icons.qr_code, size: 18),
               label: const Text('Payer maintenant',
                   style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1528,7 +1529,7 @@ class _BillingPage extends StatelessWidget {
     );
   }
 
-  void _showPaymentQR(BuildContext context, EnrollmentModel enrollment) {
+  void _showPaymentQR(BuildContext context, EnrollmentModel enrollment, ChildModel child) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
