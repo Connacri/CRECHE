@@ -9,6 +9,7 @@ import '../providers/child_enrollment_provider.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
+import '../services/pdf_dossier_service.dart';
 import 'glass_card.dart';
 
 class EnrollmentsPage extends StatefulWidget {
@@ -113,17 +114,37 @@ class _EnrollmentsPageState extends State<EnrollmentsPage> with SingleTickerProv
 
   void _handleScannedData(BuildContext context, String data) {
     try {
-      final decoded = jsonDecode(data);
-      if (decoded['type'] == 'enrollment_payment') {
-        final enrollmentId = decoded['id'];
-        final childName = decoded['child_name'];
-        final amount = (decoded['amount'] as num).toDouble();
-        
-        _showValidationDialog(context, enrollmentId, childName, amount);
+      // 1. Essayer le format JSON (format recommandé)
+      if (data.startsWith('{')) {
+        final decoded = jsonDecode(data);
+        if (decoded['type'] == 'enrollment_payment') {
+          final enrollmentId = decoded['id'];
+          final childName = decoded['child_name'];
+          final amount = (decoded['amount'] as num).toDouble();
+          
+          _showValidationDialog(context, enrollmentId, childName, amount);
+          return;
+        }
+      }
+      
+      // 2. Si ce n'est pas du JSON, essayer de trouver l'ID dans la liste locale
+      final provider = context.read<ChildEnrollmentProvider>();
+      final item = provider.ownerEnrollmentsDetailed.firstWhere(
+        (e) => e['enrollment']?['id'] == data,
+        orElse: () => {},
+      );
+
+      if (item.isNotEmpty) {
+        final enrollment = EnrollmentModel.fromSupabase(item['enrollment']);
+        final child = ChildModel.fromSupabase(item['child']);
+        _showValidationDialog(context, enrollment.id, child.firstName, enrollment.totalAmount ?? 0.0);
+      } else {
+        throw Exception('Inscription non trouvée');
       }
     } catch (e) {
+      debugPrint('❌ [EnrollmentsPage] Error handling scanned data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Format de QR Code invalide')),
+        SnackBar(content: Text('Format de QR Code invalide ou inscription introuvable : $e')),
       );
     }
   }
@@ -362,6 +383,15 @@ class _EnrollmentList extends StatelessWidget {
              Text('Paiement: ${enrollment.paymentStatus.displayName}'),
              Text('Montant: ${enrollment.totalAmount} DA'),
              const SizedBox(height: 24),
+             SizedBox(
+               width: double.infinity,
+               child: OutlinedButton.icon(
+                 onPressed: () => PdfDossierService.generateAndPrintDossier(child),
+                 icon: const Icon(Icons.picture_as_pdf),
+                 label: const Text('Imprimer Dossier PDF'),
+               ),
+             ),
+             const SizedBox(height: 8),
              SizedBox(
                width: double.infinity,
                child: FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),

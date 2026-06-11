@@ -715,7 +715,12 @@ class _ChildProfileDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: QrImageView(
-                data: enrollment.id,
+                data: jsonEncode({
+                  'type': 'enrollment_payment',
+                  'id': enrollment.id,
+                  'child_name': child.firstName,
+                  'amount': enrollment.totalAmount ?? 0.0,
+                }),
                 version: QrVersions.auto,
                 size: 200.0,
               ),
