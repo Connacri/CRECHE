@@ -549,6 +549,14 @@ class ChildEnrollmentProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> validatePayment(String enrollmentId, double amount) async {
+    return updateEnrollment(
+      enrollmentId: enrollmentId,
+      paymentStatus: PaymentStatus.paid,
+      paidAmount: amount,
+    );
+  }
+
   void _setError(String? value) { _error = value; notifyListeners(); }
   void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
 }
