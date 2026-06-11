@@ -9,10 +9,10 @@
   <br/>
 
   <div align="center">
-    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-android.apk">
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-android-v1.2.98.apk">
       <img src="https://img.shields.io/badge/Download-Android_APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK"/>
     </a>
-    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-windows-x64.zip">
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-windows-v1.2.98.zip">
       <img src="https://img.shields.io/badge/Download-Windows_EXE-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download Windows EXE"/>
     </a>
   </div>

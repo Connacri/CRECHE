@@ -86,31 +86,6 @@ jobs:
           path: release-artifacts/
           retention-days: 7
 
-  release-android:
-    name: Release Android
-    needs: [version, build-android]
-    if: needs.version.outputs.should_release == 'true' && success()
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download Android artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: android-release
-          path: android-artifacts
-
-      - name: Create Android Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-v${{ needs.version.outputs.version }}
-          name: "Android Release v${{ needs.version.outputs.version }}"
-          files: android-artifacts/*.apk
-          token: ${{ secrets.GITHUB_TOKEN }}
-          generate_release_notes: true
-          draft: false
-          prerelease: false
-
   build-windows:
     name: Build Windows
     needs: version
@@ -153,26 +128,32 @@ jobs:
           path: release-artifacts/
           retention-days: 7
 
-  release-windows:
-    name: Release Windows
-    needs: [version, build-windows]
-    if: needs.version.outputs.should_release == 'true' && success()
+  release:
+    name: Create Combined Release
+    needs: [version, build-android, build-windows]
+    if: needs.version.outputs.should_release == 'true' && (success() || failure())
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: all-artifacts
+
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
           name: windows-release
-          path: windows-artifacts
+          path: all-artifacts
 
-      - name: Create Windows Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: windows-v${{ needs.version.outputs.version }}
-          name: "Windows Release v${{ needs.version.outputs.version }}"
-          files: windows-artifacts/*
+          tag_name: v${{ needs.version.outputs.version }}
+          name: "Crèche v${{ needs.version.outputs.version }}"
+          files: all-artifacts/*
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: true
           draft: false
@@ -180,10 +161,10 @@ jobs:
 
   update-metadata:
     name: Update README and pubspec
-    needs: [version, release-android, release-windows]
+    needs: [version, release]
     if: |
       needs.version.outputs.should_release == 'true' && 
-      (success() || failure()) &&
+      needs.release.result == 'success' &&
       github.event_name == 'push' && 
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -199,20 +180,8 @@ jobs:
         run: |
           VERSION="${{ needs.version.outputs.version }}"
           BUILD="${{ needs.version.outputs.build_number }}"
-          
-          ANDROID_SUCCESS="${{ needs.release-android.result }}"
-          WINDOWS_SUCCESS="${{ needs.release-windows.result }}"
-          
-          echo "Android release status: $ANDROID_SUCCESS"
-          echo "Windows release status: $WINDOWS_SUCCESS"
-          
-          if [[ "$ANDROID_SUCCESS" == "success" ]] || [[ "$WINDOWS_SUCCESS" == "success" ]]; then
-            sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
-            echo "Updated pubspec.yaml to version $VERSION+$BUILD"
-          else
-            echo "No successful releases, skipping pubspec update"
-            exit 1
-          fi
+          sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
+          echo "Updated pubspec.yaml to version $VERSION+$BUILD"
 
       - name: Update README version
         run: |
@@ -223,8 +192,10 @@ jobs:
       - name: Update badge URLs
         run: |
           VERSION="${{ needs.version.outputs.version }}"
-          sed -i "s|creche-android-v.*.apk|creche-android-v${VERSION}.apk|g" README.md 2>/dev/null || true
-          sed -i "s|creche-windows-v.*.zip|creche-windows-v${VERSION}.zip|g" README.md 2>/dev/null || true
+          # Update the URLs in README.md to point to the new versioned files
+          sed -i "s|creche-android-v[0-9.]*|creche-android-v${VERSION}|g" README.md
+          sed -i "s|creche-windows-v[0-9.]*|creche-windows-v${VERSION}|g" README.md
+          echo "Updated README.md artifact URLs to v$VERSION"
 
       - name: Commit metadata updates
         run: |
@@ -236,8 +207,7 @@ jobs:
             git commit -m "chore: update metadata to v${{ needs.version.outputs.version }}
           
             Build number: ${{ needs.version.outputs.build_number }}
-            Android release status: ${{ needs.release-android.result }}
-            Windows release status: ${{ needs.release-windows.result }}"
+            Release status: ${{ needs.release.result }}"
             git push
           else
             echo "No changes to commit"
@@ -245,7 +215,7 @@ jobs:
 
   summary:
     name: Build Summary
-    needs: [version, release-android, release-windows, update-metadata]
+    needs: [version, release, update-metadata]
     if: always() && needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -257,15 +227,10 @@ jobs:
           echo "**Build Number:** ${{ needs.version.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Platform Status" >> $GITHUB_STEP_SUMMARY
-          echo "- **Android:** ${{ needs.release-android.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Windows:** ${{ needs.release-windows.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release:** ${{ needs.release.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Metadata Update:** ${{ needs.update-metadata.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          if [[ "${{ needs.release-android.result }}" == "success" ]]; then
-            echo "✅ Android release available: [android-v${{ needs.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/android-v${{ needs.version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [[ "${{ needs.release-windows.result }}" == "success" ]]; then
-            echo "✅ Windows release available: [windows-v${{ needs.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/windows-v${{ needs.version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.release.result }}" == "success" ]]; then
+            echo "✅ Release available: [v${{ needs.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
           fi
