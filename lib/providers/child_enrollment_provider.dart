@@ -509,9 +509,24 @@ class ChildEnrollmentProvider with ChangeNotifier {
   Future<void> loadOwnerEnrollmentsDetailed(String ownerId) async {
     try {
       final data = await _supabaseChildService.getOwnerEnrollmentsWithDetails(ownerId);
-      _ownerEnrollmentsDetailed = data;
+      
+      // Adaptation pour assurer la compatibilité entre la structure de la RPC et les attentes de l'UI
+      _ownerEnrollmentsDetailed = data.map<Map<String, dynamic>>((item) {
+        if (item.containsKey('enrollment')) {
+          return Map<String, dynamic>.from(item);
+        }
+        
+        // Si la structure est plate (ancienne version de la RPC ou appel direct Supabase)
+        return {
+          'enrollment': item,
+          'course': item['courses'] ?? item['course'],
+          'child': item['children'] ?? item['child'],
+        };
+      }).toList();
+      
       notifyListeners();
     } catch (e) {
+      debugPrint('❌ [ChildEnrollmentProvider] Error loading owner enrollments: $e');
     }
   }
 

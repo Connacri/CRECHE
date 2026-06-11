@@ -322,9 +322,9 @@ BEGIN
     SELECT jsonb_agg(row_to_json(e_data)) INTO result
     FROM (
         SELECT 
-            e.*,
-            row_to_json(c) as courses,
-            row_to_json(ch) as children
+            row_to_json(e) as enrollment,
+            row_to_json(c) as course,
+            row_to_json(ch) as child
         FROM public.enrollments e
         JOIN public.courses c ON e.course_id = c.id
         JOIN public.children ch ON e.child_id = ch.id
