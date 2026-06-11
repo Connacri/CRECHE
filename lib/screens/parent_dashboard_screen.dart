@@ -899,7 +899,7 @@ class _CoursesPage extends StatelessWidget {
         return GridView.builder(
           padding: const EdgeInsets.all(24),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.75
+            crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.50
           ),
           itemCount: courses.length,
           itemBuilder: (context, i) {
@@ -915,7 +915,7 @@ class _CoursesPage extends StatelessWidget {
               enrolledChildren: enrolledChildrenNames,
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(course: course)));
-              },
+              }, onFavorite: () {  },
             );
           },
         );
@@ -1253,64 +1253,134 @@ class _BillingPage extends StatelessWidget {
     );
   }
 
-  Widget _buildChildBillingCard(BuildContext context, ChildEnrollmentProvider provider, ChildModel child) {
+  Widget _buildChildBillingCard(
+      BuildContext context, ChildEnrollmentProvider provider, ChildModel child) {
     final enrollments = provider.getEnrollmentsForChild(child.id);
     final totalDue = provider.getTotalDueForChild(child.id);
     final nextRenewal = provider.getNextRenewalDateForChild(child.id);
+    // ✅ FIX : utilise CourseProvider (déjà chargé dans initState du dashboard)
+    final courseProvider = context.read<CourseProvider>();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                child: child.photoUrl == null ? Text(child.firstName[0]) : null,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                child.fullName,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const Spacer(),
-              if (totalDue > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          // ── Header enfant ──────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundImage: child.photoUrl != null
+                      ? CachedNetworkImageProvider(child.photoUrl!)
+                      : null,
+                  child: child.photoUrl == null
+                      ? Text(child.firstName[0],
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(child.fullName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        '${enrollments.length} inscription${enrollments.length > 1 ? "s" : ""}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+                totalDue > 0
+                    ? Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
-                  child: Text(
-                    '${totalDue.toStringAsFixed(0)} DA dû',
-                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
+                  child: Text('${totalDue.toStringAsFixed(0)} DA dû',
+                      style: const TextStyle(
+                          color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
                 )
-              else
-                const Icon(Icons.check_circle, color: Colors.green, size: 20),
-            ],
+                    : Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 14),
+                      SizedBox(width: 4),
+                      Text('À jour',
+                          style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          // ── Cards d'inscriptions ───────────────────────
           GlassCard(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 if (enrollments.isEmpty)
-                  const Text('Aucune inscription active.')
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Text('Aucune inscription active.',
+                          style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                    ),
+                  )
                 else
-                  ...enrollments.map((e) => _buildEnrollmentRow(context, e)),
-
+                  ...enrollments.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final e = entry.value;
+                    // ✅ FIX : lookup via CourseProvider
+                    final course = courseProvider.courses.firstWhere(
+                          (c) => c.id == e.courseId,
+                      orElse: CourseModel.mock,
+                    );
+                    return Column(
+                      children: [
+                        if (idx > 0)
+                          const Divider(height: 28, thickness: 0.5),
+                        _buildEnrollmentRow(context, e, course),
+                      ],
+                    );
+                  }),
                 if (nextRenewal != null) ...[
-                  const Divider(height: 24),
+                  const Divider(height: 24, thickness: 0.5),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Prochain renouvellement', style: TextStyle(fontSize: 13)),
+                      Row(
+                        children: [
+                          Icon(Icons.event_repeat, size: 16, color: Colors.blue[400]),
+                          const SizedBox(width: 6),
+                          const Text('Prochain renouvellement',
+                              style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
                       Text(
                         DateFormat('dd/MM/yyyy').format(nextRenewal),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.blue),
                       ),
                     ],
                   ),
@@ -1323,72 +1393,133 @@ class _BillingPage extends StatelessWidget {
     );
   }
 
-  Widget _buildEnrollmentRow(BuildContext context, EnrollmentModel enrollment) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Cours #${enrollment.courseId.substring(0, 5)}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                    Text(
-                      'Statut: ${enrollment.paymentStatus.displayName}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
+  Widget _buildEnrollmentRow(
+      BuildContext context, EnrollmentModel enrollment, CourseModel course) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isPaid = enrollment.paymentStatus == PaymentStatus.paid;
+    final isPartial = enrollment.paymentStatus == PaymentStatus.partial;
+    final total = enrollment.totalAmount ?? 0;
+    final paid = enrollment.paidAmount ?? 0;
+    final progress = total > 0 ? (paid / total).clamp(0.0, 1.0) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Titre du cours + badge statut ──────────────
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Icon(Icons.school_outlined,
+                  color: colorScheme.onPrimaryContainer, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    course.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
-                  if (enrollment.remainingAmount > 0)
-                    Text(
-                      '-${enrollment.paidAmount?.toStringAsFixed(0) ?? "0"} payé',
-                      style: const TextStyle(fontSize: 11, color: Colors.green),
-                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    course.category.displayName,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _buildStatusBadge(enrollment.status),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // ── Barre de progression paiement ──────────────
+        if (total > 0) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isPaid
+                    ? 'Payé intégralement'
+                    : isPartial
+                    ? 'Paiement partiel'
+                    : 'En attente de paiement',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isPaid
+                      ? Colors.green
+                      : isPartial
+                      ? Colors.orange
+                      : Colors.red[400],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                '${paid.toStringAsFixed(0)} / ${total.toStringAsFixed(0)} DA',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          if (enrollment.status == EnrollmentStatus.approved && enrollment.paymentStatus != PaymentStatus.paid) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showPaymentQR(context, enrollment),
-                    icon: const Icon(Icons.qr_code, size: 18),
-                    label: const Text('Payer maintenant', style: TextStyle(fontSize: 12)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.grey.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isPaid
+                    ? Colors.green
+                    : isPartial
+                    ? Colors.orange
+                    : Colors.red.withValues(alpha: 0.5),
+              ),
+              minHeight: 7,
             ),
-          ] else if (enrollment.status == EnrollmentStatus.completed && enrollment.paymentStatus == PaymentStatus.paid) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.verified, color: Colors.green, size: 16),
-                const SizedBox(width: 4),
-                const Text("Adhérent confirmé", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
-              ],
-            ),
-          ]
+          ),
         ],
-      ),
+        // ── Action paiement ────────────────────────────
+        if (enrollment.status == EnrollmentStatus.approved && !isPaid) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _showPaymentQR(context, enrollment),
+              icon: const Icon(Icons.qr_code, size: 18),
+              label: const Text('Payer maintenant',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ] else if (isPaid) ...[
+          const SizedBox(height: 10),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.verified, color: Colors.green, size: 16),
+              SizedBox(width: 4),
+              Text('Adhérent confirmé',
+                  style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -1429,6 +1560,29 @@ class _BillingPage extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(EnrollmentStatus status) {
+    final Color color;
+    switch (status) {
+      case EnrollmentStatus.approved:  color = Colors.green;  break;
+      case EnrollmentStatus.pending:   color = Colors.orange; break;
+      case EnrollmentStatus.rejected:  color = Colors.red;    break;
+      case EnrollmentStatus.cancelled: color = Colors.grey;   break;
+      case EnrollmentStatus.completed: color = Colors.blue;   break;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        status.displayName,
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );
   }

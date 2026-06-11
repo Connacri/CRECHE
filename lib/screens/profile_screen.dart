@@ -142,9 +142,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     SliverAppBar(
                       backgroundColor: Colors.transparent,
                       elevation: 0,
-                      leading: const BackButton(),
+
                       title: const Text('Profil'),
                       pinned: true,
+
                       actions: [
                         if (!_isEditing)
                           IconButton(

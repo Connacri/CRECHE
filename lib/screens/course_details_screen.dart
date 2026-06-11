@@ -27,7 +27,9 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   void initState() {
     super.initState();
     _course = widget.course;
-    _loadEnrollmentData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadEnrollmentData();
+    });
   }
 
   Future<void> _loadEnrollmentData() async {

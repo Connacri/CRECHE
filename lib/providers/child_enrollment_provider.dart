@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/child_model_complete.dart';
+import '../models/course_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/daily_activity_model.dart';
 import '../models/session_schedule_model.dart';
@@ -31,6 +32,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
 
   final Map<String, Map<String, dynamic>> _childrenLocations = {};
 
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -42,6 +44,34 @@ class ChildEnrollmentProvider with ChangeNotifier {
   StreamSubscription? _activitiesSubscription;
   StreamSubscription? _ownerSchedulesSubscription;
   StreamSubscription? _ownerEnrollmentsSubscription;
+
+  List<CourseModel> _courses = [];
+  final Map<String, CourseModel> _courseById = {};
+
+  CourseModel? getCourse(String id) => _courseById[id];
+
+  Future<void> loadCourses(String ownerId) async {
+    try {
+      final response = await _supabaseChildService.adminClient
+          .from('courses')
+          .select()
+          .eq('created_by', ownerId);
+
+      final list = (response as List)
+          .map((e) => CourseModel.fromSupabase(e))
+          .toList();
+
+      _courses = list;
+
+      _courseById
+        ..clear()
+        ..addEntries(list.map((c) => MapEntry(c.id, c)));
+
+      notifyListeners();
+    } catch (e) {
+      _setError(e.toString());
+    }
+  }
 
   void subscribeToParentData(String parentId) {
     if (parentId.isEmpty) return;
