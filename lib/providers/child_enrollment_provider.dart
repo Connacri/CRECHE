@@ -32,6 +32,46 @@ class ChildEnrollmentProvider with ChangeNotifier {
 
   final Map<String, Map<String, dynamic>> _childrenLocations = {};
 
+  List<Map<String, dynamic>> _expenses = [];
+  List<Map<String, dynamic>> get expenses => _expenses;
+
+  StreamSubscription? _expensesSubscription;
+
+  // Getters Statistiques Réels (Réactifs)
+  double get totalRevenue => _ownerEnrollmentsDetailed.fold(0.0, (sum, item) {
+    try {
+      final e = item['enrollment'];
+      return sum + (e?['paid_amount']?.toDouble() ?? 0.0);
+    } catch (_) { return sum; }
+  });
+
+  double get totalExpenses => _expenses.fold(0.0, (sum, item) => sum + (item['amount']?.toDouble() ?? 0.0));
+
+  double get netIncome => totalRevenue - totalExpenses;
+
+  int get approvedEnrollmentsCount => _ownerEnrollmentsDetailed.where((item) {
+    return item['enrollment']?['status'] == 'approved';
+  }).length;
+
+  int get pendingEnrollmentsCount => _ownerEnrollmentsDetailed.where((item) {
+    return item['enrollment']?['status'] == 'pending';
+  }).length;
+
+  List<Map<String, dynamic>> get weeklyEnrollmentData {
+    final now = DateTime.now();
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
+    
+    return last7Days.map((date) {
+      final dayStr = "${date.day}/${date.month}";
+      final count = _ownerEnrollmentsDetailed.where((item) {
+        try {
+          final enrolledAt = DateTime.parse(item['enrollment']['enrolled_at']);
+          return enrolledAt.year == date.year && enrolledAt.month == date.month && enrolledAt.day == date.day;
+        } catch (_) { return false; }
+      }).length;
+      return {'day': dayStr, 'count': count.toDouble()};
+    }).toList();
+  }
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -122,6 +162,20 @@ class ChildEnrollmentProvider with ChangeNotifier {
         });
   }
 
+  void subscribeToExpenses(String ownerId) {
+    if (ownerId.isEmpty) return;
+    
+    _expensesSubscription?.cancel();
+    _expensesSubscription = _supabaseChildService.adminClient
+        .from('club_expenses')
+        .stream(primaryKey: ['id'])
+        .eq('club_id', ownerId)
+        .listen((data) {
+          _expenses = data;
+          notifyListeners();
+        });
+  }
+
   @override
   void dispose() {
     _childrenSubscription?.cancel();
@@ -129,6 +183,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     _activitiesSubscription?.cancel();
     _ownerSchedulesSubscription?.cancel();
     _ownerEnrollmentsSubscription?.cancel();
+    _expensesSubscription?.cancel();
     super.dispose();
   }
 
