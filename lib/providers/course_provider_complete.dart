@@ -53,26 +53,35 @@ class CourseProvider extends ChangeNotifier {
 
   void _initRealtime() {
     _coursesSubscription?.cancel();
-    _coursesSubscription = _courseService.getCoursesStream().listen((data) {
-      _courses = data;
-      notifyListeners();
-    });
+    _coursesSubscription = _courseService.getCoursesStream().listen(
+      (data) {
+        _courses = data;
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [CourseProvider] getCoursesStream Error: $e'),
+    );
   }
 
   void subscribeToUserCourses(String userId) {
     _userCoursesSubscription?.cancel();
-    _userCoursesSubscription = _courseService.getUserCoursesStream(userId).listen((data) {
-      _userCourses = data;
-      notifyListeners();
-    });
+    _userCoursesSubscription = _courseService.getUserCoursesStream(userId).listen(
+      (data) {
+        _userCourses = data;
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [CourseProvider] getUserCoursesStream Error: $e'),
+    );
   }
 
   void subscribeToOwnerSchedules(String ownerId) {
     _schedulesSubscription?.cancel();
-    _schedulesSubscription = _childService.getSchedulesByOwnerStream(ownerId).listen((data) {
-      _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
-      notifyListeners();
-    });
+    _schedulesSubscription = _childService.getSchedulesByOwnerStream(ownerId).listen(
+      (data) {
+        _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [CourseProvider] getSchedulesByOwnerStream Error: $e'),
+    );
   }
 
   @override

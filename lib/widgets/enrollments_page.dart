@@ -12,6 +12,7 @@ import '../models/course_model_complete.dart';
 import '../models/user_model.dart';
 import '../services/pdf_dossier_service.dart';
 import 'glass_card.dart';
+import 'child_profile_dialog.dart';
 
 class EnrollmentsPage extends StatefulWidget {
   const EnrollmentsPage({super.key});
@@ -282,6 +283,9 @@ class _EnrollmentList extends StatelessWidget {
                     ],
                   ),
                 ],
+              ),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => ChildProfileDialog(childId: child.id)),
               ),
             ),
           );

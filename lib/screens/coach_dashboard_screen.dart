@@ -165,17 +165,16 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
         .from('session_schedules')
         .stream(primaryKey: ['id'])
         .eq('school_id', schoolId)
-        .handleError((error) {
-          debugPrint('❌ [CoachDashboard] Error in schedules stream: $error');
-          return <Map<String, dynamic>>[];
-        })
-        .listen((data) {
-          if (mounted) {
-            setState(() {
-              _schedules = data.map((d) => SessionSchedule.fromSupabase(d)).toList();
-            });
-          }
-        });
+        .listen(
+          (data) {
+            if (mounted) {
+              setState(() {
+                _schedules = data.map((d) => SessionSchedule.fromSupabase(d)).toList();
+              });
+            }
+          },
+          onError: (e) => debugPrint('❌ [CoachDashboard] Error in schedules stream: $e'),
+        );
 
     _clubService.adminClient.from('courses').select().eq('club_id', schoolId).then((res) {
       if (mounted) {

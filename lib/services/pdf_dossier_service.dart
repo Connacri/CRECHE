@@ -7,7 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file_plus/open_file_plus.dart';
+import 'package:open_filex/open_filex.dart';
 import '../models/child_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/course_model_complete.dart';
@@ -50,12 +50,26 @@ class PdfDossierService {
     // 1. Fetch images (Logo, Child Photo, and Documents)
     final photoProvider =
         child.photoUrl != null ? await _fetchImage(child.photoUrl!) : null;
+    
+    if (child.birthCertificateUrl != null) {
+      debugPrint('📄 [PdfDossierService] Fetching Birth Certificate: ${child.birthCertificateUrl}');
+    }
     final birthCertProvider = child.birthCertificateUrl != null
         ? await _fetchImage(child.birthCertificateUrl!)
         : null;
+    if (birthCertProvider != null) {
+      debugPrint('✅ [PdfDossierService] Birth Certificate loaded');
+    }
+
+    if (child.medicalCertificateUrl != null) {
+      debugPrint('📄 [PdfDossierService] Fetching Medical Certificate: ${child.medicalCertificateUrl}');
+    }
     final medicalCertProvider = child.medicalCertificateUrl != null
         ? await _fetchImage(child.medicalCertificateUrl!)
         : null;
+    if (medicalCertProvider != null) {
+      debugPrint('✅ [PdfDossierService] Medical Certificate loaded');
+    }
 
     pw.ImageProvider? logoProvider;
     try {
@@ -552,7 +566,7 @@ class PdfDossierService {
       debugPrint('✅ PDF saved and opening directly: $path');
 
       // Open the file directly with system default viewer
-      await OpenFile.open(path);
+      await OpenFilex.open(path);
     } catch (e) {
       debugPrint('❌ Error in PDF Generation/Opening: $e');
     }

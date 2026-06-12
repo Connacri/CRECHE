@@ -25,10 +25,13 @@ class SchoolProvider extends ChangeNotifier {
   void subscribeToSchoolSlots(String schoolId) {
     if (schoolId.isEmpty) return;
     _slotsSubscription?.cancel();
-    _slotsSubscription = _schoolService.getSchoolSlotsStream(schoolId).listen((data) {
-      _currentSchoolSlots = data;
-      notifyListeners();
-    });
+    _slotsSubscription = _schoolService.getSchoolSlotsStream(schoolId).listen(
+      (data) {
+        _currentSchoolSlots = data;
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [SchoolProvider] getSchoolSlotsStream Error: $e'),
+    );
   }
 
   @override

@@ -117,32 +117,44 @@ class ChildEnrollmentProvider with ChangeNotifier {
     if (parentId.isEmpty) return;
 
     _childrenSubscription?.cancel();
-    _childrenSubscription = _supabaseChildService.getChildrenStream(parentId).listen((data) {
-      _children = data;
-      notifyListeners();
-    });
+    _childrenSubscription = _supabaseChildService.getChildrenStream(parentId).listen(
+      (data) {
+        _children = data;
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getChildrenStream Error: $e'),
+    );
 
     _enrollmentsSubscription?.cancel();
-    _enrollmentsSubscription = _supabaseChildService.getEnrollmentsStream(parentId).listen((data) {
-      _enrollments = data;
-      notifyListeners();
-    });
+    _enrollmentsSubscription = _supabaseChildService.getEnrollmentsStream(parentId).listen(
+      (data) {
+        _enrollments = data;
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getEnrollmentsStream Error: $e'),
+    );
   }
 
   void subscribeToDailyActivities(String parentId, DateTime date) {
     _activitiesSubscription?.cancel();
-    _activitiesSubscription = _supabaseChildService.getDailyActivitiesStream(parentId, date).listen((data) {
-      _dailyActivities = data;
-      notifyListeners();
-    });
+    _activitiesSubscription = _supabaseChildService.getDailyActivitiesStream(parentId, date).listen(
+      (data) {
+        _dailyActivities = data;
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getDailyActivitiesStream Error: $e'),
+    );
   }
 
   void subscribeToOwnerSchedules(String ownerId) {
     _ownerSchedulesSubscription?.cancel();
-    _ownerSchedulesSubscription = _supabaseChildService.getSchedulesByOwnerStream(ownerId).listen((data) {
-       _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
-       notifyListeners();
-    });
+    _ownerSchedulesSubscription = _supabaseChildService.getSchedulesByOwnerStream(ownerId).listen(
+      (data) {
+        _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getSchedulesByOwnerStream Error: $e'),
+    );
   }
 
   void subscribeToOwnerEnrollments(String ownerId) {
@@ -155,11 +167,13 @@ class ChildEnrollmentProvider with ChangeNotifier {
     _ownerEnrollmentsSubscription = _supabaseChildService.adminClient
         .from('enrollments')
         .stream(primaryKey: ['id'])
-        .handleError((e) => debugPrint('❌ [ChildEnrollmentProvider] Stream Error: $e'))
-        .listen((_) {
-          debugPrint('🔄 [ChildEnrollmentProvider] Enrollments changed, reloading...');
-          loadOwnerEnrollmentsDetailed(ownerId);
-        });
+        .listen(
+          (_) {
+            debugPrint('🔄 [ChildEnrollmentProvider] Enrollments changed, reloading...');
+            loadOwnerEnrollmentsDetailed(ownerId);
+          },
+          onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] Enrollments Stream Error: $e'),
+        );
   }
 
   void subscribeToExpenses(String ownerId) {
@@ -170,10 +184,13 @@ class ChildEnrollmentProvider with ChangeNotifier {
         .from('club_expenses')
         .stream(primaryKey: ['id'])
         .eq('club_id', ownerId)
-        .listen((data) {
-          _expenses = data;
-          notifyListeners();
-        });
+        .listen(
+          (data) {
+            _expenses = data;
+            notifyListeners();
+          },
+          onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] Expenses Stream Error: $e'),
+        );
   }
 
   @override

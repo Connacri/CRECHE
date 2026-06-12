@@ -1,19 +1,16 @@
+import 'supabase_service.dart';
 import 'image_storage_service.dart';
 import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
-import '../core/config/supabase_config.dart';
 
 /// 🔐 Service d'authentification utilisant Firebase Auth et Supabase
-class AuthService {
+class AuthService extends AdminSupabaseService {
   final firebase_auth.FirebaseAuth _firebaseAuth =
       firebase_auth.FirebaseAuth.instance;
   final supabase.SupabaseClient _supabase = supabase.Supabase.instance.client;
-
-  /// 🛡️ Client Admin (Service Role) pour contourner le RLS
-  late final supabase.SupabaseClient _adminClient;
 
   bool _initialized = false;
   bool _googleSignInAvailable = true;
@@ -23,12 +20,7 @@ class AuthService {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
-  AuthService() {
-    _adminClient = supabase.SupabaseClient(
-      SupabaseConfig.url,
-      SupabaseConfig.serviceRoleKey,
-    );
-  }
+  AuthService();
 
   /// ✅ Initialisation obligatoire pour google_sign_in v7.x
   Future<void> init({
@@ -311,7 +303,7 @@ class AuthService {
       {String role = 'parent'}) async {
     debugPrint('[AuthService] ensureUserRowAdmin: id=$uid email=$email role=$role');
     try {
-      await _adminClient.from('users').upsert(
+      await adminClient.from('users').upsert(
         {
           'id': uid,
           'email': email,
@@ -338,7 +330,7 @@ class AuthService {
     required Map<String, dynamic> profileData,
   }) async {
     try {
-      await _adminClient.from('users').upsert({
+      await adminClient.from('users').upsert({
         'id': userId,
         'email': email,
         'role': role,
@@ -356,7 +348,7 @@ class AuthService {
   Future<void> updateUserProfileAdmin(
       String userId, Map<String, dynamic> data) async {
     try {
-      await _adminClient.from('users').update({
+      await adminClient.from('users').update({
         ...data,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', userId);
@@ -368,7 +360,7 @@ class AuthService {
   /// Lecture via adminClient → bypass RLS garanti
   Future<Map<String, dynamic>?> getUserData(String userId) async {
     try {
-      final response = await _adminClient
+      final response = await adminClient
           .from('users')
           .select()
           .eq('id', userId)
@@ -416,7 +408,7 @@ class AuthService {
   /// Récupère tous les utilisateurs ayant le rôle "coach"
   Future<List<Map<String, dynamic>>> getCoaches() async {
     try {
-      final response = await _adminClient
+      final response = await adminClient
           .from("users")
           .select()
           .eq("role", "coach")
@@ -433,7 +425,7 @@ class AuthService {
       debugPrint('[AuthService] Début suppression compte pour: $userId');
 
       // 1. Récupérer les IDs des cours créés par l'utilisateur
-      final coursesResponse = await _adminClient
+      final coursesResponse = await adminClient
           .from('courses')
           .select('id')
           .eq('created_by', userId);
@@ -442,7 +434,7 @@ class AuthService {
           .toList();
 
       // 2. Récupérer les IDs des enfants de l'utilisateur
-      final childrenResponse = await _adminClient
+      final childrenResponse = await adminClient
           .from('children')
           .select('id')
           .eq('parent_id', userId);
@@ -451,7 +443,7 @@ class AuthService {
           .toList();
 
       // 3. Récupérer les IDs des événements créés par l'utilisateur
-      final eventsResponse = await _adminClient
+      final eventsResponse = await adminClient
           .from('events')
           .select('id')
           .eq('created_by', userId);
@@ -466,7 +458,7 @@ class AuthService {
 
       // Activités quotidiennes des enfants
       if (childIds.isNotEmpty) {
-        await _adminClient.from('daily_activities').delete().inFilter('child_id', childIds);
+        await adminClient.from('daily_activities').delete().inFilter('child_id', childIds);
       }
 
       // Inscriptions aux événements (liées à l'utilisateur, à ses enfants, ou à ses événements créés)
@@ -477,36 +469,36 @@ class AuthService {
       if (eventIds.isNotEmpty) {
         eventRegFilter += ',event_id.in.(${eventIds.join(",")})';
       }
-      await _adminClient.from('event_registrations').delete().or(eventRegFilter);
+      await adminClient.from('event_registrations').delete().or(eventRegFilter);
 
       // Inscriptions aux cours (liées à l'utilisateur ou aux cours)
       if (courseIds.isNotEmpty) {
-        await _adminClient.from('enrollments').delete().or('parent_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
+        await adminClient.from('enrollments').delete().or('parent_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
       } else {
-        await _adminClient.from('enrollments').delete().eq('parent_id', userId);
+        await adminClient.from('enrollments').delete().eq('parent_id', userId);
       }
 
       // Horaires de sessions (liés aux cours ou à l'école)
       if (courseIds.isNotEmpty) {
-        await _adminClient.from('session_schedules').delete().or('school_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
+        await adminClient.from('session_schedules').delete().or('school_id.eq.$userId,course_id.in.(${courseIds.join(",")})');
       } else {
-        await _adminClient.from('session_schedules').delete().eq('school_id', userId);
+        await adminClient.from('session_schedules').delete().eq('school_id', userId);
       }
 
       // Créneaux de disponibilité (écoles)
-      await _adminClient.from('school_available_slots').delete().eq('school_id', userId);
+      await adminClient.from('school_available_slots').delete().eq('school_id', userId);
 
       // Enfants
-      await _adminClient.from('children').delete().eq('parent_id', userId);
+      await adminClient.from('children').delete().eq('parent_id', userId);
 
       // Événements
-      await _adminClient.from('events').delete().eq('created_by', userId);
+      await adminClient.from('events').delete().eq('created_by', userId);
 
       // Cours
-      await _adminClient.from('courses').delete().eq('created_by', userId);
+      await adminClient.from('courses').delete().eq('created_by', userId);
 
       // Enfin, l'utilisateur lui-même
-      await _adminClient.from('users').delete().eq('id', userId);
+      await adminClient.from('users').delete().eq('id', userId);
 
       // 6. Supprimer l'utilisateur Firebase
       final user = _firebaseAuth.currentUser;

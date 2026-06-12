@@ -34,37 +34,35 @@ class AuthProviderV2 with ChangeNotifier {
 
     _authSubscription =
         firebase_auth.FirebaseAuth.instance.authStateChanges().listen(
-      (user) async {
-        _currentUser = user;
+      (user) {
+        // ─────────────────────────────────────────────────────────────────
+        // 🛡️ Windows Threading Fix: Use microtask to ensure we're not 
+        // blocking or being called from a sensitive native context.
+        // ─────────────────────────────────────────────────────────────────
+        Future.microtask(() async {
+          _currentUser = user;
 
-        if (user != null) {
-          // ─────────────────────────────────────────────────────────────────
-          // ✅ FIX : Positionner le header AVANT tout appel Supabase.
-          // Le listener est déclenché à chaque reconnexion (cold start, token
-          // refresh, Google Sign-In, email/password). Sans ce header, les
-          // policies RLS qui utilisent x-firebase-id rejettent les requêtes.
-          // Note : _checkUserStatus utilise _adminClient (service_role) donc
-          // le RLS est bypassé côté DB, mais les Storage policies l'utilisent.
-          // On le positionne ici de manière défensive.
-          // ─────────────────────────────────────────────────────────────────
-          _setAuthHeader(user.uid);
+          if (user != null) {
+            _setAuthHeader(user.uid);
 
-          if (user.emailVerified) {
-            _needsEmailConfirmation = false;
-            await _checkUserStatus();
-            _updateFCMToken();
+            if (user.emailVerified) {
+              _needsEmailConfirmation = false;
+              await _checkUserStatus();
+              _updateFCMToken();
+            } else {
+              _needsEmailConfirmation = true;
+              _setState(AppAuthState.needsEmailConfirmation);
+            }
           } else {
-            _needsEmailConfirmation = true;
-            _setState(AppAuthState.needsEmailConfirmation);
+            _setAuthHeader(null);
+            _userData = null;
+            _setState(AppAuthState.unauthenticated);
           }
-        } else {
-          _setAuthHeader(null);
-          _userData = null;
-          _setState(AppAuthState.unauthenticated);
-        }
 
-        notifyListeners();
+          notifyListeners();
+        });
       },
+      onError: (e) => debugPrint('❌ [AuthProviderV2] authStateChanges Error: $e'),
     );
   }
 

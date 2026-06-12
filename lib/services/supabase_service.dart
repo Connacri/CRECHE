@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/child_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
@@ -31,10 +30,6 @@ class SupabaseCourseService extends AdminSupabaseService {
         .from(_tableName)
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
-        .handleError((error) {
-          debugPrint('❌ [SupabaseCourseService] Error in getCoursesStream: $error');
-          return <Map<String, dynamic>>[];
-        })
         .map((data) => data.map((json) => CourseModel.fromSupabase(json)).toList());
   }
 
@@ -44,10 +39,6 @@ class SupabaseCourseService extends AdminSupabaseService {
         .stream(primaryKey: ['id'])
         .eq('created_by', userId)
         .order('created_at', ascending: false)
-        .handleError((error) {
-          debugPrint('❌ [SupabaseCourseService] Error in getUserCoursesStream: $error');
-          return <Map<String, dynamic>>[];
-        })
         .map((data) => data.map((json) => CourseModel.fromSupabase(json)).toList());
   }
 
@@ -207,10 +198,6 @@ class SupabaseChildService extends AdminSupabaseService {
         .from('children')
         .stream(primaryKey: ['id'])
         .eq('parent_id', parentId)
-        .handleError((error) {
-          debugPrint('❌ [SupabaseChildService] Error in getChildrenStream: $error');
-          return <Map<String, dynamic>>[];
-        })
         .map((data) => data.where((json) => json['is_active'] == true).map((json) => ChildModel.fromSupabase(json)).toList());
   }
 
@@ -219,10 +206,6 @@ class SupabaseChildService extends AdminSupabaseService {
         .from('enrollments')
         .stream(primaryKey: ['id'])
         .eq('parent_id', parentId)
-        .handleError((error) {
-          debugPrint('❌ [SupabaseChildService] Error in getEnrollmentsStream: $error');
-          return <Map<String, dynamic>>[];
-        })
         .map((data) => data.map((json) => EnrollmentModel.fromSupabase(json)).toList());
   }
 
@@ -232,10 +215,6 @@ class SupabaseChildService extends AdminSupabaseService {
         .from('daily_activities')
         .stream(primaryKey: ['id'])
         .eq('date', dateStr)
-        .handleError((error) {
-          debugPrint('❌ [SupabaseChildService] Error in getDailyActivitiesStream: $error');
-          return <Map<String, dynamic>>[];
-        })
         .map((data) => data.map((json) => DailyActivity.fromSupabase(json)).toList());
   }
 
@@ -319,13 +298,11 @@ class SupabaseChildService extends AdminSupabaseService {
 
 extension SupabaseChildServiceSchedules on SupabaseChildService {
   Stream<List<SessionSchedule>> getSchedulesByOwnerStream(String ownerId) {
+    // Note: session_schedules doesn't have a direct owner_id filter in the stream
+    // ideally, we should filter by school_id or coach_id if possible
     return adminClient
         .from('session_schedules')
         .stream(primaryKey: ['id'])
-        .handleError((error) {
-          debugPrint('❌ [SupabaseChildServiceSchedules] Error in getSchedulesByOwnerStream: $error');
-          return <Map<String, dynamic>>[];
-        })
         .map((data) => data.map((json) => SessionSchedule.fromSupabase(json)).toList());
   }
 
