@@ -22,6 +22,15 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
   late TextEditingController _schoolGradeController;
+  
+  // Medical Info Controllers
+  late TextEditingController _bloodTypeController;
+  late TextEditingController _allergiesController;
+  late TextEditingController _medicationsController;
+  late TextEditingController _emergencyContactController;
+  late TextEditingController _emergencyPhoneController;
+  late TextEditingController _notesController;
+
   DateTime? _dateOfBirth;
   ChildGender _gender = ChildGender.male;
   File? _photo;
@@ -35,6 +44,15 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     _firstNameController = TextEditingController(text: widget.child?.firstName);
     _lastNameController = TextEditingController(text: widget.child?.lastName);
     _schoolGradeController = TextEditingController(text: widget.child?.schoolGrade);
+    
+    final medical = widget.child?.medicalInfo;
+    _bloodTypeController = TextEditingController(text: medical?.bloodType);
+    _allergiesController = TextEditingController(text: medical?.allergies.join(', '));
+    _medicationsController = TextEditingController(text: medical?.medications.join(', '));
+    _emergencyContactController = TextEditingController(text: medical?.emergencyContact);
+    _emergencyPhoneController = TextEditingController(text: medical?.emergencyPhone);
+    _notesController = TextEditingController(text: medical?.additionalNotes);
+
     _dateOfBirth = widget.child?.dateOfBirth;
     if (widget.child != null) _gender = widget.child!.gender;
   }
@@ -44,6 +62,12 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _schoolGradeController.dispose();
+    _bloodTypeController.dispose();
+    _allergiesController.dispose();
+    _medicationsController.dispose();
+    _emergencyContactController.dispose();
+    _emergencyPhoneController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -69,57 +93,62 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   }
 
   Future<void> _save() async {
-    debugPrint('🔍 Starting child save operation');
     if (!_formKey.currentState!.validate() || (_dateOfBirth == null && widget.child == null)) {
       if (_dateOfBirth == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Veuillez sélectionner une date de naissance')),
         );
       }
-      debugPrint('⚠️ Validation failed or missing date of birth');
       return;
     }
 
     setState(() => _isLoading = true);
     final provider = context.read<ChildEnrollmentProvider>();
 
+    final medicalInfo = MedicalInfo(
+      bloodType: _bloodTypeController.text.trim(),
+      allergies: _allergiesController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+      medications: _medicationsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+      emergencyContact: _emergencyContactController.text.trim(),
+      emergencyPhone: _emergencyPhoneController.text.trim(),
+      additionalNotes: _notesController.text.trim(),
+    );
+
     bool success;
     if (widget.child == null) {
-      debugPrint('📤 Adding new child with photo: ${_photo?.path}');
       success = await provider.addChild(
         parentId: widget.parentId,
-        firstName: _firstNameController.text,
-        lastName: _lastNameController.text,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
         dateOfBirth: _dateOfBirth!,
         gender: _gender,
         photoFile: _photo,
         birthCertificateFile: _birthCertificate,
         medicalCertificateFile: _medicalCertificate,
-        schoolGrade: _schoolGradeController.text,
+        schoolGrade: _schoolGradeController.text.trim(),
+        medicalInfo: medicalInfo,
       );
     } else {
-      debugPrint('✏️ Updating child ${widget.child!.id} with new photo: ${_photo?.path}');
       success = await provider.updateChild(
         childId: widget.child!.id,
         parentId: widget.parentId,
-        firstName: _firstNameController.text,
-        lastName: _lastNameController.text,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
         dateOfBirth: _dateOfBirth,
         gender: _gender,
         newPhoto: _photo,
         newBirthCertificate: _birthCertificate,
         newMedicalCertificate: _medicalCertificate,
-        schoolGrade: _schoolGradeController.text,
+        schoolGrade: _schoolGradeController.text.trim(),
+        medicalInfo: medicalInfo,
       );
     }
 
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
-        debugPrint('✅ Child saved successfully');
         Navigator.pop(context);
       } else {
-        debugPrint('❌ Error saving child: ${provider.error}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(provider.error ?? 'Une erreur est survenue')),
         );
@@ -131,80 +160,135 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.child == null ? 'Ajouter un enfant' : 'Modifier l\'enfant'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundImage: _photo != null
-                      ? FileImage(_photo!)
-                      : (widget.child?.photoUrl != null ? CachedNetworkImageProvider(widget.child!.photoUrl!) : null) as ImageProvider?,
-                  child: _photo == null && widget.child?.photoUrl == null ? const Icon(Icons.camera_alt, size: 30) : null,
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.9,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 40,
+                      backgroundImage: _photo != null
+                          ? FileImage(_photo!)
+                          : (widget.child?.photoUrl != null ? CachedNetworkImageProvider(widget.child!.photoUrl!) : null) as ImageProvider?,
+                      child: _photo == null && widget.child?.photoUrl == null ? const Icon(Icons.camera_alt, size: 30) : null,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _firstNameController,
-                decoration: const InputDecoration(labelText: 'Prénom'),
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-              ),
-              TextFormField(
-                controller: _lastNameController,
-                decoration: const InputDecoration(labelText: 'Nom'),
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                title: Text(_dateOfBirth == null
-                    ? 'Date de naissance'
-                    : 'Né(e) le: ${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 3)),
-                    firstDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
-                    lastDate: DateTime.now(),
-                  );
-                  if (date != null) setState(() => _dateOfBirth = date);
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<ChildGender>(
-                initialValue: _gender,
-                decoration: const InputDecoration(labelText: 'Genre'),
-                items: ChildGender.values.map((g) => DropdownMenuItem(
-                  value: g,
-                  child: Text(g == ChildGender.male ? 'Garçon' : g == ChildGender.female ? 'Fille' : 'Autre'),
-                )).toList(),
-                onChanged: (v) => setState(() => _gender = v!),
-              ),
-              TextFormField(
-                controller: _schoolGradeController,
-                decoration: const InputDecoration(labelText: 'Niveau scolaire (ex: Petite Section)'),
-              ),
-              const SizedBox(height: 24),
-              _buildDocumentPicker(
-                label: "Extrait de naissance",
-                file: _birthCertificate,
-                currentUrl: widget.child?.birthCertificateUrl,
-                onTap: _pickBirthCertificate,
-                onRemove: () => setState(() => _birthCertificate = null),
-              ),
-              const SizedBox(height: 16),
-              _buildDocumentPicker(
-                label: "Certificat médical",
-                file: _medicalCertificate,
-                currentUrl: widget.child?.medicalCertificateUrl,
-                onTap: _pickMedicalCertificate,
-                onRemove: () => setState(() => _medicalCertificate = null),
-              ),
-            ],
+                const SizedBox(height: 24),
+                
+                const Text('Informations de base', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                const Divider(),
+                
+                TextFormField(
+                  controller: _firstNameController,
+                  decoration: const InputDecoration(labelText: 'Prénom', prefixIcon: Icon(Icons.person)),
+                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                ),
+                TextFormField(
+                  controller: _lastNameController,
+                  decoration: const InputDecoration(labelText: 'Nom', prefixIcon: Icon(Icons.person_outline)),
+                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today, color: Colors.blue),
+                  title: Text(_dateOfBirth == null
+                      ? 'Sélectionner la date de naissance'
+                      : 'Né(e) le: ${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 3)),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) setState(() => _dateOfBirth = date);
+                  },
+                ),
+                DropdownButtonFormField<ChildGender>(
+                  initialValue: _gender,
+                  decoration: const InputDecoration(labelText: 'Genre', prefixIcon: Icon(Icons.wc)),
+                  items: ChildGender.values.map((g) => DropdownMenuItem(
+                    value: g,
+                    child: Text(g == ChildGender.male ? 'Garçon' : g == ChildGender.female ? 'Fille' : 'Autre'),
+                  )).toList(),
+                  onChanged: (v) => setState(() => _gender = v!),
+                ),
+                TextFormField(
+                  controller: _schoolGradeController,
+                  decoration: const InputDecoration(labelText: 'Niveau scolaire (ex: Petite Section)', prefixIcon: Icon(Icons.school)),
+                ),
+                
+                const SizedBox(height: 32),
+                const Text('Santé & Urgence', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                const Divider(),
+                
+                TextFormField(
+                  controller: _bloodTypeController,
+                  decoration: const InputDecoration(labelText: 'Groupe Sanguin (ex: A+)', prefixIcon: Icon(Icons.bloodtype)),
+                ),
+                TextFormField(
+                  controller: _allergiesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Allergies (séparées par des virgules)',
+                    prefixIcon: Icon(Icons.warning_amber),
+                    hintText: 'ex: Arachides, Pénicilline',
+                  ),
+                ),
+                TextFormField(
+                  controller: _medicationsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Médicaments réguliers',
+                    prefixIcon: Icon(Icons.medical_services),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _emergencyContactController,
+                  decoration: const InputDecoration(labelText: 'Contact d\'urgence (Nom)', prefixIcon: Icon(Icons.contact_phone)),
+                ),
+                TextFormField(
+                  controller: _emergencyPhoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Téléphone d\'urgence', prefixIcon: Icon(Icons.phone)),
+                ),
+                TextFormField(
+                  controller: _notesController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Notes médicales additionnelles', prefixIcon: Icon(Icons.note_alt)),
+                ),
+                
+                const SizedBox(height: 32),
+                const Text('Documents Officiels', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                const Divider(),
+                const SizedBox(height: 16),
+                
+                _buildDocumentPicker(
+                  label: "Extrait de naissance",
+                  file: _birthCertificate,
+                  currentUrl: widget.child?.birthCertificateUrl,
+                  onTap: _pickBirthCertificate,
+                  onRemove: () => setState(() => _birthCertificate = null),
+                ),
+                const SizedBox(height: 24),
+                _buildDocumentPicker(
+                  label: "Certificat médical",
+                  file: _medicalCertificate,
+                  currentUrl: widget.child?.medicalCertificateUrl,
+                  onTap: _pickMedicalCertificate,
+                  onRemove: () => setState(() => _medicalCertificate = null),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -212,7 +296,11 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Annuler")),
         ElevatedButton(
           onPressed: _isLoading ? null : _save,
-          child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text("Enregistrer"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+          ),
+          child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("Enregistrer"),
         ),
       ],
     );
