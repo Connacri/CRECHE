@@ -42,7 +42,20 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: _buildPage()),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/forest_bg_zoomed.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          SafeArea(child: _buildPage()),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }

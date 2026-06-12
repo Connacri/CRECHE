@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../providers/auth_provider_v2.dart';
@@ -84,7 +83,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         }
       });
     } catch (e) {
-      print('Error loading clubs: $e');
+      debugPrint('Error loading clubs: $e');
     } finally {
       setState(() => _isLoadingClubs = false);
     }

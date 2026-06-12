@@ -247,7 +247,26 @@ CREATE TABLE IF NOT EXISTS public.inventory_transactions (
     created_at timestamptz DEFAULT now()
 );
 
--- 10. RPC Functions
+-- 10. Ensure Shipments Table
+CREATE TABLE IF NOT EXISTS public.shipments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    tracking_number text UNIQUE NOT NULL,
+    sender_id uuid REFERENCES public.users(id),
+    receiver_id uuid REFERENCES public.users(id),
+    transporteur_id uuid REFERENCES public.users(id),
+    status text DEFAULT 'pending', -- 'pending', 'picked_up', 'in_transit', 'delivered', 'cancelled'
+    origin_address text,
+    destination_address text,
+    current_location jsonb,
+    weight decimal(10,2),
+    estimated_delivery timestamptz,
+    actual_delivery timestamptz,
+    metadata jsonb DEFAULT '{}',
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+-- 11. RPC Functions
 
 -- RPC: get_schools
 CREATE OR REPLACE FUNCTION public.get_schools()

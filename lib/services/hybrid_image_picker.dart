@@ -36,12 +36,14 @@ class HybridImagePickerService {
       File pickedFile = File(pickedXFile.path);
 
       if (crop) {
+        if (!context.mounted) return pickedFile;
         return await _cropImage(pickedFile, aspectRatio: aspectRatio, context: context);
       }
 
       return pickedFile;
     } catch (e) {
       debugPrint('❌ [HybridPicker] Erreur ImagePicker: $e');
+      if (!context.mounted) return null;
       return await _pickImageWithFilePicker(crop: crop, aspectRatio: aspectRatio, context: context);
     }
   }
@@ -63,6 +65,7 @@ class HybridImagePickerService {
       File pickedFile = File(result.files.single.path!);
 
       if (crop) {
+        if (!context.mounted) return pickedFile;
         return await _cropImage(pickedFile, aspectRatio: aspectRatio, context: context);
       }
 
@@ -74,13 +77,6 @@ class HybridImagePickerService {
   }
 
   /// Alias pour _pickImageWithFilePicker gardé pour compatibilité si besoin
-  static Future<File?> _fallbackPickImage({
-    bool crop = false,
-    CropAspectRatio? aspectRatio,
-    required BuildContext context,
-  }) async {
-    return _pickImageWithFilePicker(crop: crop, aspectRatio: aspectRatio, context: context);
-  }
 
   static Future<File?> pickProfileImage({required BuildContext context}) async {
     final bool isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
@@ -111,6 +107,7 @@ class HybridImagePickerService {
     );
 
     if (source == null) return null;
+    if (!context.mounted) return null;
 
     return await pickImage(
       source: source,

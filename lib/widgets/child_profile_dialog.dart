@@ -6,8 +6,10 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../models/child_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/course_model_complete.dart';
+import '../models/user_model.dart';
 import '../providers/child_enrollment_provider.dart';
-import '../providers/course_provider.dart';
+import '../providers/course_provider_complete.dart';
+import '../providers/auth_provider_v2.dart';
 import 'glass_card.dart';
 import 'child_form_dialog.dart';
 import 'course_selection_dialog.dart';
@@ -20,52 +22,104 @@ class ChildProfileDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final auth = context.watch<AuthProviderV2>();
+    final courseProvider = context.watch<CourseProvider>();
     
     return Consumer<ChildEnrollmentProvider>(
       builder: (context, provider, _) {
-        final childIndex = provider.children.indexWhere((c) => c.id == childId);
-        if (childIndex == -1) return const SizedBox();
-        final child = provider.children[childIndex];
+        // Search in main children list (Parent view)
+        ChildModel? child;
+        final mainIndex = provider.children.indexWhere((c) => c.id == childId);
         
-        final enrollments = provider.getEnrollmentsForChild(child.id);
-        final courses = context.read<CourseProvider>().courses;
+        if (mainIndex != -1) {
+          child = provider.children[mainIndex];
+        } else {
+          // Search in detailed enrollments (School/Coach view)
+          for (var item in provider.ownerEnrollmentsDetailed) {
+            if (item['child'] != null) {
+              try {
+                final c = ChildModel.fromSupabase(item['child']);
+                if (c.id == childId) {
+                  child = c;
+                  break;
+                }
+              } catch (_) {}
+            }
+          }
+        }
 
-        return Dialog.fullscreen(
-          child: Scaffold(
-            body: SafeArea(child: CustomScrollView(
+        // If not found yet but still loading, show progress
+        if (child == null && provider.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (child == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Profil non trouvé')),
+            body: const Center(child: Text('Le profil de cet enfant est introuvable ou vous n\'y avez plus accès.')),
+          );
+        }
+        
+        // At this point child is guaranteed non-null for the UI
+        final childModel = child;
+        final enrollments = provider.getEnrollmentsForChild(childModel.id);
+        final courses = courseProvider.courses;
+        final isParent = auth.user?.role == UserRole.parent && auth.user?.uid == childModel.parentId;
+
+        return Scaffold(
+          body: SafeArea(
+            child: CustomScrollView(
               slivers: [
                 SliverAppBar(
                   expandedHeight: 300,
                   pinned: true,
                   flexibleSpace: FlexibleSpaceBar(
-                    title: Text('${child.firstName} ${child.lastName}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold,
-                        shadows: [Shadow(color: Colors.black45, blurRadius: 10)])),
+                    title: Text(
+                      '${childModel.firstName} ${childModel.lastName}',
+                      style: const TextStyle(
+                        color: Colors.white, 
+                        fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black45, blurRadius: 10)],
+                      ),
+                    ),
                     background: InkWell(
-                      onTap: child.photoUrl != null 
-                        ? () => _openFullScreenImage(context, child.photoUrl!, 'child-photo-${child.id}', '${child.firstName} ${child.lastName}')
+                      onTap: childModel.photoUrl != null 
+                        ? () => _openFullScreenImage(context, childModel.photoUrl!, 'child-photo-${childModel.id}', '${childModel.firstName} ${childModel.lastName}')
                         : null,
                       child: Hero(
-                        tag: 'child-photo-${child.id}',
-                        child: child.photoUrl != null
-                            ? CachedNetworkImage(imageUrl: child.photoUrl!, fit: BoxFit.cover)
+                        tag: 'child-photo-${childModel.id}',
+                        child: childModel.photoUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: childModel.photoUrl!, 
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(color: Colors.grey[300]),
+                                errorWidget: (context, url, error) => const Icon(Icons.error),
+                              )
                             : Container(
                                 color: colorScheme.primary,
-                                child: Center(child: Text(child.firstName[0],
-                                  style: const TextStyle(fontSize: 80, color: Colors.white))),
+                                child: Center(
+                                  child: Text(
+                                    childModel.firstName[0],
+                                    style: const TextStyle(fontSize: 80, color: Colors.white),
+                                  ),
+                                ),
                               ),
                       ),
                     ),
                   ),
                   actions: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.white),
-                      onPressed: () => _showEditDialog(context, child),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.white),
-                      onPressed: () => _confirmDelete(context, child),
-                    ),
+                    if (isParent) ...[
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        onPressed: () => _showEditDialog(context, childModel),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.white),
+                        onPressed: () => _confirmDelete(context, childModel),
+                      ),
+                    ],
                   ],
                 ),
                 SliverToBoxAdapter(
@@ -79,21 +133,21 @@ class ChildProfileDialog extends StatelessWidget {
                         const SizedBox(height: 16),
                         Row(
                           children: [
-                            Expanded(child: _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(child.dateOfBirth))),
-                            Expanded(child: _buildInfoRow(context, Icons.hourglass_empty, 'Âge', '${child.age} ans')),
+                            Expanded(child: _buildInfoRow(context, Icons.cake, 'Date de naissance', _formatDate(childModel.dateOfBirth))),
+                            Expanded(child: _buildInfoRow(context, Icons.hourglass_empty, 'Âge', '${childModel.age} ans')),
                           ],
                         ),
                         Row(
                           children: [
-                            Expanded(child: _buildInfoRow(context, child.gender == ChildGender.male ? Icons.male : Icons.female, 'Genre', child.gender == ChildGender.male ? 'Garçon' : child.gender == ChildGender.female ? 'Fille' : 'Autre')),
-                            Expanded(child: _buildInfoRow(context, Icons.school, 'Niveau', child.schoolGrade ?? 'Non spécifié')),
+                            Expanded(child: _buildInfoRow(context, childModel.gender == ChildGender.male ? Icons.male : Icons.female, 'Genre', childModel.gender == ChildGender.male ? 'Garçon' : childModel.gender == ChildGender.female ? 'Fille' : 'Autre')),
+                            Expanded(child: _buildInfoRow(context, Icons.school, 'Niveau', childModel.schoolGrade ?? 'Non spécifié')),
                           ],
                         ),
                         const Divider(height: 32),
                         Row(
                           children: [
-                            Expanded(child: _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', child.medicalInfo.bloodType ?? 'Non spécifié')),
-                            Expanded(child: _buildInfoRow(context, Icons.medical_services, 'Allergies', child.medicalInfo.allergies.isEmpty ? 'Aucune' : child.medicalInfo.allergies.join(", "))),
+                            Expanded(child: _buildInfoRow(context, Icons.bloodtype, 'Groupe Sanguin', childModel.medicalInfo.bloodType ?? 'Non spécifié')),
+                            Expanded(child: _buildInfoRow(context, Icons.medical_services, 'Allergies', childModel.medicalInfo.allergies.isEmpty ? 'Aucune' : childModel.medicalInfo.allergies.join(", "))),
                           ],
                         ),
                         
@@ -106,15 +160,15 @@ class ChildProfileDialog extends StatelessWidget {
                             _buildDocumentPreview(
                               context, 
                               "Extrait de naissance", 
-                              child.birthCertificateUrl, 
-                              'child-birth-${child.id}'
+                              childModel.birthCertificateUrl, 
+                              'child-birth-${childModel.id}'
                             ),
                             const SizedBox(width: 16),
                             _buildDocumentPreview(
                               context, 
                               "Certificat médical", 
-                              child.medicalCertificateUrl, 
-                              'child-medical-${child.id}'
+                              childModel.medicalCertificateUrl, 
+                              'child-medical-${childModel.id}'
                             ),
                           ],
                         ),
@@ -125,11 +179,12 @@ class ChildProfileDialog extends StatelessWidget {
                           children: [
                             const Text('Inscriptions aux Cours',
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            ElevatedButton.icon(
-                              onPressed: () => _showCourseSelectionDialog(context, child),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Inscrire'),
-                            ),
+                            if (isParent)
+                              ElevatedButton.icon(
+                                onPressed: () => _showCourseSelectionDialog(context, childModel),
+                                icon: const Icon(Icons.add),
+                                label: const Text('Inscrire'),
+                              ),
                           ],
                         ),
                         if (enrollments.isEmpty)
@@ -146,10 +201,11 @@ class ChildProfileDialog extends StatelessWidget {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final enrollment = enrollments[index];
-                        final course = courses.firstWhere((c) => c.id == enrollment.courseId,
+                        final course = courses.firstWhere(
+                          (c) => c.id == enrollment.courseId,
                           orElse: () => CourseModel(
                             id: '',
-                            title: 'Cours inconnu',
+                            title: 'Chargement du cours...',
                             description: '',
                             category: CourseCategory.other,
                             season: CourseSeason.yearRound,
@@ -160,7 +216,8 @@ class ChildProfileDialog extends StatelessWidget {
                             createdBy: '',
                             createdAt: DateTime.now(),
                             updatedAt: DateTime.now(),
-                          ));
+                          ),
+                        );
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -188,8 +245,10 @@ class ChildProfileDialog extends StatelessWidget {
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
                                               Expanded(
-                                                child: Text(course.title,
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                                child: Text(
+                                                  course.title,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                                ),
                                               ),
                                               _buildBadge(context, enrollment.status.displayName, enrollment.status),
                                             ],
@@ -208,7 +267,7 @@ class ChildProfileDialog extends StatelessWidget {
                                                   ),
                                                 ],
                                               ),
-                                              if (enrollment.status == EnrollmentStatus.pending || enrollment.status == EnrollmentStatus.approved)
+                                              if (isParent && (enrollment.status == EnrollmentStatus.pending || enrollment.status == EnrollmentStatus.approved))
                                                 TextButton(
                                                   onPressed: () => _confirmCancelEnrollment(context, enrollment.id, course.title),
                                                   style: TextButton.styleFrom(
@@ -233,14 +292,14 @@ class ChildProfileDialog extends StatelessWidget {
                                                     style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13)),
                                                 ],
                                               )
-                                            else
+                                            else if (isParent)
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                 children: [
                                                   const Text("Paiement requis",
                                                     style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500, fontSize: 13)),
                                                   ElevatedButton.icon(
-                                                    onPressed: () => _showPaymentQR(context, enrollment, child),
+                                                    onPressed: () => _showPaymentQR(context, enrollment, childModel),
                                                     icon: const Icon(Icons.qr_code, size: 18),
                                                     label: const Text("Payer", style: TextStyle(fontSize: 12)),
                                                     style: ElevatedButton.styleFrom(
@@ -250,6 +309,15 @@ class ChildProfileDialog extends StatelessWidget {
                                                       minimumSize: const Size(0, 32),
                                                     ),
                                                   ),
+                                                ],
+                                              )
+                                            else
+                                              const Row(
+                                                children: [
+                                                  Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                                                  SizedBox(width: 8),
+                                                  Text("Paiement en attente",
+                                                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13)),
                                                 ],
                                               ),
                                           ],
@@ -268,7 +336,7 @@ class ChildProfileDialog extends StatelessWidget {
                   ),
                 const SliverToBoxAdapter(child: SizedBox(height: 50)),
               ],
-            )),
+            ),
           ),
         );
       },

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/child_model_complete.dart';
 import '../providers/child_enrollment_provider.dart';
-import '../providers/course_provider.dart';
+import '../providers/course_provider_complete.dart';
 import '../providers/auth_provider_v2.dart';
 
 class CourseSelectionDialog extends StatefulWidget {

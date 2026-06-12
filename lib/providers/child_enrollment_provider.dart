@@ -85,7 +85,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
   StreamSubscription? _ownerSchedulesSubscription;
   StreamSubscription? _ownerEnrollmentsSubscription;
 
-  List<CourseModel> _courses = [];
   final Map<String, CourseModel> _courseById = {};
 
   CourseModel? getCourse(String id) => _courseById[id];
@@ -100,8 +99,6 @@ class ChildEnrollmentProvider with ChangeNotifier {
       final list = (response as List)
           .map((e) => CourseModel.fromSupabase(e))
           .toList();
-
-      _courses = list;
 
       _courseById
         ..clear()
@@ -216,7 +213,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     File? birthCertificateFile,
     File? medicalCertificateFile,
     String? schoolGrade,
-    String? medicalInfo,
+    MedicalInfo? medicalInfo,
   }) async {
     try {
       _setLoading(true);
@@ -235,12 +232,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
       }
       if (birthCertificateFile != null) {
         debugPrint('📄 Uploading birth certificate: ${birthCertificateFile.path}');
-        birthCertUrl = await _imageService.uploadFile(birthCertificateFile, '\$parentId/children/certs');
+        birthCertUrl = await _imageService.uploadFile(birthCertificateFile, '$parentId/children/certs');
         debugPrint('✅ Birth certificate URL: $birthCertUrl');
       }
       if (medicalCertificateFile != null) {
         debugPrint('📄 Uploading medical certificate: ${medicalCertificateFile.path}');
-        medicalCertUrl = await _imageService.uploadFile(medicalCertificateFile, '\$parentId/children/certs');
+        medicalCertUrl = await _imageService.uploadFile(medicalCertificateFile, '$parentId/children/certs');
         debugPrint('✅ Medical certificate URL: $medicalCertUrl');
       }
 
@@ -255,7 +252,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
         birthCertificateUrl: birthCertUrl,
         medicalCertificateUrl: medicalCertUrl,
         schoolGrade: schoolGrade,
-        medicalInfo: MedicalInfo(additionalNotes: medicalInfo),
+        medicalInfo: medicalInfo ?? MedicalInfo(),
         isActive: true,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now()
@@ -277,7 +274,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     } catch (e) {
       _setLoading(false);
       debugPrint('❌ Error in addChild: $e');
-      _setError('Erreur lors de la création: \$e');
+      _setError('Erreur lors de la création: $e');
       return false;
     }
   }
@@ -290,7 +287,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
     DateTime? dateOfBirth,
     ChildGender? gender,
     String? schoolGrade,
-    String? medicalInfo,
+    MedicalInfo? medicalInfo,
     File? newPhoto,
     File? newBirthCertificate,
     File? newMedicalCertificate,
@@ -301,21 +298,21 @@ class ChildEnrollmentProvider with ChangeNotifier {
 
       if (firstName != null) updates['first_name'] = firstName;
       if (lastName != null) updates['last_name'] = lastName;
-      if (dateOfBirth != null) updates['date_of_birth'] = dateOfBirth.toIso8601String();
+      if (dateOfBirth != null) updates['date_of_birth'] = dateOfBirth.toIso8601String().split('T')[0];
       if (gender != null) updates['gender'] = gender.name;
       if (schoolGrade != null) updates['school_grade'] = schoolGrade;
-      if (medicalInfo != null) updates['medical_info'] = MedicalInfo(additionalNotes: medicalInfo).toMap();
+      if (medicalInfo != null) updates['medical_info'] = medicalInfo.toMap();
 
       if (newPhoto != null) updates['photo_url'] = await _imageService.uploadChildPhoto(imageFile: newPhoto, userId: parentId, childId: childId);
-      if (newBirthCertificate != null) updates['birth_certificate_url'] = await _imageService.uploadFile(newBirthCertificate, '\$parentId/children/certs');
-      if (newMedicalCertificate != null) updates['medical_certificate_url'] = await _imageService.uploadFile(newMedicalCertificate, '\$parentId/children/certs');
+      if (newBirthCertificate != null) updates['birth_certificate_url'] = await _imageService.uploadFile(newBirthCertificate, '$parentId/children/certs');
+      if (newMedicalCertificate != null) updates['medical_certificate_url'] = await _imageService.uploadFile(newMedicalCertificate, '$parentId/children/certs');
 
       await _supabaseChildService.updateChild(childId, updates);
       _setLoading(false);
       return true;
     } catch (e) {
       _setLoading(false);
-      _setError('Erreur lors de la mise à jour: \$e');
+      _setError('Erreur lors de la mise à jour: $e');
       return false;
     }
   }
@@ -340,7 +337,7 @@ class ChildEnrollmentProvider with ChangeNotifier {
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
-      _setError('Erreur lors du chargement des enfants: \$e');
+      _setError('Erreur lors du chargement des enfants: $e');
     }
   }
 
@@ -560,13 +557,13 @@ class ChildEnrollmentProvider with ChangeNotifier {
       final now = DateTime.now();
       for (int i = 0; i < 6; i++) {
         final monthDate = DateTime(now.year, now.month - i, 1);
-        final key = "\${monthDate.year}-\${monthDate.month.toString().padLeft(2, '0')}";
+        final key = "${monthDate.year}-${monthDate.month.toString().padLeft(2, '0')}";
         stats[key] = 0;
       }
 
       for (var e in enrollments) {
         final date = e.enrolledAt;
-        final key = "\${date.year}-\${date.month.toString().padLeft(2, '0')}";
+        final key = "${date.year}-${date.month.toString().padLeft(2, '0')}";
         if (stats.containsKey(key)) {
           stats[key] = stats[key]! + 1;
         }

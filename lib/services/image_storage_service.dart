@@ -74,8 +74,11 @@ class ImageStorageService extends AdminSupabaseService {
       String contentType = 'application/octet-stream';
       if (fileName.toLowerCase().endsWith('.pdf')) {
         contentType = 'application/pdf';
-      } else if (fileName.toLowerCase().endsWith('.jpg') || fileName.toLowerCase().endsWith('.jpeg')) contentType = 'image/jpeg';
-      else if (fileName.toLowerCase().endsWith('.png')) contentType = 'image/png';
+      } else if (fileName.toLowerCase().endsWith('.jpg') || fileName.toLowerCase().endsWith('.jpeg')) {
+        contentType = 'image/jpeg';
+      } else if (fileName.toLowerCase().endsWith('.png')) {
+        contentType = 'image/png';
+      }
 
       await adminClient.storage.from(_profileBucket).uploadBinary(
             filePath,

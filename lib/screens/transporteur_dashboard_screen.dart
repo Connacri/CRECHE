@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider_v2.dart';
 import '../widgets/glass_card.dart';
 import 'shipment_detail_screen.dart';
+import '../services/shipment_service.dart';
+import '../models/shipment_model.dart';
 
 class TransporteurDashboard extends StatelessWidget {
   const TransporteurDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProviderV2>().user;
+    final shipmentService = ShipmentService();
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -44,9 +50,24 @@ class TransporteurDashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context),
+              _buildHeader(context, user),
               Expanded(
-                child: _buildShipmentList(context),
+                child: StreamBuilder<List<ShipmentModel>>(
+                  stream: shipmentService.getShipmentsStream(transporteurId: user?.uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Erreur: ${snapshot.error}'));
+                    }
+                    final shipments = snapshot.data ?? [];
+                    if (shipments.isEmpty) {
+                      return const Center(child: Text('Aucune expédition en cours'));
+                    }
+                    return _buildShipmentList(context, shipments);
+                  },
+                ),
               ),
             ],
           ),
@@ -55,31 +76,33 @@ class TransporteurDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, UserModel? user) {
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: GlassCard(
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 30,
-              backgroundImage: AssetImage('assets/images/app_icon.jpg'),
+              backgroundImage: user?.profileImages.profileImage != null 
+                  ? NetworkImage(user!.profileImages.profileImage!) 
+                  : const AssetImage('assets/images/app_icon.jpg') as ImageProvider,
             ),
             const SizedBox(width: 15),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Bonjour, Transporteur',
+                  'Bonjour, ${user?.name ?? "Transporteur"}',
                   style: GoogleFonts.oswald(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  '3 expéditions en cours aujourd\'hui',
-                  style: GoogleFonts.oswald(
+                const Text(
+                  'Suivi de vos expéditions en temps réel',
+                  style: TextStyle(
                     fontSize: 14,
                     color: Colors.white70,
                   ),
@@ -92,36 +115,14 @@ class TransporteurDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildShipmentList(BuildContext context) {
-    final List<Map<String, dynamic>> shipments = [
-      {
-        'id': 'EXP-2024-001',
-        'route': 'Alger -> Oran',
-        'status': 'En transit',
-        'progress': 0.65,
-        'time': 'Arrivée prévue: 14:30',
-      },
-      {
-        'id': 'EXP-2024-002',
-        'route': 'Blida -> Tipaza',
-        'status': 'Chargement',
-        'progress': 0.15,
-        'time': 'Départ: 10:00',
-      },
-      {
-        'id': 'EXP-2024-003',
-        'route': 'Sétif -> Constantine',
-        'status': 'Livré',
-        'progress': 1.0,
-        'time': 'Livré à: 08:45',
-      },
-    ];
-
+  Widget _buildShipmentList(BuildContext context, List<ShipmentModel> shipments) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: shipments.length,
       itemBuilder: (context, index) {
         final shipment = shipments[index];
+        final progress = _calculateProgress(shipment.status);
+        
         return Padding(
           padding: const EdgeInsets.only(bottom: 15),
           child: GlassCard(
@@ -141,19 +142,19 @@ class TransporteurDashboard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      shipment['id'],
+                      shipment.trackingNumber,
                       style: GoogleFonts.oswald(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
-                    _buildStatusChip(shipment['status']),
+                    _buildStatusChip(shipment.status),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  shipment['route'],
+                  '${shipment.originAddress ?? "N/A"} -> ${shipment.destinationAddress ?? "N/A"}',
                   style: GoogleFonts.oswald(
                     fontSize: 18,
                     fontWeight: FontWeight.w500,
@@ -161,7 +162,9 @@ class TransporteurDashboard extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  shipment['time'],
+                  shipment.estimatedDelivery != null 
+                      ? 'Livraison prévue: ${shipment.estimatedDelivery!.day}/${shipment.estimatedDelivery!.month}'
+                      : 'Livraison non planifiée',
                   style: GoogleFonts.oswald(
                     fontSize: 14,
                     color: Colors.white60,
@@ -169,10 +172,10 @@ class TransporteurDashboard extends StatelessWidget {
                 ),
                 const SizedBox(height: 15),
                 LinearProgressIndicator(
-                  value: shipment['progress'].toDouble(),
+                  value: progress,
                   backgroundColor: Colors.white10,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    shipment['progress'] == 1.0 ? Colors.green : Colors.blue,
+                    progress == 1.0 ? Colors.green : Colors.blue,
                   ),
                 ),
               ],
@@ -183,20 +186,39 @@ class TransporteurDashboard extends StatelessWidget {
     );
   }
 
+  double _calculateProgress(String status) {
+    switch (status) {
+      case 'pending': return 0.1;
+      case 'picked_up': return 0.3;
+      case 'in_transit': return 0.65;
+      case 'delivered': return 1.0;
+      default: return 0.0;
+    }
+  }
+
   Widget _buildStatusChip(String status) {
     Color color;
+    String label;
     switch (status) {
-      case 'En transit':
+      case 'in_transit':
         color = Colors.blue;
+        label = 'En transit';
         break;
-      case 'Chargement':
+      case 'picked_up':
         color = Colors.orange;
+        label = 'Chargement';
         break;
-      case 'Livré':
+      case 'delivered':
         color = Colors.green;
+        label = 'Livré';
+        break;
+      case 'pending':
+        color = Colors.grey;
+        label = 'Attente';
         break;
       default:
         color = Colors.grey;
+        label = status;
     }
 
     return Container(
@@ -207,7 +229,7 @@ class TransporteurDashboard extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
-        status,
+        label,
         style: GoogleFonts.oswald(
           fontSize: 12,
           color: color,

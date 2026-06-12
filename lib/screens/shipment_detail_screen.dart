@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/glass_card.dart';
+import '../models/shipment_model.dart';
+import 'package:intl/intl.dart';
 
 class ShipmentDetailScreen extends StatelessWidget {
-  final Map<String, dynamic> shipment;
+  final ShipmentModel shipment;
 
   const ShipmentDetailScreen({super.key, required this.shipment});
 
@@ -35,8 +37,6 @@ class ShipmentDetailScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 _buildTimeline(context),
                 const SizedBox(height: 20),
-                _buildDriverInfo(context),
-                const SizedBox(height: 30),
                 _buildActionButtons(context),
               ],
             ),
@@ -56,21 +56,21 @@ class ShipmentDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                shipment['id'],
+                shipment.trackingNumber,
                 style: GoogleFonts.oswald(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
               ),
               Text(
-                '04 Juin 2024',
+                DateFormat('dd MMM yyyy').format(shipment.createdAt),
                 style: GoogleFonts.oswald(color: Colors.white60),
               ),
             ],
           ),
           const Divider(height: 30, color: Colors.white24),
-          _buildInfoRow(Icons.location_on, 'Origine', 'Dépôt Central, Alger'),
+          _buildInfoRow(Icons.location_on, 'Origine', shipment.originAddress ?? 'N/A'),
           const SizedBox(height: 15),
-          _buildInfoRow(Icons.flag, 'Destination', 'Crèche Les Petits Anges, Oran'),
+          _buildInfoRow(Icons.flag, 'Destination', shipment.destinationAddress ?? 'N/A'),
           const SizedBox(height: 15),
-          _buildInfoRow(Icons.inventory_2, 'Contenu', 'Matériel pédagogique, Denrées alimentaires'),
+          _buildInfoRow(Icons.inventory_2, 'Statut', shipment.status),
         ],
       ),
     );
@@ -81,12 +81,14 @@ class ShipmentDetailScreen extends StatelessWidget {
       children: [
         Icon(icon, size: 20, color: Colors.white70),
         const SizedBox(width: 15),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: GoogleFonts.oswald(fontSize: 12, color: Colors.white38)),
-            Text(value, style: GoogleFonts.oswald(fontSize: 16, fontWeight: FontWeight.w500)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: GoogleFonts.oswald(fontSize: 12, color: Colors.white38)),
+              Text(value, style: GoogleFonts.oswald(fontSize: 16, fontWeight: FontWeight.w500)),
+            ],
+          ),
         ),
       ],
     );
@@ -100,10 +102,10 @@ class ShipmentDetailScreen extends StatelessWidget {
         children: [
           Text('Suivi', style: GoogleFonts.oswald(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
-          _buildTimelineItem('Livré', 'Arrivée à destination', '08:45', true),
-          _buildTimelineItem('En transit', 'Sortie de l\'autoroute Est-Ouest', '07:30', true),
-          _buildTimelineItem('Pris en charge', 'Chargement terminé au dépôt', '06:15', true),
-          _buildTimelineItem('Planifié', 'Assigné au chauffeur', 'Hier, 18:00', true),
+          _buildTimelineItem('Livré', 'Arrivée à destination', '', shipment.status == 'delivered'),
+          _buildTimelineItem('En transit', 'Expédition en cours', '', shipment.status == 'in_transit' || shipment.status == 'delivered'),
+          _buildTimelineItem('Pris en charge', 'Collecté par le transporteur', '', ['picked_up', 'in_transit', 'delivered'].contains(shipment.status)),
+          _buildTimelineItem('Planifié', 'Expédition enregistrée', DateFormat('HH:mm').format(shipment.createdAt), true),
         ],
       ),
     );
@@ -138,35 +140,6 @@ class ShipmentDetailScreen extends StatelessWidget {
         ),
         Text(time, style: GoogleFonts.oswald(fontSize: 12, color: Colors.white38)),
       ],
-    );
-  }
-
-  Widget _buildDriverInfo(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 25,
-            backgroundColor: Colors.white10,
-            child: Icon(Icons.person, color: Colors.white),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Chauffeur', style: GoogleFonts.oswald(fontSize: 12, color: Colors.white38)),
-                Text('Ahmed Mansouri', style: GoogleFonts.oswald(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.phone, color: Colors.green),
-            onPressed: () {},
-          ),
-        ],
-      ),
     );
   }
 

@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider_v2.dart';
 import '../widgets/glass_card.dart';
+import '../services/shipment_service.dart';
+import '../models/shipment_model.dart';
+import 'shipment_detail_screen.dart';
 
 class FournisseurDashboard extends StatelessWidget {
   const FournisseurDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProviderV2>().user;
+    final shipmentService = ShipmentService();
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -43,11 +50,11 @@ class FournisseurDashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatsHeader(context),
+              _buildStatsHeader(context, user),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  'Commandes Récentes',
+                  'Expéditions Récentes',
                   style: GoogleFonts.oswald(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -56,7 +63,19 @@ class FournisseurDashboard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: _buildOrderList(context),
+                child: StreamBuilder<List<ShipmentModel>>(
+                  stream: shipmentService.getShipmentsStream(senderId: user?.uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final shipments = snapshot.data ?? [];
+                    if (shipments.isEmpty) {
+                      return const Center(child: Text('Aucune expédition trouvée'));
+                    }
+                    return _buildOrderList(context, shipments);
+                  },
+                ),
               ),
             ],
           ),
@@ -65,7 +84,8 @@ class FournisseurDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsHeader(BuildContext context) {
+  Widget _buildStatsHeader(BuildContext context, UserModel? user) {
+    // In a full implementation, these would also come from real-time streams/counts
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: Row(
@@ -77,8 +97,8 @@ class FournisseurDashboard extends StatelessWidget {
                 children: [
                   const Icon(Icons.shopping_cart, size: 30),
                   const SizedBox(height: 5),
-                  Text('12', style: GoogleFonts.oswald(fontSize: 24, fontWeight: FontWeight.bold)),
-                  Text('Commandes', style: GoogleFonts.oswald(fontSize: 12, color: Colors.white70)),
+                  Text('Stock', style: GoogleFonts.oswald(fontSize: 12, color: Colors.white70)),
+                  const Icon(Icons.inventory, size: 20),
                 ],
               ),
             ),
@@ -91,8 +111,7 @@ class FournisseurDashboard extends StatelessWidget {
                 children: [
                   const Icon(Icons.pending_actions, size: 30, color: Colors.orange),
                   const SizedBox(height: 5),
-                  Text('4', style: GoogleFonts.oswald(fontSize: 24, fontWeight: FontWeight.bold)),
-                  Text('À préparer', style: GoogleFonts.oswald(fontSize: 12, color: Colors.white70)),
+                  Text('Actif', style: GoogleFonts.oswald(fontSize: 12, color: Colors.white70)),
                 ],
               ),
             ),
@@ -105,8 +124,7 @@ class FournisseurDashboard extends StatelessWidget {
                 children: [
                   const Icon(Icons.check_circle, size: 30, color: Colors.green),
                   const SizedBox(height: 5),
-                  Text('8', style: GoogleFonts.oswald(fontSize: 24, fontWeight: FontWeight.bold)),
-                  Text('Livrées', style: GoogleFonts.oswald(fontSize: 12, color: Colors.white70)),
+                  Text('Prêt', style: GoogleFonts.oswald(fontSize: 12, color: Colors.white70)),
                 ],
               ),
             ),
@@ -116,22 +134,24 @@ class FournisseurDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderList(BuildContext context) {
-    final List<Map<String, dynamic>> orders = [
-      {'id': 'CMD-782', 'client': 'Crèche Les Petits Anges', 'items': '5x Lait, 10x Couches', 'status': 'En préparation'},
-      {'id': 'CMD-785', 'client': 'EURL Logistique Pro', 'items': '2x Bureaux, 4x Chaises', 'status': 'Prêt pour expédition'},
-      {'id': 'CMD-789', 'client': 'Pharmacie Centrale', 'items': '20x Gants, 15x Masques', 'status': 'Validée'},
-    ];
-
+  Widget _buildOrderList(BuildContext context, List<ShipmentModel> shipments) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: orders.length,
+      itemCount: shipments.length,
       itemBuilder: (context, index) {
-        final order = orders[index];
+        final shipment = shipments[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: GlassCard(
             padding: const EdgeInsets.all(15),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ShipmentDetailScreen(shipment: shipment),
+                ),
+              );
+            },
             child: Row(
               children: [
                 Container(
@@ -140,7 +160,7 @@ class FournisseurDashboard extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.assignment),
+                  child: const Icon(Icons.local_shipping),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -148,15 +168,15 @@ class FournisseurDashboard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order['id'],
+                        shipment.trackingNumber,
                         style: GoogleFonts.oswald(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
-                        order['client'],
+                        'Vers: ${shipment.destinationAddress ?? "Inconnu"}',
                         style: GoogleFonts.oswald(color: Colors.white70, fontSize: 14),
                       ),
                       Text(
-                        order['items'],
+                        'Statut: ${shipment.status}',
                         style: GoogleFonts.oswald(color: Colors.white60, fontSize: 12),
                       ),
                     ],

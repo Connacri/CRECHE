@@ -95,6 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     if (pickedFile != null) {
+      if (!mounted) return;
       setState(() => _isSaving = true);
       try {
         final auth = context.read<AuthProviderV2>();
@@ -251,10 +252,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'profileImageSupabase': '$imageUrl?t=${DateTime.now().millisecondsSinceEpoch}',
           }
         };
+        if (!mounted) return;
         await auth.updateUserProfileSilent(profileImagesUpdate);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo de profil mise à jour !')));
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo de profil mise à jour !')));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));

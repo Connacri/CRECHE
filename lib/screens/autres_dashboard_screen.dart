@@ -13,38 +13,15 @@ class AutresDashboardScreen extends StatefulWidget {
 }
 
 class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
-  UserModel? _user;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUser();
-  }
-
-  Future<void> _loadUser() async {
-    setState(() => _isLoading = true);
-    try {
-      final auth = Provider.of<AuthProviderV2>(context, listen: false);
-      _user = auth.user;
-    } catch (e) {
-      debugPrint('Error loading user: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   String _formatDateTime(DateTime dt) {
     return DateFormat('dd/MM/yyyy HH:mm').format(dt);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    final user = context.watch<AuthProviderV2>().user;
 
-    if (_user == null) {
+    if (user == null) {
       return const Scaffold(body: Center(child: Text('Utilisateur non trouvé')));
     }
 
@@ -62,15 +39,15 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(),
+                _buildHeader(user),
                 const SizedBox(height: 20),
-                _buildCoverAndAvatar(),
+                _buildCoverAndAvatar(user),
                 const SizedBox(height: 60), // Increased height for avatar overflow
-                _buildProfileInfo(),
+                _buildProfileInfo(user),
                 const SizedBox(height: 20),
-                _buildProfessionalInfo(),
+                _buildProfessionalInfo(user),
                 const SizedBox(height: 20),
-                _buildSystemInfo(),
+                _buildSystemInfo(user),
                 const SizedBox(height: 30),
                 _buildLogoutButton(),
               ],
@@ -81,7 +58,7 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(UserModel user) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -96,12 +73,12 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
               ),
             ),
             Text(
-              'Profil ${_user!.role.displayName}',
+              'Profil ${user.role.displayName}',
               style: const TextStyle(color: Colors.white70),
             ),
           ],
         ),
-        _buildRoleBadge(_user!.role),
+        _buildRoleBadge(user.role),
       ],
     );
   }
@@ -159,9 +136,9 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
     );
   }
 
-  Widget _buildCoverAndAvatar() {
-    final coverUrl = _user!.profileImages.coverImage;
-    final profileUrl = _user!.profileImages.profileImage;
+  Widget _buildCoverAndAvatar(UserModel user) {
+    final coverUrl = user.profileImages.coverImage;
+    final profileUrl = user.profileImages.profileImage;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -197,27 +174,27 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
     );
   }
 
-  Widget _buildProfileInfo() {
-    final hasLocation = _user!.location?.hasLocation ?? false;
+  Widget _buildProfileInfo(UserModel user) {
+    final hasLocation = user.location?.hasLocation ?? false;
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildReadOnlyField(label: 'Nom complet', value: _user!.name),
-          _buildReadOnlyField(label: 'Email', value: _user!.email),
-          _buildReadOnlyField(label: 'Téléphone', value: _user!.phoneNumber ?? 'Non renseigné'),
+          _buildReadOnlyField(label: 'Nom complet', value: user.name),
+          _buildReadOnlyField(label: 'Email', value: user.email),
+          _buildReadOnlyField(label: 'Téléphone', value: user.phoneNumber ?? 'Non renseigné'),
           if (hasLocation)
-            _buildReadOnlyField(label: 'Adresse', value: _user!.location!.address),
-          _buildReadOnlyField(label: 'Bio', value: _user!.bio ?? 'Aucune bio', isLongText: true),
+            _buildReadOnlyField(label: 'Adresse', value: user.location!.address),
+          _buildReadOnlyField(label: 'Bio', value: user.bio ?? 'Aucune bio', isLongText: true),
         ],
       ),
     );
   }
 
-  Widget _buildProfessionalInfo() {
-    if (_user!.role != UserRole.coach && _user!.role != UserRole.school) {
+  Widget _buildProfessionalInfo(UserModel user) {
+    if (user.role != UserRole.coach && user.role != UserRole.school) {
       return const SizedBox.shrink();
     }
 
@@ -231,10 +208,10 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
             style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 16),
-          _buildReadOnlyField(label: 'Palmarès', value: _user!.palmares ?? 'Non renseigné', isLongText: true),
-          _buildListField(label: 'Diplômes', items: _user!.diplomas),
-          _buildListField(label: 'Certificats', items: _user!.certificates),
-          if (_user!.cvUrl != null)
+          _buildReadOnlyField(label: 'Palmarès', value: user.palmares ?? 'Non renseigné', isLongText: true),
+          _buildListField(label: 'Diplômes', items: user.diplomas),
+          _buildListField(label: 'Certificats', items: user.certificates),
+          if (user.cvUrl != null)
             ListTile(
               leading: const Icon(Icons.description, color: Colors.white),
               title: const Text('CV / Documentation', style: TextStyle(color: Colors.white)),
@@ -248,7 +225,7 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
     );
   }
 
-  Widget _buildSystemInfo() {
+  Widget _buildSystemInfo(UserModel user) {
     return GlassCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -259,23 +236,23 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
             style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 16),
-          _buildReadOnlyField(label: 'ID Unique', value: _user!.uid),
-          _buildReadOnlyField(label: 'Créé le', value: _formatDateTime(_user!.createdAt)),
-          _buildReadOnlyField(label: 'Mis à jour le', value: _formatDateTime(_user!.updatedAt)),
-          _buildReadOnlyField(label: 'Statut', value: _user!.isActive ? 'Actif' : 'Inactif'),
-          _buildReadOnlyField(label: 'Profil complété', value: _user!.profileCompleted ? 'Oui' : 'Non'),
+          _buildReadOnlyField(label: 'ID Unique', value: user.uid),
+          _buildReadOnlyField(label: 'Créé le', value: _formatDateTime(user.createdAt)),
+          _buildReadOnlyField(label: 'Mis à jour le', value: _formatDateTime(user.updatedAt)),
+          _buildReadOnlyField(label: 'Statut', value: user.isActive ? 'Actif' : 'Inactif'),
+          _buildReadOnlyField(label: 'Profil complété', value: user.profileCompleted ? 'Oui' : 'Non'),
           _buildImageInfo(
             label: 'Photo de profil',
-            url: _user!.profileImages.profileImageSupabase,
+            url: user.profileImages.profileImageSupabase,
           ),
           _buildImageInfo(
             label: 'Image de couverture',
-            url: _user!.profileImages.coverImageSupabase,
+            url: user.profileImages.coverImageSupabase,
           ),
-          if (_user!.profileImages.lastUpdated != null)
+          if (user.profileImages.lastUpdated != null)
             _buildReadOnlyField(
               label: 'Dernière mise à jour',
-              value: _formatDateTime(_user!.profileImages.lastUpdated!),
+              value: _formatDateTime(user.profileImages.lastUpdated!),
             ),
         ],
       ),

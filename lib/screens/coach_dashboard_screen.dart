@@ -27,7 +27,20 @@ class _CoachDashboardScreenState extends State<CoachDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _buildPage(),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/bg_ghibli.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          SafeArea(child: _buildPage()),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }

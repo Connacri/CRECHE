@@ -16,7 +16,6 @@ import '../widgets/modern_course_card_widget.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/child_profile_dialog.dart';
 import '../widgets/child_form_dialog.dart';
-import '../widgets/course_selection_dialog.dart';
 import 'profile_screen.dart';
 import 'course_details_screen.dart';
 
