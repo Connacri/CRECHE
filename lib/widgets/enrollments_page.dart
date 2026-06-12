@@ -9,6 +9,7 @@ import '../providers/child_enrollment_provider.dart';
 import '../models/enrollment_model_complete.dart';
 import '../models/child_model_complete.dart';
 import '../models/course_model_complete.dart';
+import '../models/user_model.dart';
 import '../services/pdf_dossier_service.dart';
 import 'glass_card.dart';
 
@@ -386,9 +387,39 @@ class _EnrollmentList extends StatelessWidget {
              SizedBox(
                width: double.infinity,
                child: OutlinedButton.icon(
-                 onPressed: () => PdfDossierService.generateAndPrintDossier(child),
+                 onPressed: () async {
+                    final auth = context.read<AuthProviderV2>();
+                    // Si on est admin/school, on veut peut-être le parent de l'inscription, 
+                    // sinon on prend l'utilisateur actuel (si c'est le parent lui-même)
+                    UserModel? parent;
+                    if (auth.currentUser?.uid == enrollment.parentId) {
+                      parent = auth.user;
+                    } else {
+                      // Optionnel: On pourrait charger le profil du parent ici via l'API
+                      final data = await auth.getUserData(enrollment.parentId);
+                      if (data != null) parent = UserModel.fromSupabase(data);
+                    }
+
+                    // Fetch club/school name
+                    String? clubName;
+                    if (course.clubId != null) {
+                      final clubData = await auth.getUserData(course.clubId!);
+                      if (clubData != null) clubName = clubData['name'];
+                    } else {
+                      final ownerData = await auth.getUserData(course.createdBy);
+                      if (ownerData != null) clubName = ownerData['name'];
+                    }
+
+                    await PdfDossierService.generateAndPrintDossier(
+                      child: child,
+                      enrollment: enrollment,
+                      course: course,
+                      parent: parent,
+                      clubName: clubName,
+                    );
+                 },
                  icon: const Icon(Icons.picture_as_pdf),
-                 label: const Text('Imprimer Dossier PDF'),
+                 label: const Text('Générer Dossier PDF'),
                ),
              ),
              const SizedBox(height: 8),

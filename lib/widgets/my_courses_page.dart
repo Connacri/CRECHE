@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/course_provider_complete.dart';
 import '../providers/auth_provider_v2.dart';
 import '../models/course_model_complete.dart';
+import '../screens/course_details_screen.dart';
 import '../screens/create_course_screen.dart';
 import 'glass_card.dart';
 
@@ -156,6 +157,11 @@ class _CourseItem extends StatelessWidget {
                 ),
                 Row(
                   children: [
+                    IconButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(course: course,))),
+                      icon: const Icon(Icons.info, color: Colors.blueGrey),
+                      tooltip: 'Info',
+                    ),
                     IconButton(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateCourseScreen(courseToEdit: course))),
                       icon: const Icon(Icons.edit_outlined, color: Colors.blue),

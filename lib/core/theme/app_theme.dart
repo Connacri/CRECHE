@@ -24,7 +24,7 @@ class AppTheme {
     );
 
     final appColors = isDark ? AppColors.dark : AppColors.light;
-    final oswaldFont = GoogleFonts.oswaldTextTheme();
+    final merriweatherFont = GoogleFonts.merriweatherTextTheme();
 
     return ThemeData(
       extensions: [appColors],
@@ -32,21 +32,21 @@ class AppTheme {
       brightness: brightness,
       colorScheme: colorScheme,
       textTheme: (isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme).copyWith(
-        displayLarge: oswaldFont.displayLarge?.copyWith(color: colorScheme.onSurface),
-        displayMedium: oswaldFont.displayMedium?.copyWith(color: colorScheme.onSurface),
-        displaySmall: oswaldFont.displaySmall?.copyWith(color: colorScheme.onSurface),
-        headlineLarge: oswaldFont.headlineLarge?.copyWith(color: colorScheme.onSurface),
-        headlineMedium: oswaldFont.headlineMedium?.copyWith(color: colorScheme.onSurface),
-        headlineSmall: oswaldFont.headlineSmall?.copyWith(color: colorScheme.onSurface),
-        titleLarge: oswaldFont.titleLarge?.copyWith(color: colorScheme.onSurface),
-        titleMedium: oswaldFont.titleMedium?.copyWith(color: colorScheme.onSurface),
-        titleSmall: oswaldFont.titleSmall?.copyWith(color: colorScheme.onSurface),
-        bodyLarge: oswaldFont.bodyLarge?.copyWith(color: colorScheme.onSurface),
-        bodyMedium: oswaldFont.bodyMedium?.copyWith(color: colorScheme.onSurface),
-        bodySmall: oswaldFont.bodySmall?.copyWith(color: colorScheme.onSurface),
-        labelLarge: oswaldFont.labelLarge?.copyWith(color: colorScheme.onSurface),
-        labelMedium: oswaldFont.labelMedium?.copyWith(color: colorScheme.onSurface),
-        labelSmall: oswaldFont.labelSmall?.copyWith(color: colorScheme.onSurface),
+        displayLarge: merriweatherFont.displayLarge?.copyWith(color: colorScheme.onSurface),
+        displayMedium: merriweatherFont.displayMedium?.copyWith(color: colorScheme.onSurface),
+        displaySmall: merriweatherFont.displaySmall?.copyWith(color: colorScheme.onSurface),
+        headlineLarge: merriweatherFont.headlineLarge?.copyWith(color: colorScheme.onSurface),
+        headlineMedium: merriweatherFont.headlineMedium?.copyWith(color: colorScheme.onSurface),
+        headlineSmall: merriweatherFont.headlineSmall?.copyWith(color: colorScheme.onSurface),
+        titleLarge: merriweatherFont.titleLarge?.copyWith(color: colorScheme.onSurface),
+        titleMedium: merriweatherFont.titleMedium?.copyWith(color: colorScheme.onSurface),
+        titleSmall: merriweatherFont.titleSmall?.copyWith(color: colorScheme.onSurface),
+        bodyLarge: merriweatherFont.bodyLarge?.copyWith(color: colorScheme.onSurface),
+        bodyMedium: merriweatherFont.bodyMedium?.copyWith(color: colorScheme.onSurface),
+        bodySmall: merriweatherFont.bodySmall?.copyWith(color: colorScheme.onSurface),
+        labelLarge: merriweatherFont.labelLarge?.copyWith(color: colorScheme.onSurface),
+        labelMedium: merriweatherFont.labelMedium?.copyWith(color: colorScheme.onSurface),
+        labelSmall: merriweatherFont.labelSmall?.copyWith(color: colorScheme.onSurface),
       ),
 
       cardTheme: CardThemeData(

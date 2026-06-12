@@ -434,6 +434,8 @@ class AuthProviderV2 with ChangeNotifier {
 
   String? get userRole => _userData?['role'];
 
+  Future<Map<String, dynamic>?> getUserData(String userId) => _authService.getUserData(userId);
+
   void _setState(AppAuthState newState) {
     _state = newState;
     notifyListeners();
