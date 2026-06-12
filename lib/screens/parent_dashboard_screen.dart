@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../dependences/calendar_timeline/calendar_timeline.dart';
 import '../providers/auth_provider_v2.dart';
@@ -442,12 +444,10 @@ class _CoursesPage extends StatelessWidget {
         final courses = courseProvider.courses;
         final children = childProvider.children;
 
-        return GridView.builder(
+        return ListView.separated(
           padding: const EdgeInsets.all(24),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.50
-          ),
           itemCount: courses.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 20),
           itemBuilder: (context, i) {
             final course = courses[i];
             
@@ -645,16 +645,17 @@ class _BillingPage extends StatelessWidget {
                 if (nextRenewal != null) ...[
                   const Divider(height: 24, thickness: 0.5),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.event_repeat, size: 16, color: Colors.blue[400]),
-                          const SizedBox(width: 6),
-                          const Text('Prochain renouvellement',
-                              style: TextStyle(fontSize: 13)),
-                        ],
+                      Icon(Icons.event_repeat, size: 16, color: Colors.blue[400]),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text(
+                          'Prochain renouvellement',
+                          style: TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         DateFormat('dd/MM/yyyy').format(nextRenewal),
                         style: const TextStyle(
@@ -722,24 +723,27 @@ class _BillingPage extends StatelessWidget {
         // ── Barre de progression paiement ──────────────
         if (total > 0) ...[
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                isPaid
-                    ? 'Payé intégralement'
-                    : isPartial
-                    ? 'Paiement partiel'
-                    : 'En attente de paiement',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isPaid
-                      ? Colors.green
+              Expanded(
+                child: Text(
+                  isPaid
+                      ? 'Payé intégralement'
                       : isPartial
-                      ? Colors.orange
-                      : Colors.red[400],
-                  fontWeight: FontWeight.w500,
+                      ? 'Paiement partiel'
+                      : 'En attente de paiement',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isPaid
+                        ? Colors.green
+                        : isPartial
+                        ? Colors.orange
+                        : Colors.red[400],
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '${paid.toStringAsFixed(0)} / ${total.toStringAsFixed(0)} DA',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -806,34 +810,45 @@ class _BillingPage extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Paiement par QR Code'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Scannez ce code pour effectuer le paiement de votre inscription.'),
-            const SizedBox(height: 20),
-            Image.asset(
-              'assets/qrcode/qr.jpg',
-              width: 200,
-              height: 200,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 200,
-                height: 200,
-                color: Colors.grey[200],
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.qr_code, size: 50, color: Colors.grey),
-                    Text('QR Code non disponible', style: TextStyle(fontSize: 12)),
-                  ],
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Scannez ce code pour effectuer le paiement de votre inscription.'),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(
+                  data: jsonEncode({
+                    'type': 'enrollment_payment',
+                    'id': enrollment.id,
+                    'child_name': child.firstName,
+                    'amount': enrollment.totalAmount ?? 0.0,
+                  }),
+                  version: QrVersions.auto,
+                  size: 200.0,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: Colors.black,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: Colors.black,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text('Montant: ${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 12),
-            const Text("Une fois le paiement effectué, le coach confirmera votre statut d'adhérent.",
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
-          ],
+              const SizedBox(height: 20),
+              Text('Montant: ${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 12),
+              const Text("Une fois le paiement effectué, le coach confirmera votre statut d'adhérent.",
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),

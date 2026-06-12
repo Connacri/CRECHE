@@ -308,22 +308,25 @@ class _EnrollmentList extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('QR Code - ${child.firstName}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 200,
-              height: 200,
-              child: QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 200.0,
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 200,
+                height: 200,
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text('Cours: ${course.title}', style: const TextStyle(fontSize: 12)),
-            Text('Montant: ${enrollment.totalAmount ?? 0} DA', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
+              const SizedBox(height: 16),
+              Text('Cours: ${course.title}', style: const TextStyle(fontSize: 12)),
+              Text('Montant: ${enrollment.totalAmount ?? 0} DA', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),

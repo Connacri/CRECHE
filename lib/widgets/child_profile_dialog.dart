@@ -177,8 +177,10 @@ class ChildProfileDialog extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Inscriptions aux Cours',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            const Expanded(
+                              child: Text('Inscriptions aux Cours',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            ),
                             if (isParent)
                               ElevatedButton.icon(
                                 onPressed: () => _showCourseSelectionDialog(context, childModel),
@@ -348,32 +350,43 @@ class ChildProfileDialog extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Paiement par QR Code"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Veuillez présenter ce code au club pour valider votre paiement."),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Veuillez présenter ce code au club pour valider votre paiement."),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(
+                  data: jsonEncode({
+                    'type': 'enrollment_payment',
+                    'id': enrollment.id,
+                    'child_name': child.firstName,
+                    'amount': enrollment.totalAmount ?? 0.0,
+                  }),
+                  version: QrVersions.auto,
+                  size: 200.0,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: Colors.black,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: Colors.black,
+                  ),
+                ),
               ),
-              child: QrImageView(
-                data: jsonEncode({
-                  'type': 'enrollment_payment',
-                  'id': enrollment.id,
-                  'child_name': child.firstName,
-                  'amount': enrollment.totalAmount ?? 0.0,
-                }),
-                version: QrVersions.auto,
-                size: 200.0,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text("${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
+              const SizedBox(height: 12),
+              Text("${enrollment.totalAmount?.toStringAsFixed(0) ?? "0"} DA",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Fermer")),

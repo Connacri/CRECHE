@@ -325,6 +325,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<CourseCategory>(
+                    isExpanded: true,
                     initialValue: _selectedCategory,
                     decoration: const InputDecoration(labelText: 'Catégorie', prefixIcon: Icon(Icons.category)),
                     items: CourseCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.displayName))).toList(),
@@ -334,6 +335,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: DropdownButtonFormField<CourseSeason>(
+                    isExpanded: true,
                     initialValue: _selectedSeason,
                     decoration: const InputDecoration(labelText: 'Saison', prefixIcon: Icon(Icons.calendar_today)),
                     items: CourseSeason.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName))).toList(),
