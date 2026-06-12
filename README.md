@@ -3,16 +3,16 @@
 <div align="center">
   <img src="assets/images/creche_logo.png" width="200" alt="Crèche Logo" style="border-radius: 50%; box-shadow: 0 0 30px rgba(138, 43, 226, 0.6); border: 4px solid #8A2BE2;"/>
   <br/>
-  <h1 style="font-family: 'Oswald', sans-serif; letter-spacing: 2px;">✨ CRÈCHE V1.2.101 ✨</h1>
+  <h1 style="font-family: 'Oswald', sans-serif; letter-spacing: 2px;">✨ CRÈCHE V1.2.102 ✨</h1>
   <p><i>Un écosystème intelligent, connecté et sécurisé pour l'épanouissement de vos enfants.</i></p>
   
   <br/>
 
   <div align="center">
-    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-android-v1.2.101apk">
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-android-v1.2.102apk">
       <img src="https://img.shields.io/badge/Download-Android_APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK"/>
     </a>
-    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-windows-v1.2.101zip">
+    <a href="https://github.com/Connacri/CRECHE/releases/latest/download/creche-windows-v1.2.102zip">
       <img src="https://img.shields.io/badge/Download-Windows_EXE-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download Windows EXE"/>
     </a>
   </div>
