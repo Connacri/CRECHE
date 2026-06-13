@@ -460,7 +460,7 @@ class _CoursesPage extends StatelessWidget {
               course: course,
               enrolledChildren: enrolledChildrenNames,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(course: course)));
+                Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(course: course, enrolledChildren: enrolledChildrenNames,)));
               }, onFavorite: () {  },
             );
           },

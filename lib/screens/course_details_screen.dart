@@ -7,13 +7,16 @@ import '../models/course_model_complete.dart';
 import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/modern_course_card_widget.dart';
 
 class CourseDetailsScreen extends StatefulWidget {
   final CourseModel course;
+  final List<String> enrolledChildren;
 
   const CourseDetailsScreen({
     super.key,
     required this.course,
+    this.enrolledChildren = const [],
   });
 
   @override
@@ -82,7 +85,8 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -144,6 +148,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: GlassCard(
+                    color: Colors.black45,
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +156,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildBadge(_course.category.displayName),
+                            _buildBadge(_course.category.displayName, color: Colors.white70),
                             _buildBadge(
                               '${_course.availableSpots} places restantes',
                               color: _course.availableSpots < 5 ? Colors.orange : Colors.green,
@@ -197,6 +202,24 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                           maxLines: 4,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 24),
+                        // Enfants inscrits (Compact Row)
+                        if (widget.enrolledChildren.isNotEmpty) ...[
+                          SizedBox(
+                            height: 18,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: widget.enrolledChildren.length,
+                              separatorBuilder: (_, __) =>
+                              const SizedBox(width: 4),
+                              itemBuilder: (context, index) => ChildChip(
+                                name: widget.enrolledChildren[index],
+                                primary: cs.inversePrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
                         const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,

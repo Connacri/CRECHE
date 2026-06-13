@@ -3,7 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/course_model_complete.dart';
 import '../services/auth_service.dart';
 
-class CourseCard extends StatelessWidget {
+class CourseCard extends StatelessWidget   {
   final CourseModel course;
   final VoidCallback onTap;
   final VoidCallback onFavorite;
@@ -35,7 +35,7 @@ class CourseCard extends StatelessWidget {
     final cs = theme.colorScheme;
 
     return Container(
-      height: 165, // Fixed height to ensure stability and alignment
+      height: 220, // Fixed height to ensure stability and alignment
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -59,7 +59,9 @@ class CourseCard extends StatelessWidget {
               SizedBox(
                 width: 130,
                 child: _ImageHeader(
-                  imageUrl: course.images.isNotEmpty ? course.images.first.supabaseUrl : null,
+                  imageUrl: course.images.isNotEmpty
+                      ? course.images.first.supabaseUrl
+                      : null,
                   isFavorited: isFavorited,
                   onFavorite: onFavorite,
                   rating: rating,
@@ -100,9 +102,19 @@ class CourseCard extends StatelessWidget {
                           fontSize: 10,
                         ),
                       ),
-                      
+                      // Prix + CTA
+                      Text(
+                        '${(course.price ?? 0).toStringAsFixed(0)} DA',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: cs.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 8),
-                      
+
                       // Description (Flexible but constrained)
                       Expanded(
                         child: Text(
@@ -116,7 +128,7 @@ class CourseCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 8),
 
                       // Enfants inscrits (Compact Row)
@@ -126,8 +138,9 @@ class CourseCard extends StatelessWidget {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: enrolledChildren.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 4),
-                            itemBuilder: (context, index) => _ChildChip(
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 4),
+                            itemBuilder: (context, index) => ChildChip(
                               name: enrolledChildren[index],
                               primary: cs.primary,
                             ),
@@ -136,40 +149,28 @@ class CourseCard extends StatelessWidget {
                         const SizedBox(height: 10),
                       ],
 
-                      // Prix + CTA
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${(course.price ?? 0).toStringAsFixed(0)} DA',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 15,
-                                color: cs.onSurface,
+
+
+                      const SizedBox(height: 8),
+                        Align(alignment: Alignment.centerRight,
+                          child: SizedBox(
+                                height: 32,
+                                child: FilledButton(
+                                  onPressed: onTap,
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10)),
+                                    backgroundColor: cs.primary,
+                                  ),
+                                  child: const Text("S'inscrire",
+                                      style: TextStyle(
+                                          fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            height: 32,
-                            child: FilledButton(
-                              onPressed: onTap,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 14),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                backgroundColor: cs.primary,
-                              ),
-                              child: const Text(
-                                "S'inscrire", 
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+
                     ],
                   ),
                 ),
@@ -189,7 +190,12 @@ class _ImageHeader extends StatelessWidget {
   final double? rating;
   final Color primary;
 
-  const _ImageHeader({required this.imageUrl, required this.isFavorited, required this.onFavorite, required this.rating, required this.primary});
+  const _ImageHeader(
+      {required this.imageUrl,
+      required this.isFavorited,
+      required this.onFavorite,
+      required this.rating,
+      required this.primary});
 
   @override
   Widget build(BuildContext context) {
@@ -229,14 +235,16 @@ class _ImageHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min, // Fix: Use min size to avoid overflow
+                mainAxisSize:
+                    MainAxisSize.min, // Fix: Use min size to avoid overflow
                 children: [
                   const Icon(Icons.star_rounded, color: Colors.amber, size: 12),
                   const SizedBox(width: 2),
-                  Text(
-                    rating!.toStringAsFixed(1), 
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)
-                  ),
+                  Text(rating!.toStringAsFixed(1),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -253,14 +261,18 @@ class _ImageHeader extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.9),
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2)),
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2)),
                 ],
               ),
               child: Icon(
-                isFavorited ? Icons.favorite_rounded : Icons.favorite_border_rounded, 
-                color: isFavorited ? Colors.red : Colors.grey.shade600, 
-                size: 16
-              ),
+                  isFavorited
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: isFavorited ? Colors.red : Colors.grey.shade600,
+                  size: 16),
             ),
           ),
         ),
@@ -271,8 +283,8 @@ class _ImageHeader extends StatelessWidget {
   Widget _buildImage(ColorScheme cs) {
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       return CachedNetworkImage(
-        imageUrl: imageUrl!, 
-        fit: BoxFit.cover, 
+        imageUrl: imageUrl!,
+        fit: BoxFit.cover,
         errorWidget: (c, u, e) => Container(
           color: cs.surfaceContainerHighest,
           child: const Icon(Icons.broken_image_outlined, size: 30),
@@ -280,29 +292,28 @@ class _ImageHeader extends StatelessWidget {
       );
     }
     return Container(
-      color: primary.withValues(alpha: 0.05), 
-      child: Icon(Icons.image_outlined, color: primary.withValues(alpha: 0.2), size: 40)
-    );
+        color: primary.withValues(alpha: 0.05),
+        child: Icon(Icons.image_outlined,
+            color: primary.withValues(alpha: 0.2), size: 40));
   }
 }
 
-class _ChildChip extends StatelessWidget {
+class ChildChip extends StatelessWidget {
   final String name;
   final Color primary;
-  const _ChildChip({required this.name, required this.primary});
+  const ChildChip({required this.name, required this.primary});
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: primary.withValues(alpha: 0.08), 
+        color: primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: primary.withValues(alpha: 0.1)),
       ),
-      child: Text(
-        name, 
-        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: primary)
-      ),
+      child: Text(name,
+          style: TextStyle(
+              fontSize: 9, fontWeight: FontWeight.w700, color: primary)),
     );
   }
 }
