@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/course_model_complete.dart';
-import '../services/auth_service.dart';
 
 class CourseCard extends StatelessWidget   {
   final CourseModel course;
@@ -104,10 +103,10 @@ class CourseCard extends StatelessWidget   {
                       ),
                       // Prix + CTA
                       Text(
-                        '${(course.price ?? 0).toStringAsFixed(0)} DA',
+                        '${(course.price ?? 0).toStringAsFixed(0)} DA / ${course.pricingType.displayName.toLowerCase()}',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w900,
-                          fontSize: 15,
+                          fontSize: 13,
                           color: cs.onSurface,
                         ),
                         maxLines: 1,
@@ -190,12 +189,13 @@ class _ImageHeader extends StatelessWidget {
   final double? rating;
   final Color primary;
 
-  const _ImageHeader(
-      {required this.imageUrl,
-      required this.isFavorited,
-      required this.onFavorite,
-      required this.rating,
-      required this.primary});
+  const _ImageHeader({
+    required this.imageUrl,
+    required this.isFavorited,
+    required this.onFavorite,
+    required this.rating,
+    required this.primary,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -301,7 +301,7 @@ class _ImageHeader extends StatelessWidget {
 class ChildChip extends StatelessWidget {
   final String name;
   final Color primary;
-  const ChildChip({required this.name, required this.primary});
+  const ChildChip({super.key, required this.name, required this.primary});
   @override
   Widget build(BuildContext context) {
     return Container(

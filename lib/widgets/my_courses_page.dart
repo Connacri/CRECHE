@@ -138,7 +138,7 @@ class _CourseItem extends StatelessWidget {
                     const Text('Actif', style: TextStyle(fontSize: 10, color: Colors.grey)),
                     Switch.adaptive(
                       value: course.isActive,
-                      activeColor: Colors.green,
+                      activeThumbColor: Colors.green,
                       onChanged: (val) {
                         context.read<CourseProvider>().updateCourse(courseId: course.id, isActive: val);
                       },
@@ -152,7 +152,7 @@ class _CourseItem extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${course.price?.toStringAsFixed(0) ?? "0"} DA',
+                  '${course.price?.toStringAsFixed(0) ?? "0"} DA / ${course.pricingType.displayName.toLowerCase()}',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
                 ),
                 Row(

@@ -191,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       children: [
         GestureDetector(
-          onTap: () => _updateProfilePhoto(context, auth, user),
+          onTap: () => _updateProfilePhoto(auth, user),
           child: Stack(
             children: [
               CircleAvatar(
@@ -234,7 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _updateProfilePhoto(BuildContext context, AuthProviderV2 auth, UserModel user) async {
+  Future<void> _updateProfilePhoto(AuthProviderV2 auth, UserModel user) async {
     try {
       final imageFile = await HybridImagePickerService.pickProfileImage(context: context);
       if (imageFile == null) return;
@@ -252,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'profileImageSupabase': '$imageUrl?t=${DateTime.now().millisecondsSinceEpoch}',
           }
         };
-        if (!mounted) return;
+        
         await auth.updateUserProfileSilent(profileImagesUpdate);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo de profil mise à jour !')));
@@ -517,16 +517,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _confirmDeleteAccount() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Supprimer le compte ?'),
         content: const Text('Cette action est irréversible. Toutes vos données seront supprimées après 30 jours.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
           TextButton(
             onPressed: () async {
-              final auth = context.read<AuthProviderV2>();
+              final auth = dialogContext.read<AuthProviderV2>();
               await auth.deleteAccount();
-              if (mounted) Navigator.pop(context);
+              if (mounted) {
+                // Check if dialog is still open by checking its context's mounted property
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              }
             },
             child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
           ),

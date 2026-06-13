@@ -77,13 +77,13 @@ class _LocationPickerDialogWindowsState
     _selectedAddress = addr;
     _addMarkerAtPosition(_selectedPosition!);
 
-    print('🔵 [LocationPickerWindows] Position initiale: $lat, $lon');
+    debugPrint('🔵 [LocationPickerWindows] Position initiale: $lat, $lon');
 
     // Centrer la carte après le build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _mapController.move(_selectedPosition!, 13.0);
-        print('✅ [LocationPickerWindows] Carte centrée sur position initiale');
+        debugPrint('✅ [LocationPickerWindows] Carte centrée sur position initiale');
       }
     });
   }
@@ -98,14 +98,14 @@ class _LocationPickerDialogWindowsState
   Future<void> _loadCurrentLocation() async {
     if (!mounted) return;
 
-    print('🔵 [LocationPickerWindows] _loadCurrentLocation - DÉBUT');
+    debugPrint('🔵 [LocationPickerWindows] _loadCurrentLocation - DÉBUT');
     setState(() => _isLoadingCurrentLocation = true);
 
     try {
       final position = await _locationService.getCurrentPosition();
 
       if (position != null && mounted) {
-        print('✅ [LocationPickerWindows] Position: ${position
+        debugPrint('✅ [LocationPickerWindows] Position: ${position
             .latitude}, ${position.longitude}');
 
         final latLng = LatLng(position.latitude, position.longitude);
@@ -126,10 +126,10 @@ class _LocationPickerDialogWindowsState
 
         if (mounted) {
           setState(() => _selectedAddress = address);
-          print('✅ [LocationPickerWindows] Adresse: $address');
+          debugPrint('✅ [LocationPickerWindows] Adresse: $address');
         }
       } else {
-        print('⚠️ [LocationPickerWindows] Position NULL');
+        debugPrint('⚠️ [LocationPickerWindows] Position NULL');
 
         // Position par défaut (Mascara, Algérie) si la géolocalisation échoue
         if (mounted) {
@@ -141,12 +141,12 @@ class _LocationPickerDialogWindowsState
           _mapController.move(defaultPos, 13.0);
           _addMarkerAtPosition(defaultPos);
 
-          print('⚠️ [LocationPickerWindows] Utilisation position par défaut');
+          debugPrint('⚠️ [LocationPickerWindows] Utilisation position par défaut');
         }
       }
     } catch (e, stackTrace) {
-      print('❌ [LocationPickerWindows] Erreur: $e');
-      print('❌ [LocationPickerWindows] StackTrace: $stackTrace');
+      debugPrint('❌ [LocationPickerWindows] Erreur: $e');
+      debugPrint('❌ [LocationPickerWindows] StackTrace: $stackTrace');
 
       // Position par défaut en cas d'erreur
       if (mounted) {
@@ -164,7 +164,7 @@ class _LocationPickerDialogWindowsState
       }
     }
 
-    print('🔵 [LocationPickerWindows] _loadCurrentLocation - FIN');
+    debugPrint('🔵 [LocationPickerWindows] _loadCurrentLocation - FIN');
   }
 
   Future<void> _searchLocation(String query) async {
@@ -190,7 +190,7 @@ class _LocationPickerDialogWindowsState
         });
       }
     } catch (e) {
-      print('❌ [LocationPickerWindows] Erreur recherche: $e');
+      debugPrint('❌ [LocationPickerWindows] Erreur recherche: $e');
       if (mounted) {
         setState(() {
           _searchResults = [];
@@ -213,7 +213,7 @@ class _LocationPickerDialogWindowsState
     _mapController.move(latLng, 15.0);
     _addMarkerAtPosition(latLng);
 
-    print('✅ [LocationPickerWindows] Résultat recherche sélectionné: ${result
+    debugPrint('✅ [LocationPickerWindows] Résultat recherche sélectionné: ${result
         .displayName}');
   }
 
@@ -252,7 +252,7 @@ class _LocationPickerDialogWindowsState
       );
     });
 
-    print('✅ [LocationPickerWindows] Marqueur ajouté: ${position
+    debugPrint('✅ [LocationPickerWindows] Marqueur ajouté: ${position
         .latitude}, ${position.longitude}');
   }
 
@@ -266,7 +266,7 @@ class _LocationPickerDialogWindowsState
       );
       Navigator.pop(context, location);
 
-      print(
+      debugPrint(
           '✅ [LocationPickerWindows] Location confirmée: ${location.address}');
     }
   }

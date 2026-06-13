@@ -232,10 +232,10 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                                   style: TextStyle(fontSize: 12, color: Colors.white70),
                                 ),
                                 Text(
-                                  '${_course.price?.toStringAsFixed(0) ?? "0"} DA',
+                                  '${_course.price?.toStringAsFixed(0) ?? "0"} DA / ${_course.pricingType.displayName.toLowerCase()}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 22,
+                                    fontSize: 18,
                                     color: Colors.white,
                                   ),
                                 ),

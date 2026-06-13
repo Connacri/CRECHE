@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'supabase_service.dart';
 
 class ActivityService extends AdminSupabaseService {
@@ -17,7 +18,7 @@ class ActivityService extends AdminSupabaseService {
 
       return allActivities.take(50).toList();
     } catch (e) {
-      print('Error fetching recent activities: $e');
+      debugPrint('Error fetching recent activities: $e');
       return [];
     }
   }

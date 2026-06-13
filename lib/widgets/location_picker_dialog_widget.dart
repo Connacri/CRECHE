@@ -135,7 +135,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
       debugPrint('🔵 [LocationPicker] Centrage carte sur: ${position
           .latitude}, ${position.longitude}');
 
-      await _mapController.changeLocation(position);
+      await _mapController.moveTo(position, animate: true);
       await _mapController.setZoom(zoomLevel: 15);
       await _addMarkerAtPosition(position);
 

@@ -12,7 +12,7 @@ class FCMService extends AdminSupabaseService {
 
   Future<void> initialize() async {
     if (!kIsWeb && ![Platform.isAndroid, Platform.isIOS].any((b) => b)) {
-      print('FCMService: Skipping initialization on unsupported platform');
+      debugPrint('FCMService: Skipping initialization on unsupported platform');
       return;
     }
     try {
@@ -23,22 +23,22 @@ class FCMService extends AdminSupabaseService {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('User granted permission');
+        debugPrint('User granted permission');
       }
 
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Foreground message: ${message.notification?.title}');
+        debugPrint('Foreground message: ${message.notification?.title}');
       });
 
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        print('Notification clicked!');
+        debugPrint('Notification clicked!');
       });
 
       _fcm.onTokenRefresh.listen((token) async {
-        print('FCM Token refreshed');
+        debugPrint('FCM Token refreshed');
       });
     } catch (e) {
-      print('FCMService: initialize error (non-bloquant): $e');
+      debugPrint('FCMService: initialize error (non-bloquant): $e');
     }
   }
 
@@ -49,7 +49,7 @@ class FCMService extends AdminSupabaseService {
     try {
       return await _fcm.getToken();
     } catch (e) {
-      print('FCMService: Error getting FCM token: $e');
+      debugPrint('FCMService: Error getting FCM token: $e');
       return null;
     }
   }
@@ -60,9 +60,9 @@ class FCMService extends AdminSupabaseService {
         'fcm_token': token,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', userId);
-      print('FCM Token updated in Supabase for user $userId');
+      debugPrint('FCM Token updated in Supabase for user $userId');
     } catch (e) {
-      print('Error updating FCM token in Supabase: $e');
+      debugPrint('Error updating FCM token in Supabase: $e');
     }
   }
 }

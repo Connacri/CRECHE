@@ -33,6 +33,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
 
   CourseCategory _selectedCategory = CourseCategory.other;
   CourseSeason _selectedSeason = CourseSeason.yearRound;
+  CoursePricingType _selectedPricingType = CoursePricingType.session;
   DateTime _seasonStartDate = DateTime.now();
   DateTime _seasonEndDate = DateTime.now().add(const Duration(days: 365));
   CourseLocation? _selectedLocation;
@@ -64,6 +65,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     _maxStudentsController.text = course.maxStudents.toString();
     _selectedCategory = course.category;
     _selectedSeason = course.season;
+    _selectedPricingType = course.pricingType;
     _seasonStartDate = course.seasonStartDate;
     _seasonEndDate = course.seasonEndDate;
     _selectedLocation = course.location;
@@ -73,19 +75,32 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     setState(() => _isLoadingClubs = true);
     try {
       final clubs = await ClubService().getAvailableClubs();
+      
+      if (!mounted) return;
+      final authProvider = Provider.of<AuthProviderV2>(context, listen: false);
+      final currentUser = authProvider.user;
+
       setState(() {
         _availableClubs = clubs;
-        if (widget.courseToEdit?.clubId != null) {
-          _selectedClub = _availableClubs.firstWhere(
-            (c) => c.uid == widget.courseToEdit!.clubId,
-            orElse: () => _availableClubs.first, // Fallback or handle differently
+        if (widget.courseToEdit != null) {
+          if (widget.courseToEdit?.clubId != null) {
+            _selectedClub = _availableClubs.cast<UserModel?>().firstWhere(
+              (c) => c?.uid == widget.courseToEdit!.clubId,
+              orElse: () => null,
+            );
+          }
+        } else if (currentUser != null && currentUser.role == UserRole.school) {
+          // Si l'utilisateur est un club/école, on le sélectionne par défaut
+          _selectedClub = _availableClubs.cast<UserModel?>().firstWhere(
+            (c) => c?.uid == currentUser.uid,
+            orElse: () => null,
           );
         }
       });
     } catch (e) {
       debugPrint('Error loading clubs: $e');
     } finally {
-      setState(() => _isLoadingClubs = false);
+      if (mounted) setState(() => _isLoadingClubs = false);
     }
   }
 
@@ -215,6 +230,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         currentUserRole: authProvider.userData!['role'],
         clubId: _selectedClub?.uid,
         maxStudents: int.tryParse(_maxStudentsController.text) ?? 30,
+        pricingType: _selectedPricingType,
       );
     } else {
       success = await courseProvider.updateCourse(
@@ -230,6 +246,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         newImageFiles: _selectedImages,
         clubId: _selectedClub?.uid,
         maxStudents: int.tryParse(_maxStudentsController.text),
+        pricingType: _selectedPricingType,
       );
     }
 
@@ -344,7 +361,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                         setState(() {
                           _selectedSeason = val;
                           final dates = val.getDefaultDateRange();
-                          _seasonStartDate = dates['start']!;
+                          _seasonStartDate = dates!['start']!;
                           _seasonEndDate = dates['end']!;
                         });
                       }
@@ -364,6 +381,20 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
+                Expanded(
+                  child: DropdownButtonFormField<CoursePricingType>(
+                    isExpanded: true,
+                    initialValue: _selectedPricingType,
+                    decoration: const InputDecoration(labelText: 'Type de prix', prefixIcon: Icon(Icons.payments_outlined)),
+                    items: CoursePricingType.values.map((p) => DropdownMenuItem(value: p, child: Text(p.displayName))).toList(),
+                    onChanged: (val) => setState(() => _selectedPricingType = val!),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
                 Expanded(
                   child: TextFormField(
                     controller: _maxStudentsController,

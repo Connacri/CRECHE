@@ -57,6 +57,20 @@ class ChildEnrollmentProvider with ChangeNotifier {
     return item['enrollment']?['status'] == 'pending';
   }).length;
 
+  int get paidEnrollmentsCount => _ownerEnrollmentsDetailed.where((item) {
+    return item['enrollment']?['payment_status'] == 'paid';
+  }).length;
+
+  int get unpaidEnrollmentsCount => _ownerEnrollmentsDetailed.where((item) {
+    final status = item['enrollment']?['status'];
+    final paymentStatus = item['enrollment']?['payment_status'];
+    return status != 'rejected' && status != 'cancelled' && paymentStatus != 'paid';
+  }).length;
+
+  int get confirmedEnrollmentsCount => _ownerEnrollmentsDetailed.where((item) {
+    return item['enrollment']?['status'] == 'approved' && item['enrollment']?['payment_status'] == 'paid';
+  }).length;
+
   List<Map<String, dynamic>> get weeklyEnrollmentData {
     final now = DateTime.now();
     final last7Days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));

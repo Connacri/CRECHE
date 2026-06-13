@@ -138,6 +138,7 @@ class CourseProvider extends ChangeNotifier {
     int maxStudents = 30,
     List<String> tags = const [],
     Map<String, dynamic>? metadata,
+    CoursePricingType pricingType = CoursePricingType.session,
     Function(int current, int total)? onImageUploadProgress,
   }) async {
     try {
@@ -167,6 +168,7 @@ class CourseProvider extends ChangeNotifier {
            ...?metadata,
            'currency': currency,
         },
+        pricingType: pricingType,
       );
 
       final courseId = await _courseService.createCourse(newCourse);
@@ -218,6 +220,7 @@ class CourseProvider extends ChangeNotifier {
     bool? isActive,
     String? clubId,
     Map<String, dynamic>? metadata,
+    CoursePricingType? pricingType,
     Function(int current, int total)? onImageUploadProgress,
   }) async {
     try {
@@ -242,6 +245,7 @@ class CourseProvider extends ChangeNotifier {
       if (isActive != null) updates['is_active'] = isActive;
       if (clubId != null) updates['club_id'] = clubId;
       if (metadata != null) updates['metadata'] = metadata;
+      if (pricingType != null) updates['pricing_type'] = pricingType.name;
 
       if (newImageFiles != null && newImageFiles.isNotEmpty) {
         final uploadedImages = await _imageService.uploadMultipleCourseImages(
@@ -395,7 +399,7 @@ class CourseProvider extends ChangeNotifier {
       _coaches = rawCoaches.map((json) => UserModel.fromSupabase(json)).toList();
       notifyListeners();
     } catch (e) {
-      print("❌ [CourseProvider] Erreur loadCoaches: $e");
+      debugPrint("❌ [CourseProvider] Erreur loadCoaches: $e");
     }
   }
 

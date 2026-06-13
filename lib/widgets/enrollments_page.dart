@@ -27,7 +27,7 @@ class _EnrollmentsPageState extends State<EnrollmentsPage> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProviderV2>();
       if (auth.currentUser != null) {
@@ -53,17 +53,48 @@ class _EnrollmentsPageState extends State<EnrollmentsPage> with SingleTickerProv
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Demandes'),
-            Tab(text: 'Inscrits'),
+          isScrollable: true,
+          tabs: [
+            Tab(
+              child: Consumer<ChildEnrollmentProvider>(
+                builder: (context, provider, _) => Badge(
+                  label: Text(provider.pendingEnrollmentsCount.toString()),
+                  isLabelVisible: provider.pendingEnrollmentsCount > 0,
+                  child: const Text('Demandes'),
+                ),
+              ),
+            ),
+            Tab(
+              child: Consumer<ChildEnrollmentProvider>(
+                builder: (context, provider, _) => Badge(
+                  label: Text(provider.approvedEnrollmentsCount.toString()),
+                  isLabelVisible: provider.approvedEnrollmentsCount > 0,
+                  child: const Text('Inscrits'),
+                ),
+              ),
+            ),
+            const Tab(text: 'Confirmés'),
+            const Tab(text: 'Validés'),
+            const Tab(text: 'Payés'),
+            const Tab(text: 'Pas encore payé'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          const _EnrollmentList(status: EnrollmentStatus.pending),
-          const _EnrollmentList(status: EnrollmentStatus.approved),
+          _EnrollmentList(filter: (e) => e.status == EnrollmentStatus.pending, emptyMessage: 'Aucune demande en attente.'),
+          _EnrollmentList(filter: (e) => e.status == EnrollmentStatus.approved, emptyMessage: 'Aucun inscrit pour le moment.'),
+          _EnrollmentList(
+            filter: (e) => e.status == EnrollmentStatus.approved && e.paymentStatus == PaymentStatus.paid,
+            emptyMessage: 'Aucun inscrit confirmé (payé).',
+          ),
+          _EnrollmentList(filter: (e) => e.status == EnrollmentStatus.approved, emptyMessage: 'Aucune inscription validée.'),
+          _EnrollmentList(filter: (e) => e.paymentStatus == PaymentStatus.paid, emptyMessage: 'Aucun paiement reçu.'),
+          _EnrollmentList(
+            filter: (e) => e.status != EnrollmentStatus.rejected && e.status != EnrollmentStatus.cancelled && e.paymentStatus != PaymentStatus.paid,
+            emptyMessage: 'Toutes les inscriptions sont payées.',
+          ),
         ],
       ),
     );
@@ -178,8 +209,9 @@ class _EnrollmentsPageState extends State<EnrollmentsPage> with SingleTickerProv
 }
 
 class _EnrollmentList extends StatelessWidget {
-  final EnrollmentStatus status;
-  const _EnrollmentList({required this.status});
+  final bool Function(EnrollmentModel) filter;
+  final String emptyMessage;
+  const _EnrollmentList({required this.filter, required this.emptyMessage});
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +220,7 @@ class _EnrollmentList extends StatelessWidget {
       if (e['enrollment'] == null) return false;
       try {
         final enrollment = EnrollmentModel.fromSupabase(e['enrollment']);
-        return enrollment.status == status;
+        return filter(enrollment);
       } catch (err) {
         debugPrint('❌ [EnrollmentsPage] Error parsing enrollment: $err');
         return false;
@@ -200,7 +232,7 @@ class _EnrollmentList extends StatelessWidget {
     }
 
     if (enrollments.isEmpty) {
-      return Center(child: Text(status == EnrollmentStatus.pending ? 'Aucune demande en attente.' : 'Aucun inscrit pour le moment.'));
+      return Center(child: Text(emptyMessage));
     }
 
     return ListView.builder(
@@ -247,7 +279,7 @@ class _EnrollmentList extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Inscrit le: ${enrollment.enrolledAt.day}/${enrollment.enrolledAt.month}/${enrollment.enrolledAt.year}', style: const TextStyle(fontSize: 11)),
-                      if (status == EnrollmentStatus.pending)
+                      if (enrollment.status == EnrollmentStatus.pending)
                         Row(
                           children: [
                             IconButton(
