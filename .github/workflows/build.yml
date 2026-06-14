@@ -2,188 +2,164 @@ name: creche
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      version_bump:
-        description: 'Version bump type (patch/minor/major)'
-        required: true
-        default: 'patch'
 
 jobs:
   version:
-    name: Determine Version
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.set_version.outputs.version }}
-      build_number: ${{ steps.set_version.outputs.build_number }}
-      should_release: ${{ steps.set_version.outputs.should_release }}
+      version: ${{ steps.version.outputs.version }}
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Extract version from tag or generate
-        id: set_version
+      - name: Determine Version
+        id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            TAG="${GITHUB_REF#refs/tags/v}"
-            echo "version=$TAG" >> "$GITHUB_OUTPUT"
-            echo "build_number=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event_name }}" == 'push' && "${{ github.ref }}" == 'refs/heads/main' ]]; then
-            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.2.82")
-            LATEST_VERSION="${LATEST_TAG##*v}"
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
-            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-            echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-            echo "build_number=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-          fi
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          VERSION="${LATEST_TAG#v}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          PATCH=$((PATCH + 1))
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
   build-android:
-    name: Build Android
     needs: version
-    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: zulu
+          java-version: 17
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.0'
-          channel: 'stable'
+          flutter-version: "3.44.0"
+          channel: stable
           cache: true
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
+        run: |
+          flutter build apk \
+          --release \
+          --obfuscate \
+          --split-debug-info=build/app/outputs/symbols
 
-      - name: Rename APK
-  run: |
-    mkdir -p release-artifacts
-    cp build/app/outputs/flutter-apk/app-release.apk "release-artifacts/creche-android.apk"
+      - name: Prepare Artifact
+        run: |
+          mkdir -p release-artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk release-artifacts/creche-android.apk
 
-      - name: Upload Android artifacts
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-release
-          path: release-artifacts/
-          retention-days: 7
+          path: release-artifacts
 
   build-windows:
-    name: Build Windows
     needs: version
-    if: needs.version.outputs.should_release == 'true'
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.0'
-          channel: 'stable'
+          flutter-version: "3.44.0"
+          channel: stable
           cache: true
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Create Windows artifacts
+      - name: Create Artifacts
         shell: pwsh
         run: |
-          $version = "${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path release-artifacts
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "release-artifacts/creche-windows.zip"
-          
-          if (Test-Path "C:\Program Files (x86)\Inno Setup 6\iscc.exe") {
-            & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows/inno-setup.iss
-            if (Test-Path "build/windows/installer/creche-windows-installer.exe") {
-              Copy-Item "build/windows/installer/creche-windows-installer.exe" -Destination "release-artifacts/creche-windows-installer.exe"
-            }
+
+          Compress-Archive `
+            -Path build/windows/x64/runner/Release/* `
+            -DestinationPath release-artifacts/creche-windows.zip
+
+          if (Test-Path "build/windows/installer/creche-windows-installer.exe") {
+            Copy-Item `
+              "build/windows/installer/creche-windows-installer.exe" `
+              -Destination "release-artifacts/creche-windows-installer.exe"
           }
 
-      - name: Upload Windows artifacts
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-release
-          path: release-artifacts/
-          retention-days: 7
+          path: release-artifacts
 
   release:
-    name: Create Combined Release
-    needs: [version, build-android, build-windows]
-    if: needs.version.outputs.should_release == 'true' && (success() || failure())
+    needs:
+      - version
+      - build-android
+      - build-windows
+
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
+
     steps:
-      - name: Download Android artifacts
+      - name: Download Android Artifact
         uses: actions/download-artifact@v4
         with:
           name: android-release
-          path: all-artifacts
+          path: artifacts
 
-      - name: Download Windows artifacts
+      - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
           name: windows-release
-          path: all-artifacts
-- name: Create Git Tag
-  run: |
-    git config user.name github-actions
-    git config user.email github-actions@github.com
+          path: artifacts
 
-    if ! git rev-parse "v${{ needs.version.outputs.version }}" >/dev/null 2>&1; then
-      git tag "v${{ needs.version.outputs.version }}"
-      git push origin "v${{ needs.version.outputs.version }}"
-    fi
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.version }}
-          name: "Crèche v${{ needs.version.outputs.version }}"
-          files: all-artifacts/*
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Crèche v${{ needs.version.outputs.version }}
+          files: artifacts/*
           generate_release_notes: true
-          draft: false
-          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   summary:
-    name: Build Summary
-    needs: [version, release]
-    if: always() && needs.version.outputs.should_release == 'true'
+    needs:
+      - version
+      - release
+
+    if: always()
+
     runs-on: ubuntu-latest
+
     steps:
-      - name: Create Summary
+      - name: Summary
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Number:** ${{ needs.version.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Platform Status" >> $GITHUB_STEP_SUMMARY
-          echo "- **Release:** ${{ needs.release.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workflow:** Completed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ needs.release.result }}" == "success" ]]; then
-            echo "✅ Release available: [v${{ needs.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "Version: ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "Release Status: ${{ needs.release.result }}" >> $GITHUB_STEP_SUMMARY
