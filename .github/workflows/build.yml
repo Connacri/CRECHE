@@ -95,20 +95,25 @@ jobs:
         shell: pwsh
         run: |
           $env:APP_VERSION="${{ needs.version.outputs.version }}"
+          $ROOT = "${{ github.workspace }}"
+          $ISCC = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 
-          if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
-            # Lancer depuis la racine du projet — les chemins ..\..\  dans .iss seront corrects
-            & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "windows\innosetup\setup.iss"
+          Write-Host "Workspace: $ROOT"
+          Write-Host "Icon exists: $(Test-Path "$ROOT\windows\runner\resources\app_icon.ico")"
+          Write-Host "Release build exists: $(Test-Path "$ROOT\build\windows\x64\runner\Release")"
 
-            New-Item -ItemType Directory -Force -Path release
+          if (Test-Path $ISCC) {
+            & $ISCC `
+              /DMySourceDir="$ROOT\build\windows\x64\runner\Release" `
+              /DMyOutputDir="$ROOT\build\windows\installer" `
+              /DMyIconFile="$ROOT\windows\runner\resources\app_icon.ico" `
+              "$ROOT\windows\innosetup\setup.iss"
 
-            Copy-Item `
-              "build\windows\installer\creche-windows-installer.exe" `
-              "release\creche-windows-installer.exe"
-
-            Compress-Archive `
-              -Path "build\windows\x64\runner\Release\*" `
-              -DestinationPath "release\creche-windows.zip"
+            New-Item -ItemType Directory -Force -Path "$ROOT\release"
+            Copy-Item "$ROOT\build\windows\installer\creche-windows-installer.exe" "$ROOT\release\creche-windows-installer.exe"
+            Compress-Archive -Path "$ROOT\build\windows\x64\runner\Release\*" -DestinationPath "$ROOT\release\creche-windows.zip"
+          } else {
+            Write-Error "ISCC.exe not found"
           }
 
       - name: Upload Windows
