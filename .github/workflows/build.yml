@@ -146,7 +146,15 @@ jobs:
         with:
           name: windows-release
           path: all-artifacts
+- name: Create Git Tag
+  run: |
+    git config user.name github-actions
+    git config user.email github-actions@github.com
 
+    if ! git rev-parse "v${{ needs.version.outputs.version }}" >/dev/null 2>&1; then
+      git tag "v${{ needs.version.outputs.version }}"
+      git push origin "v${{ needs.version.outputs.version }}"
+    fi
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -158,63 +166,9 @@ jobs:
           draft: false
           prerelease: false
 
-  update-metadata:
-    name: Update README and pubspec
-    needs: [version, release]
-    if: |
-      needs.version.outputs.should_release == 'true' && 
-      needs.release.result == 'success' &&
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update pubspec.yaml
-        run: |
-          VERSION="${{ needs.version.outputs.version }}"
-          BUILD="${{ needs.version.outputs.build_number }}"
-          sed -i "s/^version:.*/version: $VERSION+$BUILD/" pubspec.yaml
-          echo "Updated pubspec.yaml to version $VERSION+$BUILD"
-
-      - name: Update README version
-        run: |
-          VERSION="${{ needs.version.outputs.version }}"
-          sed -i "s/✨ CRÈCHE V.* ✨/✨ CRÈCHE V${VERSION} ✨/" README.md
-          echo "Updated README.md badge to version $VERSION"
-
-      - name: Update badge URLs
-        run: |
-          VERSION="${{ needs.version.outputs.version }}"
-          # Update the URLs in README.md to point to the new versioned files
-          sed -i "s|creche-android-v[0-9.]*|creche-android-v${VERSION}|g" README.md
-          sed -i "s|creche-windows-v[0-9.]*|creche-windows-v${VERSION}|g" README.md
-          echo "Updated README.md artifact URLs to v$VERSION"
-
-      - name: Commit metadata updates
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git add pubspec.yaml README.md
-            git commit -m "chore: update metadata to v${{ needs.version.outputs.version }}
-          
-            Build number: ${{ needs.version.outputs.build_number }}
-            Release status: ${{ needs.release.result }}"
-            git push
-          else
-            echo "No changes to commit"
-          fi
-
   summary:
     name: Build Summary
-    needs: [version, release, update-metadata]
+    needs: [version, release]
     if: always() && needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -227,7 +181,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Platform Status" >> $GITHUB_STEP_SUMMARY
           echo "- **Release:** ${{ needs.release.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Metadata Update:** ${{ needs.update-metadata.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow:** Completed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ needs.release.result }}" == "success" ]]; then
