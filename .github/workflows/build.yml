@@ -1,16 +1,41 @@
-name: creche-release
+name: creche-ci
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: v
+        run: |
+          git fetch --tags
+
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          VERSION=${LAST_TAG#v}
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH + 1))
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
   build-android:
-    name: Build Android
+    needs: version
     runs-on: ubuntu-latest
 
     steps:
@@ -25,30 +50,28 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "4.33.0"
+          flutter-version: stable
           cache: true
 
-      - name: Install Dependencies
+      - name: Install deps
         run: flutter pub get
 
       - name: Build APK
-        run: |
-          flutter build apk --release
+        run: flutter build apk --release
 
       - name: Prepare APK
         run: |
-          mkdir -p release-artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk \
-          release-artifacts/creche-android.apk
+          mkdir -p release
+          cp build/app/outputs/flutter-apk/app-release.apk release/creche-android.apk
 
-      - name: Upload Android Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-release
-          path: release-artifacts
+          name: apk
+          path: release
 
   build-windows:
-    name: Build Windows
+    needs: version
     runs-on: windows-latest
 
     steps:
@@ -57,74 +80,71 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "4.33.0"
+          flutter-version: stable
           cache: true
 
-      - name: Install Dependencies
+      - name: Install deps
         run: flutter pub get
 
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Create Installer and ZIP
+      - name: Build Installer
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path release-artifacts
-
-          Compress-Archive `
-            -Path build/windows/x64/runner/Release/* `
-            -DestinationPath release-artifacts/creche-windows.zip
+          $env:APP_VERSION="${{ needs.version.outputs.version }}"
 
           if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
 
-            $env:APP_VERSION="${{ github.ref_name }}"
-            $env:APP_VERSION=$env:APP_VERSION.Replace("v","")
+            & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\innosetup\setup.iss
 
-            & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-              windows\innosetup\setup.iss
+            New-Item -ItemType Directory -Force -Path release
 
-            if (Test-Path "build\windows\installer\creche-windows-installer.exe") {
+            Copy-Item `
+              "build\windows\installer\creche-windows-installer.exe" `
+              "release\creche-windows-installer.exe"
 
-              Copy-Item `
-                "build\windows\installer\creche-windows-installer.exe" `
-                -Destination `
-                "release-artifacts\creche-windows-installer.exe"
-            }
+            Compress-Archive `
+              -Path build/windows/x64/runner/Release/* `
+              -DestinationPath release/creche-windows.zip
           }
 
-      - name: Upload Windows Artifact
+      - name: Upload Windows
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
-          path: release-artifacts
+          name: windows
+          path: release
 
   release:
-    name: Create Release
-    needs:
-      - build-android
-      - build-windows
-
+    needs: [version, build-android, build-windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Download Android Artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: android-release
-          path: artifacts
+          name: apk
+          path: out
 
-      - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: windows-release
-          path: artifacts
+          name: windows
+          path: out
+
+      - name: Create Git Tag
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+          git tag v${{ needs.version.outputs.version }}
+          git push origin v${{ needs.version.outputs.version }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Crèche ${{ github.ref_name }}
-          files: artifacts/*
-          generate_release_notes: true
+          tag_name: v${{ needs.version.outputs.version }}
+          name: Crèche v${{ needs.version.outputs.version }}
+          files: out/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
