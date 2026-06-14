@@ -5,7 +5,7 @@
 #define MyAppExeName "creche.exe"
 
 [Setup]
-AppId={{D3D3D3D3-D3D3-D3D3-D3D3-D3D3D3D3D3D3}
+AppId={{A1B2C3D4-E5F6-7890-ABCD-1234567890AB}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -18,8 +18,6 @@ DefaultDirName={autopf64}\{#MyAppName}
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
-DisableProgramGroupPage=yes
-
 OutputDir=build\windows\installer
 OutputBaseFilename=creche-windows-installer
 
@@ -28,31 +26,16 @@ SolidCompression=yes
 WizardStyle=modern
 
 UninstallDisplayIcon={app}\{#MyAppExeName}
-
 SetupIconFile=windows\runner\resources\app_icon.ico
 
 PrivilegesRequired=admin
 
-[Languages]
-Name: "french"; MessagesFile: "compiler:Languages\French.isl"
-
-[Tasks]
-Name: "desktopicon"; Description: "Créer un raccourci sur le bureau"; Flags: unchecked
-
 [Files]
-Source: "build\windows\x64\runner\Release\*"; \
-    DestDir: "{app}"; \
-    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; \
-    Filename: "{app}\{#MyAppExeName}"
-
-Name: "{autodesktop}\{#MyAppName}"; \
-    Filename: "{app}\{#MyAppExeName}"; \
-    Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; \
-    Description: "Lancer {#MyAppName}"; \
-    Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait postinstall skipifsilent
