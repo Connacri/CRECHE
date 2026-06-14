@@ -184,7 +184,7 @@ class _UserHeader extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Bonjour,', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                const Text('Bonjour,', style: TextStyle(color: Colors.white, fontSize: 14)),
                 Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               ],
             ),
