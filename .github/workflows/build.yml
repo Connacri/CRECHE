@@ -74,10 +74,9 @@ jobs:
         run: flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
 
       - name: Rename APK
-        run: |
-          VERSION="${{ needs.version.outputs.version }}"
-          mkdir -p release-artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk "release-artifacts/creche-android-v${VERSION}.apk"
+  run: |
+    mkdir -p release-artifacts
+    cp build/app/outputs/flutter-apk/app-release.apk "release-artifacts/creche-android.apk"
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
@@ -112,12 +111,12 @@ jobs:
         run: |
           $version = "${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path release-artifacts
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "release-artifacts/creche-windows-v${version}.zip"
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "release-artifacts/creche-windows.zip"
           
           if (Test-Path "C:\Program Files (x86)\Inno Setup 6\iscc.exe") {
             & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows/inno-setup.iss
             if (Test-Path "build/windows/installer/creche-windows-installer.exe") {
-              Copy-Item "build/windows/installer/creche-windows-installer.exe" -Destination "release-artifacts/creche-windows-installer-v${version}.exe"
+              Copy-Item "build/windows/installer/creche-windows-installer.exe" -Destination "release-artifacts/creche-windows-installer.exe"
             }
           }
 
