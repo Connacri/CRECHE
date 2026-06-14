@@ -97,8 +97,8 @@ jobs:
           $env:APP_VERSION="${{ needs.version.outputs.version }}"
 
           if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
-
-            & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\innosetup\setup.iss
+            # Lancer depuis la racine du projet — les chemins ..\..\  dans .iss seront corrects
+            & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "windows\innosetup\setup.iss"
 
             New-Item -ItemType Directory -Force -Path release
 
@@ -107,8 +107,8 @@ jobs:
               "release\creche-windows-installer.exe"
 
             Compress-Archive `
-              -Path build/windows/x64/runner/Release/* `
-              -DestinationPath release/creche-windows.zip
+              -Path "build\windows\x64\runner\Release\*" `
+              -DestinationPath "release\creche-windows.zip"
           }
 
       - name: Upload Windows
