@@ -161,9 +161,10 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          # We are in a detached HEAD or on a commit, let's push the tag
-          git tag v${{ needs.version.outputs.version }}
-          git push origin v${{ needs.version.outputs.version }}
+          # Create tag if it doesn't exist, ignore error if it does
+          git tag v${{ needs.version.outputs.version }} || echo "Tag v${{ needs.version.outputs.version }} already exists"
+          # Push tag, ignore error if it already exists on remote
+          git push origin v${{ needs.version.outputs.version }} || echo "Tag v${{ needs.version.outputs.version }} already exists on remote"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
