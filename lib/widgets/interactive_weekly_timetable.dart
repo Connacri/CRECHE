@@ -85,8 +85,8 @@ class InteractiveWeeklyTimetable extends StatelessWidget {
               onTap: () => onEmptySlotTap(
                 day,
                 TimeSlot(
-                  startTime: DateTime(2024, 1, 1, hour, 0),
-                  endTime: DateTime(2024, 1, 1, hour + 1, 0),
+                  start: TimeOfDay(hour: hour, minute: 0),
+                  end: TimeOfDay(hour: hour + 1, minute: 0),
                 )
               ),
               child: Container(
@@ -103,8 +103,8 @@ class InteractiveWeeklyTimetable extends StatelessWidget {
 
   Widget _buildSessionWidget(BuildContext context, SessionSchedule session) {
     final dayIndex = session.dayOfWeek.index;
-    final startHour = session.timeSlot.startTime.hour;
-    final startMinute = session.timeSlot.startTime.minute;
+    final startHour = session.timeSlot.start.hour;
+    final startMinute = session.timeSlot.start.minute;
     final durationHours = session.timeSlot.duration.inMinutes / 60.0;
 
     // Calcul de la position

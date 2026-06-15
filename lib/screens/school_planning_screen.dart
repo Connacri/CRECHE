@@ -4,14 +4,14 @@ import '../providers/schedule_provider.dart';
 import '../models/session_schedule_model.dart';
 // import 'package:calendar_timeline/calendar_timeline.dart'; // déjà présent dans le projet
 
-class ClubSchoolPlanningScreen extends StatefulWidget {
-  const ClubSchoolPlanningScreen({super.key});
+class SchoolPlanningScreen extends StatefulWidget {
+  const SchoolPlanningScreen({super.key});
 
   @override
-  State<ClubSchoolPlanningScreen> createState() => _ClubSchoolPlanningScreenState();
+  State<SchoolPlanningScreen> createState() => _SchoolPlanningScreenState();
 }
 
-class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
+class _SchoolPlanningScreenState extends State<SchoolPlanningScreen> {
   @override
   void initState() {
     super.initState();
@@ -46,21 +46,20 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(Colors.white.withOpacity(0.1)),
-                        dataRowColor: WidgetStateProperty.all(Colors.white.withOpacity(0.05)),
+                        headingRowColor: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.1)),
+                        dataRowColor: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.05)),
                         border: TableBorder.all(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1,
                         ),
-                        columns: List.generate(
-                          7,
-                          (index) => DataColumn(
+                        columns: DayOfWeek.values.map(
+                          (day) => DataColumn(
                             label: Text(
-                              _getDayName(index + 1),
+                              day.displayName,
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
-                        ),
+                        ).toList(),
                         rows: _buildScheduleRows(schedule, isWide),
                       ),
                     ),
@@ -77,12 +76,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
     );
   }
 
-  String _getDayName(int day) {
-    const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-    return days[day - 1];
-  }
-
-  List<DataRow> _buildScheduleRows(Map<int, List<SessionSchedule>> schedule, bool isWide) {
+  List<DataRow> _buildScheduleRows(Map<DayOfWeek, List<SessionSchedule>> schedule, bool isWide) {
     // Exemple simplifié : une ligne par créneau horaire fixe (8h-18h)
     // Vous pouvez améliorer avec une vraie grille temporelle
     final rows = <DataRow>[];
@@ -90,7 +84,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
 
     for (int h in hours) {
       final cells = <DataCell>[];
-      for (int d = 1; d <= 7; d++) {
+      for (var d in DayOfWeek.values) {
         final daySessions = schedule[d] ?? [];
         final slotSessions = daySessions.where((s) => s.timeSlot.start.hour == h).toList();
 
@@ -117,12 +111,12 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1), // Glassmorphism
+        color: Colors.white.withValues(alpha: 0.1), // Glassmorphism
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -137,7 +131,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ),
           Text(
             '${session.timeSlot.start.format(context)} - ${session.timeSlot.end.format(context)}',
-            style: TextStyle(color: Colors.white.withOpacity(0.8)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
           ),
           if (session.roomName != null) Text('Salle: ${session.roomName}'),
           if (session.coachId != null) Text('Coach: ${session.coachId}'),

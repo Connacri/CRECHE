@@ -224,8 +224,8 @@ class TimeSlot {
 
   Map<String, dynamic> toMap() {
     return {
-      'start': '\( {start.hour}: \){start.minute.toString().padLeft(2, '0')}',
-      'end': '\( {end.hour}: \){end.minute.toString().padLeft(2, '0')}',
+      'start': '${start.hour}:${start.minute.toString().padLeft(2, '0')}',
+      'end': '${end.hour}:${end.minute.toString().padLeft(2, '0')}',
     };
   }
 
@@ -239,5 +239,5 @@ class TimeSlot {
 }
 
 extension TimeOfDayExtension on TimeOfDay {
-  String formatAsString() => "\( {hour.toString().padLeft(2, '0')}: \){minute.toString().padLeft(2, '0')}";
+  String formatAsString() => "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
 }

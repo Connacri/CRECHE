@@ -5,14 +5,14 @@ import '../services/schedule_service.dart';
 class ScheduleProvider with ChangeNotifier {
   final ScheduleService _service = ScheduleService();
 
-  Map<int, List<SessionSchedule>> _weeklySchedule = {};
+  Map<DayOfWeek, List<SessionSchedule>> _weeklySchedule = {};
   bool _isLoading = false;
 
   // Filtres actuels
   String? _currentCoachId;
   String? _currentCourseId;
 
-  Map<int, List<SessionSchedule>> get weeklySchedule => _weeklySchedule;
+  Map<DayOfWeek, List<SessionSchedule>> get weeklySchedule => _weeklySchedule;
   bool get isLoading => _isLoading;
 
   String? get currentCoachId => _currentCoachId;
@@ -38,7 +38,7 @@ class ScheduleProvider with ChangeNotifier {
   /// Déplace une session et rafraîchit le planning
   Future<bool> moveSessionAndRefresh(
     String sessionId,
-    int newDay,
+    DayOfWeek newDay,
     TimeOfDay newStart,
     TimeOfDay newEnd,
   ) async {

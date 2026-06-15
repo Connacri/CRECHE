@@ -41,18 +41,18 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
     if (widget.sessionToEdit != null) {
       _selectedCourseId = widget.sessionToEdit!.courseId;
       _selectedDay = widget.sessionToEdit!.dayOfWeek;
-      _startTime = TimeOfDay.fromDateTime(widget.sessionToEdit!.timeSlot.startTime);
-      _endTime = TimeOfDay.fromDateTime(widget.sessionToEdit!.timeSlot.endTime);
+      _startTime = widget.sessionToEdit!.timeSlot.start;
+      _endTime = widget.sessionToEdit!.timeSlot.end;
       _selectedCoachId = widget.sessionToEdit!.coachId;
       _roomName = widget.sessionToEdit!.roomName;
     } else {
       _selectedCourseId = widget.courses.isNotEmpty ? widget.courses.first.id : "";
       _selectedDay = widget.initialDay ?? DayOfWeek.monday;
       _startTime = widget.initialTimeSlot != null
-          ? TimeOfDay.fromDateTime(widget.initialTimeSlot!.startTime)
+          ? widget.initialTimeSlot!.start
           : const TimeOfDay(hour: 9, minute: 0);
       _endTime = widget.initialTimeSlot != null
-          ? TimeOfDay.fromDateTime(widget.initialTimeSlot!.endTime)
+          ? widget.initialTimeSlot!.end
           : const TimeOfDay(hour: 10, minute: 0);
     }
   }
@@ -77,16 +77,12 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day, _startTime.hour, _startTime.minute);
-    final end = DateTime(now.year, now.month, now.day, _endTime.hour, _endTime.minute);
-
     final schedule = SessionSchedule(
       id: widget.sessionToEdit?.id ?? "",
       courseId: _selectedCourseId,
       enrollmentId: "",
       dayOfWeek: _selectedDay,
-      timeSlot: TimeSlot(startTime: start, endTime: end),
+      timeSlot: TimeSlot(start: _startTime, end: _endTime),
       startDate: DateTime(2024, 1, 1),
       endDate: DateTime(2025, 1, 1),
       currentEnrollment: 0,

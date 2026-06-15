@@ -40,17 +40,16 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(Colors.white.withOpacity(0.08)),
+                    headingRowColor: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.08)),
                     dataRowMinHeight: 70,
-                    columns: List.generate(
-                      7,
-                      (i) => DataColumn(
+                    columns: DayOfWeek.values.map(
+                      (day) => DataColumn(
                         label: Text(
-                          _getDayName(i + 1),
+                          day.displayName,
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
-                    ),
+                    ).toList(),
                     rows: _buildRows(schedule),
                   ),
                 ),
@@ -66,17 +65,12 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
     );
   }
 
-  String _getDayName(int day) {
-    const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-    return days[day - 1];
-  }
-
-  List<DataRow> _buildRows(Map<int, List<SessionSchedule>> schedule) {
+  List<DataRow> _buildRows(Map<DayOfWeek, List<SessionSchedule>> schedule) {
     final rows = <DataRow>[];
     // Créneaux horaires de 8h à 18h
     for (int hour = 8; hour <= 18; hour++) {
       final cells = <DataCell>[];
-      for (int day = 1; day <= 7; day++) {
+      for (var day in DayOfWeek.values) {
         final daySessions = schedule[day] ?? [];
         final hourSessions = daySessions.where((s) => s.timeSlot.start.hour == hour).toList();
 
@@ -103,9 +97,9 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,7 +110,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ),
           Text(
             '${session.timeSlot.start.format(context)} - ${session.timeSlot.end.format(context)}',
-            style: TextStyle(color: Colors.white.withOpacity(0.9)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
           ),
           if (session.roomName != null) Text('📍 ${session.roomName}'),
           if (session.coachId != null) Text('👨‍🏫 ${session.coachId}'),

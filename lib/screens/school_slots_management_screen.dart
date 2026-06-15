@@ -201,17 +201,13 @@ class _SchoolSlotsManagementScreenState extends State<SchoolSlotsManagementScree
             ),
             ElevatedButton(
               onPressed: () {
-                final now = DateTime.now();
-                final start = DateTime(now.year, now.month, now.day, startTime.hour, startTime.minute);
-                final end = DateTime(now.year, now.month, now.day, endTime.hour, endTime.minute);
-
                 final userId = context.read<AuthProviderV2>().currentUser?.uid;
                 if (userId != null) {
                   final newSlot = SchoolSlotModel(
                     id: '',
                     schoolId: userId,
                     dayOfWeek: selectedDay,
-                    timeSlot: TimeSlot(startTime: start, endTime: end),
+                    timeSlot: TimeSlot(start: startTime, end: endTime),
                     createdAt: DateTime.now(),
                     updatedAt: DateTime.now(),
                   );

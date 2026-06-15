@@ -1,6 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/session_schedule_model.dart';
-import '../models/course_model_complete.dart';
 
 class ScheduleService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -20,12 +20,12 @@ class ScheduleService {
   }
 
   /// Génère le planning hebdomadaire groupé par jour
-  Future<Map<int, List<SessionSchedule>>> generateWeeklySchedule({
+  Future<Map<DayOfWeek, List<SessionSchedule>>> generateWeeklySchedule({
     String? courseId,
     String? coachId,
   }) async {
     final sessions = await getActiveSessions(courseId: courseId, coachId: coachId);
-    final Map<int, List<SessionSchedule>> schedule = {};
+    final Map<DayOfWeek, List<SessionSchedule>> schedule = {};
 
     for (var session in sessions) {
       schedule.putIfAbsent(session.dayOfWeek, () => []).add(session);
@@ -50,7 +50,7 @@ class ScheduleService {
   /// Déplace une session (avec validation anti-chevauchement)
   Future<bool> moveSession(
     String sessionId,
-    int newDay,
+    DayOfWeek newDay,
     TimeOfDay newStart,
     TimeOfDay newEnd,
   ) async {
@@ -64,6 +64,10 @@ class ScheduleService {
       courseId: target.courseId,
       dayOfWeek: newDay,
       timeSlot: TimeSlot(start: newStart, end: newEnd),
+      startDate: target.startDate,
+      endDate: target.endDate,
+      currentEnrollment: target.currentEnrollment,
+      maxCapacity: target.maxCapacity,
       coachId: target.coachId,
       roomName: target.roomName,
       schoolId: target.schoolId,
@@ -95,9 +99,13 @@ class ScheduleService {
   /// Crée une nouvelle session liée à un cours
   Future<String?> createSession({
     required String courseId,
-    required int dayOfWeek,
+    required DayOfWeek dayOfWeek,
     required TimeOfDay startTime,
     required TimeOfDay endTime,
+    required DateTime startDate,
+    required DateTime endDate,
+    required int maxCapacity,
+    int currentEnrollment = 0,
     String? coachId,
     String? roomName,
     String? schoolId,
@@ -107,6 +115,10 @@ class ScheduleService {
       courseId: courseId,
       dayOfWeek: dayOfWeek,
       timeSlot: TimeSlot(start: startTime, end: endTime),
+      startDate: startDate,
+      endDate: endDate,
+      maxCapacity: maxCapacity,
+      currentEnrollment: currentEnrollment,
       coachId: coachId,
       roomName: roomName,
       schoolId: schoolId,

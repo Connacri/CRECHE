@@ -5,22 +5,31 @@ enum CourseCategory {
   business, accounting, marketing, entrepreneurship, health, cooking, crafts,
   personalDevelopment, religion, tutoring, examPreparation, professionalTraining, other;
 
-  String get displayName { /* ... votre implémentation existante ... */ }
+  String get displayName {
+    return name[0].toUpperCase() + name.substring(1);
+  }
 }
 
 enum CourseSeason {
   spring, summer, fall, winter, schoolYear, firstSemester, secondSemester,
   holidayProgram, yearRound, custom;
 
-  String get displayName { /* ... votre implémentation existante ... */ }
-  Map<String, DateTime>? getDefaultDateRange() { /* ... votre implémentation existante ... */ }
+  String get displayName {
+    return name[0].toUpperCase() + name.substring(1);
+  }
+
+  Map<String, DateTime>? getDefaultDateRange() {
+    return null;
+  }
 }
 
 enum CoursePricingType {
   hourly, session, daily, weekly, biweekly, monthly, quarterly, semester,
   yearly, season, module, package, event, participant, group, custom;
 
-  String get displayName { /* ... votre implémentation existante ... */ }
+  String get displayName {
+    return name[0].toUpperCase() + name.substring(1);
+  }
 }
 
 enum CourseLevel { beginner, intermediate, advanced, expert; }
@@ -262,8 +271,8 @@ class CourseModel {
       'pricing_type': pricingType.name,
       // Planning fields
       'day_of_week': dayOfWeek,
-      'start_time': startTime != null ? '\( {startTime!.hour}: \){startTime!.minute.toString().padLeft(2, '0')}' : null,
-      'end_time': endTime != null ? '\( {endTime!.hour}: \){endTime!.minute.toString().padLeft(2, '0')}' : null,
+      'start_time': startTime != null ? '${startTime!.hour}:${startTime!.minute.toString().padLeft(2, '0')}' : null,
+      'end_time': endTime != null ? '${endTime!.hour}:${endTime!.minute.toString().padLeft(2, '0')}' : null,
       'room_id': roomId,
       'coach_id': coachId,
       'recurrence': recurrence,
