@@ -99,22 +99,30 @@ jobs:
           $ROOT = "${{ github.workspace }}"
           $ISCC = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           
-          # Set environment variable for Inno Setup GetEnv
-          $env:APP_VERSION = $VERSION
-          
-          $SOURCE_DIR = "$ROOT\build\windows\x64\runner\Release"
-          $OUTPUT_DIR = "$ROOT\build\windows\installer"
-          $ICON_FILE = "$ROOT\windows\runner\resources\app_icon.ico"
-          $ISS_FILE = "$ROOT\windows\innosetup\setup.iss"
+          # Paths relative to the root (since setup.iss now uses SourceDir=..\..)
+          $SOURCE_DIR = "build\windows\x64\runner\Release"
+          $OUTPUT_DIR = "build\windows\installer"
+          $ICON_FILE = "windows\runner\resources\app_icon.ico"
+          $ISS_FILE = "windows\innosetup\setup.iss"
+
+          # Ensure output directory exists (relative to root)
+          if (!(Test-Path "$ROOT\$OUTPUT_DIR")) {
+            New-Item -ItemType Directory -Force -Path "$ROOT\$OUTPUT_DIR"
+          }
 
           if (Test-Path $ISCC) {
-            Write-Host "Running ISCC..."
-            & $ISCC `
-              /DMySourceDir="$SOURCE_DIR" `
-              /DMyOutputDir="$OUTPUT_DIR" `
-              /DMyIconFile="$ICON_FILE" `
-              /DMyAppVersion="$VERSION" `
-              "$ISS_FILE"
+            Write-Host "Running ISCC for version $VERSION..."
+            
+            # Define arguments for ISCC
+            $isccArgs = @(
+                "/DMyAppVersion=$VERSION",
+                "/DMySourceDir=$SOURCE_DIR",
+                "/DMyOutputDir=$OUTPUT_DIR",
+                "/DMyIconFile=$ICON_FILE",
+                "$ROOT\$ISS_FILE"
+            )
+            
+            & $ISCC $isccArgs
 
             if ($LASTEXITCODE -ne 0) {
               Write-Error "ISCC failed with exit code $LASTEXITCODE"
@@ -123,11 +131,19 @@ jobs:
 
             New-Item -ItemType Directory -Force -Path "$ROOT\release"
             
-            $INSTALLER_NAME = "creche-windows-installer.v$VERSION.exe"
-            Copy-Item "$OUTPUT_DIR\creche-windows-installer.exe" "$ROOT\release\$INSTALLER_NAME"
+            $INSTALLER_PATH = "$ROOT\$OUTPUT_DIR\creche-windows-installer.exe"
+            $DEST_PATH = "$ROOT\release\creche-windows-installer.v$VERSION.exe"
+            
+            if (Test-Path $INSTALLER_PATH) {
+              Copy-Item $INSTALLER_PATH $DEST_PATH
+              Write-Host "Installer copied to $DEST_PATH"
+            } else {
+              Write-Error "Installer not found at $INSTALLER_PATH"
+              exit 1
+            }
             
             Write-Host "Creating ZIP..."
-            Compress-Archive -Path "$SOURCE_DIR\*" -DestinationPath "$ROOT\release\creche-windows.v$VERSION.zip"
+            Compress-Archive -Path "$ROOT\$SOURCE_DIR\*" -DestinationPath "$ROOT\release\creche-windows.v$VERSION.zip"
           } else {
             Write-Error "ISCC.exe not found at $ISCC"
             exit 1

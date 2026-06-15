@@ -1,14 +1,23 @@
 #define MyAppName "Creche"
-#ifndef MyAppVersion
-  #define MyAppVersion GetEnv("APP_VERSION")
-#endif
+#define MyAppPublisher "Connacri"
+#define MyAppURL "https://github.com/Connacri/CRECHE"
+#define MyAppExeName "creche.exe"
+
 #ifndef MyAppVersion
   #define MyAppVersion "1.0.0"
 #endif
 
-#define MyAppPublisher "Connacri"
-#define MyAppURL "https://github.com/Connacri/CRECHE"
-#define MyAppExeName "creche.exe"
+#ifndef MySourceDir
+  #define MySourceDir "build\windows\x64\runner\Release"
+#endif
+
+#ifndef MyOutputDir
+  #define MyOutputDir "build\windows\installer"
+#endif
+
+#ifndef MyIconFile
+  #define MyIconFile "windows\runner\resources\app_icon.ico"
+#endif
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-1234567890AB}
@@ -20,33 +29,23 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 
 DefaultDirName={autopf64}\{#MyAppName}
-
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
-#ifndef MyOutputDir
-  #define MyOutputDir "build\windows\installer"
-#endif
+; Use SourceDir to make all paths relative to the project root
+SourceDir=..\..
 OutputDir={#MyOutputDir}
 OutputBaseFilename=creche-windows-installer
+SetupIconFile={#MyIconFile}
 
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 
 UninstallDisplayIcon={app}\{#MyAppExeName}
-
-#ifndef MyIconFile
-  #define MyIconFile "windows\runner\resources\app_icon.ico"
-#endif
-SetupIconFile={#MyIconFile}
-
 PrivilegesRequired=admin
 
 [Files]
-#ifndef MySourceDir
-  #define MySourceDir "build\windows\x64\runner\Release"
-#endif
 Source: "{#MySourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
