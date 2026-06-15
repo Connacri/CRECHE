@@ -163,6 +163,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Git Tag
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git tag v${{ needs.version.outputs.version }}
+          git push origin v${{ needs.version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -172,16 +184,6 @@ jobs:
 
       - name: List artifacts
         run: ls -R out
-
-      - name: Create Git Tag
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          # We are in a detached HEAD or on a commit, let's push the tag
-          git tag v${{ needs.version.outputs.version }}
-          git push origin v${{ needs.version.outputs.version }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
