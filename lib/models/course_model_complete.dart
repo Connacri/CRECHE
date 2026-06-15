@@ -362,6 +362,14 @@ class CourseModel {
   final int? maxAge;
   final CoursePricingType pricingType;
 
+// === NOUVEAUX CHAMPS POUR PLANNING HEBDOMADAIRE ===
+  final int? dayOfWeek;           // 1=Lundi → 7=Dimanche
+  final TimeOfDay? startTime;
+  final TimeOfDay? endTime;
+  final String? roomId;
+  final String? coachId;
+  final Map<String, dynamic> recurrence; // ex: {"freq": "weekly", "exceptions": ["2026-06-20"]}
+
   CourseModel({
     required this.id,
     required this.title,
@@ -385,6 +393,14 @@ class CourseModel {
     this.minAge,
     this.maxAge,
     this.pricingType = CoursePricingType.session,
+// Nouveaux paramètres
+    this.dayOfWeek,
+    this.startTime,
+    this.endTime,
+    this.roomId,
+    this.coachId,
+    this.recurrence = const {'freq': 'weekly', 'exceptions': []},
+
   });
 
   factory CourseModel.fromSupabase(Map<String, dynamic> data) {
@@ -423,6 +439,14 @@ class CourseModel {
         (e) => e.name == data['pricing_type'],
         orElse: () => CoursePricingType.session,
       ),
+// Nouveaux champs
+      dayOfWeek: data['day_of_week'],
+      startTime: _parseTime(data['start_time']),
+      endTime: _parseTime(data['end_time']),
+      roomId: data['room_id'],
+      coachId: data['coach_id'],
+      recurrence: data['recurrence'] ?? {'freq': 'weekly', 'exceptions': []},
+   
     );
   }
 
@@ -449,6 +473,13 @@ class CourseModel {
       'min_age': minAge,
       'max_age': maxAge,
       'pricing_type': pricingType.name,
+// Nouveaux champs
+      'day_of_week': dayOfWeek,
+      'start_time': startTime != null ? '\( {startTime!.hour}: \){startTime!.minute.toString().padLeft(2, '0')}' : null,
+      'end_time': endTime != null ? '\( {endTime!.hour}: \){endTime!.minute.toString().padLeft(2, '0')}' : null,
+      'room_id': roomId,
+      'coach_id': coachId,
+      'recurrence': recurrence,
     };
   }
 
@@ -475,6 +506,12 @@ class CourseModel {
     int? minAge,
     int? maxAge,
     CoursePricingType? pricingType,
+int? dayOfWeek,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? roomId,
+    String? coachId,
+    Map<String, dynamic>? recurrence,
   }) {
     return CourseModel(
       id: id ?? this.id,
@@ -499,6 +536,14 @@ class CourseModel {
       minAge: minAge ?? this.minAge,
       maxAge: maxAge ?? this.maxAge,
       pricingType: pricingType ?? this.pricingType,
+// ... copier tous les champs existants ...
+      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      roomId: roomId ?? this.roomId,
+      coachId: coachId ?? this.coachId,
+      recurrence: recurrence ?? this.recurrence,
+      // ... 
     );
   }
 
@@ -537,4 +582,23 @@ class CourseModel {
         now.isAfter(seasonStartDate) &&
         now.isBefore(seasonEndDate);
   }
+// === MÉTHODES PLANNING ===
+  bool get hasWeeklySchedule => dayOfWeek != null && startTime != null && endTime != null;
+
+  bool overlapsWith(CourseModel other) {
+    if (!hasWeeklySchedule || !other.hasWeeklySchedule) return false;
+    if (dayOfWeek != other.dayOfWeek) return false;
+    if ((coachId != null && coachId == other.coachId) || (roomId != null && roomId == other.roomId)) {
+      final s1 = startTime!.hour * 60 + startTime!.minute;
+      final e1 = endTime!.hour * 60 + endTime!.minute;
+      final s2 = other.startTime!.hour * 60 + other.startTime!.minute;
+      final e2 = other.endTime!.hour * 60 + other.endTime!.minute;
+      return s1 < e2 && s2 < e1;
+    }
+    return false;
+  }
+
+  bool hasAvailableSpots() => currentStudents < maxStudents;
+  int get availableSpots => maxStudents - currentStudents;
+}
 }
