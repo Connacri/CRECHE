@@ -1,5 +1,6 @@
+import 'package:flutter/material.dart';
+
 /// Modèle pour représenter une session de cours planifiée
-/// Utilisé pour la timeline hebdomadaire dans le ParentDashboard
 class SessionSchedule {
   final String id;
   final String courseId;
@@ -16,6 +17,8 @@ class SessionSchedule {
   final String? coachId;
   final String? roomName;
   final String? schoolId;
+  final bool isActive;
+  final Map<String, dynamic>? recurrence;
   final Map<String, dynamic>? metadata;
 
   SessionSchedule({
@@ -34,23 +37,22 @@ class SessionSchedule {
     this.coachId,
     this.roomName,
     this.schoolId,
+    this.isActive = true,
+    this.recurrence,
     this.metadata,
   });
 
   /// Vérifie si la session est planifiée pour une date donnée
   bool isScheduledFor(DateTime date) {
+    if (isCancelled) return false;
     final normalizedDate = DateTime(date.year, date.month, date.day);
-    final normalizedStart =
-        DateTime(startDate.year, startDate.month, startDate.day);
+    final normalizedStart = DateTime(startDate.year, startDate.month, startDate.day);
     final normalizedEnd = DateTime(endDate.year, endDate.month, endDate.day);
 
-    // Vérifier si la date est dans la plage
-    if (normalizedDate.isBefore(normalizedStart) ||
-        normalizedDate.isAfter(normalizedEnd)) {
+    if (normalizedDate.isBefore(normalizedStart) || normalizedDate.isAfter(normalizedEnd)) {
       return false;
     }
 
-    // Vérifier si c'est le bon jour de la semaine
     return date.weekday == dayOfWeek.index + 1;
   }
 
@@ -62,8 +64,8 @@ class SessionSchedule {
       enrollmentId: data['enrollment_id'],
       dayOfWeek: DayOfWeek.values[data['day_of_week'] ?? 0],
       timeSlot: TimeSlot.fromMap(data['time_slot'] ?? {}),
-      startDate: DateTime.parse(data['start_date']),
-      endDate: DateTime.parse(data['end_date']),
+      startDate: DateTime.parse(data['start_date'] ?? DateTime.now().toIso8601String()),
+      endDate: DateTime.parse(data['end_date'] ?? DateTime.now().add(const Duration(days: 365)).toIso8601String()),
       isCancelled: data['is_cancelled'] ?? false,
       cancellationReason: data['cancellation_reason'],
       currentEnrollment: data['current_enrollment'] ?? 0,
@@ -72,6 +74,8 @@ class SessionSchedule {
       coachId: data['coach_id'],
       roomName: data['room_name'],
       schoolId: data['school_id'],
+      isActive: data['is_active'] ?? true,
+      recurrence: data['recurrence'],
       metadata: data['metadata'],
     );
   }
@@ -93,6 +97,8 @@ class SessionSchedule {
       'coach_id': coachId,
       'room_name': roomName,
       'school_id': schoolId,
+      'is_active': isActive,
+      'recurrence': recurrence ?? {'freq': 'weekly', 'exceptions': []},
       'metadata': metadata,
     };
   }
@@ -113,6 +119,8 @@ class SessionSchedule {
     String? coachId,
     String? roomName,
     String? schoolId,
+    bool? isActive,
+    Map<String, dynamic>? recurrence,
     Map<String, dynamic>? metadata,
   }) {
     return SessionSchedule(
@@ -131,8 +139,20 @@ class SessionSchedule {
       coachId: coachId ?? this.coachId,
       roomName: roomName ?? this.roomName,
       schoolId: schoolId ?? this.schoolId,
+      isActive: isActive ?? this.isActive,
+      recurrence: recurrence ?? this.recurrence,
       metadata: metadata ?? this.metadata,
     );
+  }
+
+  /// Méthode de chevauchement optimisée pour le planning hebdomadaire
+  bool overlapsWith(SessionSchedule other) {
+    if (dayOfWeek != other.dayOfWeek) return false;
+    if (isCancelled || other.isCancelled) return false;
+    if (coachId == other.coachId || roomName == other.roomName) {
+      return timeSlot.overlaps(other.timeSlot);
+    }
+    return false;
   }
 }
 
@@ -148,91 +168,76 @@ enum DayOfWeek {
 
   String get displayName {
     switch (this) {
-      case DayOfWeek.monday:
-        return 'Lundi';
-      case DayOfWeek.tuesday:
-        return 'Mardi';
-      case DayOfWeek.wednesday:
-        return 'Mercredi';
-      case DayOfWeek.thursday:
-        return 'Jeudi';
-      case DayOfWeek.friday:
-        return 'Vendredi';
-      case DayOfWeek.saturday:
-        return 'Samedi';
-      case DayOfWeek.sunday:
-        return 'Dimanche';
+      case DayOfWeek.monday: return 'Lundi';
+      case DayOfWeek.tuesday: return 'Mardi';
+      case DayOfWeek.wednesday: return 'Mercredi';
+      case DayOfWeek.thursday: return 'Jeudi';
+      case DayOfWeek.friday: return 'Vendredi';
+      case DayOfWeek.saturday: return 'Samedi';
+      case DayOfWeek.sunday: return 'Dimanche';
     }
   }
 
   String get shortName {
     switch (this) {
-      case DayOfWeek.monday:
-        return 'Lun';
-      case DayOfWeek.tuesday:
-        return 'Mar';
-      case DayOfWeek.wednesday:
-        return 'Mer';
-      case DayOfWeek.thursday:
-        return 'Jeu';
-      case DayOfWeek.friday:
-        return 'Ven';
-      case DayOfWeek.saturday:
-        return 'Sam';
-      case DayOfWeek.sunday:
-        return 'Dim';
+      case DayOfWeek.monday: return 'Lun';
+      case DayOfWeek.tuesday: return 'Mar';
+      case DayOfWeek.wednesday: return 'Mer';
+      case DayOfWeek.thursday: return 'Jeu';
+      case DayOfWeek.friday: return 'Ven';
+      case DayOfWeek.saturday: return 'Sam';
+      case DayOfWeek.sunday: return 'Dim';
     }
   }
 
-  /// Crée un DayOfWeek depuis un DateTime
-  static DayOfWeek fromDateTime(DateTime date) {
-    // DateTime.weekday renvoie 1-7 (lundi-dimanche)
-    return DayOfWeek.values[date.weekday - 1];
-  }
+  static DayOfWeek fromDateTime(DateTime date) => DayOfWeek.values[date.weekday - 1];
 }
 
-/// Modèle pour représenter un créneau horaire
-
+/// Modèle pour un créneau horaire (optimisé pour planning hebdomadaire)
 class TimeSlot {
-  final DateTime startTime;
-  final DateTime endTime;
+  final TimeOfDay start;
+  final TimeOfDay end;
 
-  TimeSlot({
-    required this.startTime,
-    required this.endTime,
-  });
+  TimeSlot({required this.start, required this.end});
 
-  Duration get duration => endTime.difference(startTime);
+  Duration get duration => Duration(
+        hours: end.hour - start.hour,
+        minutes: end.minute - start.minute,
+      );
 
-  String get displayTime {
-    return "${_formatTime(startTime)} - ${_formatTime(endTime)}";
-  }
-
-  String _formatTime(DateTime time) {
-    return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
-  }
+  String get displayTime => "${start.formatAsString()} - ${end.formatAsString()}";
 
   bool overlaps(TimeSlot other) {
-    return startTime.isBefore(other.endTime) &&
-        endTime.isAfter(other.startTime);
+    final s1 = start.hour * 60 + start.minute;
+    final e1 = end.hour * 60 + end.minute;
+    final s2 = other.start.hour * 60 + other.start.minute;
+    final e2 = other.end.hour * 60 + other.end.minute;
+    return s1 < e2 && s2 < e1;
   }
 
   factory TimeSlot.fromMap(Map<String, dynamic> map) {
-    DateTime parseDate(dynamic value) {
-      if (value is String) return DateTime.parse(value);
-      return DateTime.now();
-    }
-
     return TimeSlot(
-      startTime: parseDate(map['startTime'] ?? map['start_time']),
-      endTime: parseDate(map['endTime'] ?? map['end_time']),
+      start: _parseTime(map['start'] ?? map['start_time']),
+      end: _parseTime(map['end'] ?? map['end_time']),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'start_time': startTime.toIso8601String(),
-      'end_time': endTime.toIso8601String(),
+      'start': '\( {start.hour}: \){start.minute.toString().padLeft(2, '0')}',
+      'end': '\( {end.hour}: \){end.minute.toString().padLeft(2, '0')}',
     };
   }
+
+  static TimeOfDay _parseTime(dynamic value) {
+    if (value is String) {
+      final parts = value.split(':').map(int.parse).toList();
+      return TimeOfDay(hour: parts[0], minute: parts.length > 1 ? parts[1] : 0);
+    }
+    return const TimeOfDay(hour: 9, minute: 0);
+  }
+}
+
+extension TimeOfDayExtension on TimeOfDay {
+  String formatAsString() => "\( {hour.toString().padLeft(2, '0')}: \){minute.toString().padLeft(2, '0')}";
 }
