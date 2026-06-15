@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,16 +24,18 @@ jobs:
         id: v
         run: |
           git fetch --tags
-
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          # Get the last tag, or default to v1.2.104
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.2.104")
           VERSION=${LAST_TAG#v}
 
+          # Split version into major, minor, patch
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          # Increment patch
           PATCH=$((PATCH + 1))
-
+          
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Computed version: $NEW_VERSION"
 
   build-android:
     needs: version
@@ -50,7 +53,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.44.0"
           channel: stable
           cache: true
 
@@ -58,18 +60,18 @@ jobs:
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --build-name=${{ needs.version.outputs.version }} --build-number=${{ github.run_number }}
 
       - name: Prepare APK
         run: |
           mkdir -p release
-          cp build/app/outputs/flutter-apk/app-release.apk release/creche-android.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release/creche-android.v${{ needs.version.outputs.version }}.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: apk
-          path: release
+          path: release/creche-android.v${{ needs.version.outputs.version }}.apk
 
   build-windows:
     needs: version
@@ -81,7 +83,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.44.0"
           channel: stable
           cache: true
 
@@ -89,38 +90,54 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows
-        run: flutter build windows --release
+        run: flutter build windows --release --build-name=${{ needs.version.outputs.version }} --build-number=${{ github.run_number }}
 
       - name: Build Installer
         shell: pwsh
         run: |
-          $env:APP_VERSION="${{ needs.version.outputs.version }}"
+          $VERSION = "${{ needs.version.outputs.version }}"
           $ROOT = "${{ github.workspace }}"
           $ISCC = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-
-          Write-Host "Workspace: $ROOT"
-          Write-Host "Icon exists: $(Test-Path "$ROOT\windows\runner\resources\app_icon.ico")"
-          Write-Host "Release build exists: $(Test-Path "$ROOT\build\windows\x64\runner\Release")"
+          
+          # Set environment variable for Inno Setup GetEnv
+          $env:APP_VERSION = $VERSION
+          
+          $SOURCE_DIR = "$ROOT\build\windows\x64\runner\Release"
+          $OUTPUT_DIR = "$ROOT\build\windows\installer"
+          $ICON_FILE = "$ROOT\windows\runner\resources\app_icon.ico"
+          $ISS_FILE = "$ROOT\windows\innosetup\setup.iss"
 
           if (Test-Path $ISCC) {
+            Write-Host "Running ISCC..."
             & $ISCC `
-              /DMySourceDir="$ROOT\build\windows\x64\runner\Release" `
-              /DMyOutputDir="$ROOT\build\windows\installer" `
-              /DMyIconFile="$ROOT\windows\runner\resources\app_icon.ico" `
-              "$ROOT\windows\innosetup\setup.iss"
+              /DMySourceDir="$SOURCE_DIR" `
+              /DMyOutputDir="$OUTPUT_DIR" `
+              /DMyIconFile="$ICON_FILE" `
+              /DMyAppVersion="$VERSION" `
+              "$ISS_FILE"
+
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "ISCC failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+            }
 
             New-Item -ItemType Directory -Force -Path "$ROOT\release"
-            Copy-Item "$ROOT\build\windows\installer\creche-windows-installer.exe" "$ROOT\release\creche-windows-installer.exe"
-            Compress-Archive -Path "$ROOT\build\windows\x64\runner\Release\*" -DestinationPath "$ROOT\release\creche-windows.zip"
+            
+            $INSTALLER_NAME = "creche-windows-installer.v$VERSION.exe"
+            Copy-Item "$OUTPUT_DIR\creche-windows-installer.exe" "$ROOT\release\$INSTALLER_NAME"
+            
+            Write-Host "Creating ZIP..."
+            Compress-Archive -Path "$SOURCE_DIR\*" -DestinationPath "$ROOT\release\creche-windows.v$VERSION.zip"
           } else {
-            Write-Error "ISCC.exe not found"
+            Write-Error "ISCC.exe not found at $ISCC"
+            exit 1
           }
 
       - name: Upload Windows
         uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: release
+          path: release/
 
   release:
     needs: [version, build-android, build-windows]
@@ -129,29 +146,37 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: apk
           path: out
+          merge-multiple: true
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows
-          path: out
+      - name: List artifacts
+        run: ls -R out
 
       - name: Create Git Tag
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-
+          # We are in a detached HEAD or on a commit, let's push the tag
           git tag v${{ needs.version.outputs.version }}
           git push origin v${{ needs.version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.version }}
           name: Crèche v${{ needs.version.outputs.version }}
+          body: |
+            Automated release for version ${{ needs.version.outputs.version }}.
+            
+            ### Artifacts
+            - Android APK
+            - Windows Installer
+            - Windows Portable (ZIP)
           files: out/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
