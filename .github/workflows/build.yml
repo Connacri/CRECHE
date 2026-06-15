@@ -21,9 +21,12 @@ jobs:
       - name: Compute next version
         id: v
         run: |
-          git fetch --tags
-          # Get the last tag, or default to v1.2.104
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.2.104")
+          git fetch --tags --force
+          # Get the highest tag by version number, or default to v1.2.104
+          LAST_TAG=$(git tag -l "v*" | sort -V | tail -n1)
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG="v1.2.104"
+          fi
           VERSION=${LAST_TAG#v}
 
           # Split version into major, minor, patch
