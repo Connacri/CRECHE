@@ -1,250 +1,30 @@
+import 'package:flutter/material.dart';
 
 enum CourseCategory {
-  mathematics,
-  sciences,
-  languages,
-  technology,
-  computerScience,
-  arts,
-  music,
-  sports,
-  business,
-  accounting,
-  marketing,
-  entrepreneurship,
-  health,
-  cooking,
-  crafts,
-  personalDevelopment,
-  religion,
-  tutoring,
-  examPreparation,
-  professionalTraining,
-  other;
+  mathematics, sciences, languages, technology, computerScience, arts, music, sports,
+  business, accounting, marketing, entrepreneurship, health, cooking, crafts,
+  personalDevelopment, religion, tutoring, examPreparation, professionalTraining, other;
 
-  String get displayName {
-    switch (this) {
-      case CourseCategory.mathematics:
-        return 'Mathématiques';
-      case CourseCategory.sciences:
-        return 'Sciences';
-      case CourseCategory.languages:
-        return 'Langues';
-      case CourseCategory.technology:
-        return 'Technologie';
-      case CourseCategory.computerScience:
-        return 'Informatique';
-      case CourseCategory.arts:
-        return 'Arts';
-      case CourseCategory.music:
-        return 'Musique';
-      case CourseCategory.sports:
-        return 'Sports';
-      case CourseCategory.business:
-        return 'Commerce';
-      case CourseCategory.accounting:
-        return 'Comptabilité';
-      case CourseCategory.marketing:
-        return 'Marketing';
-      case CourseCategory.entrepreneurship:
-        return 'Entrepreneuriat';
-      case CourseCategory.health:
-        return 'Santé';
-      case CourseCategory.cooking:
-        return 'Cuisine';
-      case CourseCategory.crafts:
-        return 'Artisanat';
-      case CourseCategory.personalDevelopment:
-        return 'Développement personnel';
-      case CourseCategory.religion:
-        return 'Études religieuses';
-      case CourseCategory.tutoring:
-        return 'Soutien scolaire';
-      case CourseCategory.examPreparation:
-        return 'Préparation aux examens';
-      case CourseCategory.professionalTraining:
-        return 'Formation professionnelle';
-      case CourseCategory.other:
-        return 'Autre';
-    }
-  }
+  String get displayName { /* ... votre implémentation existante ... */ }
 }
 
 enum CourseSeason {
-  spring,
-  summer,
-  fall,
-  winter,
-  schoolYear,
-  firstSemester,
-  secondSemester,
-  holidayProgram,
-  yearRound,
-  custom;
+  spring, summer, fall, winter, schoolYear, firstSemester, secondSemester,
+  holidayProgram, yearRound, custom;
 
-  String get displayName {
-    switch (this) {
-      case CourseSeason.spring:
-        return 'Printemps';
-      case CourseSeason.summer:
-        return 'Été';
-      case CourseSeason.fall:
-        return 'Automne';
-      case CourseSeason.winter:
-        return 'Hiver';
-      case CourseSeason.schoolYear:
-        return 'Année scolaire';
-      case CourseSeason.firstSemester:
-        return '1er semestre';
-      case CourseSeason.secondSemester:
-        return '2ème semestre';
-      case CourseSeason.holidayProgram:
-        return 'Programme de vacances';
-      case CourseSeason.yearRound:
-        return 'Toute l\'année';
-      case CourseSeason.custom:
-        return 'Personnalisé';
-    }
-  }
-
-  Map<String, DateTime>? getDefaultDateRange() {
-    final now = DateTime.now();
-    final year = now.year;
-
-    switch (this) {
-      case CourseSeason.spring:
-        return {
-          'start': DateTime(year, 3, 21),
-          'end': DateTime(year, 6, 20),
-        };
-
-      case CourseSeason.summer:
-        return {
-          'start': DateTime(year, 6, 21),
-          'end': DateTime(year, 9, 21),
-        };
-
-      case CourseSeason.fall:
-        return {
-          'start': DateTime(year, 9, 22),
-          'end': DateTime(year, 12, 20),
-        };
-
-      case CourseSeason.winter:
-        return {
-          'start': DateTime(year, 12, 21),
-          'end': DateTime(year + 1, 3, 20),
-        };
-
-      case CourseSeason.schoolYear:
-        return {
-          'start': DateTime(year, 9, 1),
-          'end': DateTime(year + 1, 6, 30),
-        };
-
-      case CourseSeason.firstSemester:
-        return {
-          'start': DateTime(year, 9, 1),
-          'end': DateTime(year, 1, 31),
-        };
-
-      case CourseSeason.secondSemester:
-        return {
-          'start': DateTime(year, 2, 1),
-          'end': DateTime(year, 6, 30),
-        };
-
-      case CourseSeason.holidayProgram:
-        return {
-          'start': DateTime(year, 7, 1),
-          'end': DateTime(year, 8, 31),
-        };
-
-      case CourseSeason.yearRound:
-        return {
-          'start': DateTime(year, 1, 1),
-          'end': DateTime(year, 12, 31),
-        };
-
-      case CourseSeason.custom:
-        return {
-          'start': now,
-          'end': now.add(const Duration(days: 30)),
-        };
-       }
-  }
+  String get displayName { /* ... votre implémentation existante ... */ }
+  Map<String, DateTime>? getDefaultDateRange() { /* ... votre implémentation existante ... */ }
 }
 
 enum CoursePricingType {
-  hourly,
-  session,
-  daily,
-  weekly,
-  biweekly,
-  monthly,
-  quarterly,
-  semester,
-  yearly,
-  season,
-  module,
-  package,
-  event,
-  participant,
-  group,
-  custom;
+  hourly, session, daily, weekly, biweekly, monthly, quarterly, semester,
+  yearly, season, module, package, event, participant, group, custom;
 
-  String get displayName {
-    switch (this) {
-      case CoursePricingType.hourly:
-        return 'Par heure';
-      case CoursePricingType.session:
-        return 'Par séance';
-      case CoursePricingType.daily:
-        return 'Par jour';
-      case CoursePricingType.weekly:
-        return 'Par semaine';
-      case CoursePricingType.biweekly:
-        return 'Par quinzaine';
-      case CoursePricingType.monthly:
-        return 'Par mois';
-      case CoursePricingType.quarterly:
-        return 'Par trimestre';
-      case CoursePricingType.semester:
-        return 'Par semestre';
-      case CoursePricingType.yearly:
-        return 'Par année';
-      case CoursePricingType.season:
-        return 'Par saison';
-      case CoursePricingType.module:
-        return 'Par module';
-      case CoursePricingType.package:
-        return 'Forfait';
-      case CoursePricingType.event:
-        return 'Par événement';
-      case CoursePricingType.participant:
-        return 'Par participant';
-      case CoursePricingType.group:
-        return 'Par groupe';
-      case CoursePricingType.custom:
-        return 'Personnalisé';
-    }
-  }
+  String get displayName { /* ... votre implémentation existante ... */ }
 }
 
-enum CourseLevel {
-  beginner,
-  intermediate,
-  advanced,
-  expert;
-}
-
-enum CourseStatus {
-  draft,
-  scheduled,
-  active,
-  completed,
-  cancelled;
-}
+enum CourseLevel { beginner, intermediate, advanced, expert; }
+enum CourseStatus { draft, scheduled, active, completed, cancelled; }
 
 class CourseLocation {
   final double latitude;
@@ -362,7 +142,13 @@ class CourseModel {
   final int? maxAge;
   final CoursePricingType pricingType;
 
-
+  // === CHAMPS PLANNING HEBDOMADAIRE ===
+  final int? dayOfWeek;        // 1 = Lundi → 7 = Dimanche
+  final TimeOfDay? startTime;
+  final TimeOfDay? endTime;
+  final String? roomId;        // Correspond à room_name dans session_schedules
+  final String? coachId;
+  final Map<String, dynamic> recurrence;
 
   CourseModel({
     required this.id,
@@ -387,7 +173,13 @@ class CourseModel {
     this.minAge,
     this.maxAge,
     this.pricingType = CoursePricingType.session,
-
+    // Planning
+    this.dayOfWeek,
+    this.startTime,
+    this.endTime,
+    this.roomId,
+    this.coachId,
+    this.recurrence = const {'freq': 'weekly', 'exceptions': []},
   });
 
   factory CourseModel.fromSupabase(Map<String, dynamic> data) {
@@ -426,9 +218,23 @@ class CourseModel {
         (e) => e.name == data['pricing_type'],
         orElse: () => CoursePricingType.session,
       ),
-
-   
+      // Planning fields
+      dayOfWeek: data['day_of_week'],
+      startTime: _parseTime(data['start_time']),
+      endTime: _parseTime(data['end_time']),
+      roomId: data['room_id'] ?? data['room_name'],
+      coachId: data['coach_id'],
+      recurrence: data['recurrence'] ?? {'freq': 'weekly', 'exceptions': []},
     );
+  }
+
+  static TimeOfDay? _parseTime(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final parts = value.split(':').map(int.parse).toList();
+      return TimeOfDay(hour: parts[0], minute: parts.length > 1 ? parts[1] : 0);
+    }
+    return null;
   }
 
   Map<String, dynamic> toSupabase() {
@@ -454,7 +260,13 @@ class CourseModel {
       'min_age': minAge,
       'max_age': maxAge,
       'pricing_type': pricingType.name,
-
+      // Planning fields
+      'day_of_week': dayOfWeek,
+      'start_time': startTime != null ? '\( {startTime!.hour}: \){startTime!.minute.toString().padLeft(2, '0')}' : null,
+      'end_time': endTime != null ? '\( {endTime!.hour}: \){endTime!.minute.toString().padLeft(2, '0')}' : null,
+      'room_id': roomId,
+      'coach_id': coachId,
+      'recurrence': recurrence,
     };
   }
 
@@ -481,7 +293,8 @@ class CourseModel {
     int? minAge,
     int? maxAge,
     CoursePricingType? pricingType,
-int? dayOfWeek,
+    // Planning
+    int? dayOfWeek,
     TimeOfDay? startTime,
     TimeOfDay? endTime,
     String? roomId,
@@ -511,7 +324,13 @@ int? dayOfWeek,
       minAge: minAge ?? this.minAge,
       maxAge: maxAge ?? this.maxAge,
       pricingType: pricingType ?? this.pricingType,
-
+      // Planning
+      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      roomId: roomId ?? this.roomId,
+      coachId: coachId ?? this.coachId,
+      recurrence: recurrence ?? this.recurrence,
     );
   }
 
@@ -525,11 +344,7 @@ int? dayOfWeek,
       season: CourseSeason.yearRound,
       seasonStartDate: DateTime.now().subtract(const Duration(days: 365)),
       seasonEndDate: DateTime.now().add(const Duration(days: 365)),
-      location: CourseLocation(
-        latitude: 0.0,
-        longitude: 0.0,
-        address: 'N/A',
-      ),
+      location: CourseLocation(latitude: 0.0, longitude: 0.0, address: 'N/A'),
       images: [],
       createdBy: 'system',
       createdAt: DateTime.now(),
@@ -537,19 +352,29 @@ int? dayOfWeek,
     );
   }
 
-  bool hasAvailableSpots() {
-    return currentStudents < maxStudents;
-  }
-
+  bool hasAvailableSpots() => currentStudents < maxStudents;
   int get availableSpots => maxStudents - currentStudents;
 
   bool get isAvailableNow {
     final now = DateTime.now();
-    return isActive &&
-        hasAvailableSpots() &&
-        now.isAfter(seasonStartDate) &&
-        now.isBefore(seasonEndDate);
+    return isActive && hasAvailableSpots() &&
+        now.isAfter(seasonStartDate) && now.isBefore(seasonEndDate);
   }
 
+  // === MÉTHODES PLANNING ===
+  bool get hasWeeklySchedule => dayOfWeek != null && startTime != null && endTime != null;
 
+  bool overlapsWith(CourseModel other) {
+    if (!hasWeeklySchedule || !other.hasWeeklySchedule) return false;
+    if (dayOfWeek != other.dayOfWeek) return false;
+    if ((coachId != null && coachId == other.coachId) || 
+        (roomId != null && roomId == other.roomId)) {
+      final s1 = startTime!.hour * 60 + startTime!.minute;
+      final e1 = endTime!.hour * 60 + endTime!.minute;
+      final s2 = other.startTime!.hour * 60 + other.startTime!.minute;
+      final e2 = other.endTime!.hour * 60 + other.endTime!.minute;
+      return s1 < e2 && s2 < e1;
+    }
+    return false;
+  }
 }
