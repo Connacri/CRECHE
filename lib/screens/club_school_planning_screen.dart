@@ -14,7 +14,11 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<ScheduleProvider>().loadWeeklySchedule();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<ScheduleProvider>().loadWeeklySchedule();
+      }
+    });
   }
 
   @override
@@ -42,6 +46,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                   child: DataTable(
                     headingRowColor: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.08)),
                     dataRowMinHeight: 70,
+                    dataRowMaxHeight: 120,
                     columns: DayOfWeek.values.map(
                       (day) => DataColumn(
                         label: Text(
@@ -105,15 +110,20 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Cours ${session.courseId.substring(0, 8)}...", // À remplacer par titre réel via join
+            session.courseTitle ?? "Cours ${session.courseId.substring(0, 8)}...",
             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             '${session.timeSlot.start.format(context)} - ${session.timeSlot.end.format(context)}',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12),
           ),
-          if (session.roomName != null) Text('📍 ${session.roomName}'),
-          if (session.coachId != null) Text('👨‍🏫 ${session.coachId}'),
+          if (session.roomName != null) 
+            Text(
+              '📍 ${session.roomName}',
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            ),
         ],
       ),
     );

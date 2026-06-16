@@ -6,17 +6,86 @@ class ScheduleService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   /// Récupère toutes les sessions actives pour le planning hebdomadaire
-  Future<List<SessionSchedule>> getActiveSessions({String? courseId, String? coachId}) async {
-    var query = _supabase
-        .from('session_schedules')
-        .select()
-        .eq('is_active', true);
+  Future<List<SessionSchedule>> getActiveSessions({String? courseId, String? coachId, String? schoolId}) async {
+    try {
+      debugPrint('🔍 [ScheduleService] fetching sessions. Filters: courseId=$courseId, coachId=$coachId, schoolId=$schoolId');
+      
+      // 1. Fetch from session_schedules
+      var sessionQuery = _supabase
+          .from('session_schedules')
+          .select('*, courses(title)')
+          .eq('is_active', true);
 
-    if (courseId != null) query = query.eq('course_id', courseId);
-    if (coachId != null) query = query.eq('coach_id', coachId);
+      if (courseId != null) sessionQuery = sessionQuery.eq('course_id', courseId);
+      if (coachId != null) sessionQuery = sessionQuery.eq('coach_id', coachId);
+      if (schoolId != null) sessionQuery = sessionQuery.eq('school_id', schoolId);
 
-    final data = await query;
-    return data.map((e) => SessionSchedule.fromSupabase(e)).toList();
+      final sessionData = await sessionQuery;
+      final List<SessionSchedule> sessions = sessionData.map((e) => SessionSchedule.fromSupabase(e)).toList();
+
+      // 2. Fetch from courses (those with planning fields populated)
+      var courseQuery = _supabase
+          .from('courses')
+          .select()
+          .not('day_of_week', 'is', null)
+          .not('start_time', 'is', null)
+          .not('end_time', 'is', null)
+          .eq('is_active', true);
+
+      if (courseId != null) courseQuery = courseQuery.eq('id', courseId);
+      if (coachId != null) courseQuery = courseQuery.eq('coach_id', coachId);
+      if (schoolId != null) courseQuery = courseQuery.eq('club_id', schoolId);
+
+      final courseData = await courseQuery;
+      debugPrint('🔍 [ScheduleService] Found ${sessions.length} sessions and ${courseData.length} courses with planning');
+
+      for (var c in courseData) {
+        // Normalisation: DB day_of_week is 1-7, DayOfWeek enum is 0-6
+        final rawDay = c['day_of_week'] as int;
+        final dayIndex = rawDay - 1; 
+        
+        if (dayIndex < 0 || dayIndex > 6) {
+          debugPrint('⚠️ [ScheduleService] Invalid day_of_week: $rawDay for course ${c['title']}');
+          continue;
+        }
+
+        final startTimeStr = c['start_time'] as String;
+        final endTimeStr = c['end_time'] as String;
+        
+        // Comparaison robuste (on parse les deux pour comparer les TimeOfDay)
+        final parsedStart = TimeSlot.parseTime(startTimeStr);
+        
+        final exists = sessions.any((s) => 
+          s.courseId == c['id'] && 
+          s.dayOfWeek.index == dayIndex && 
+          s.timeSlot.start.hour == parsedStart.hour &&
+          s.timeSlot.start.minute == parsedStart.minute
+        );
+
+        if (!exists) {
+          debugPrint('➕ [ScheduleService] Adding course to schedule: ${c['title']} on day $rawDay at $startTimeStr');
+          sessions.add(SessionSchedule(
+            id: 'course-${c['id']}',
+            courseId: c['id'],
+            courseTitle: c['title'],
+            dayOfWeek: DayOfWeek.values[dayIndex],
+            timeSlot: TimeSlot.fromMap({'start': startTimeStr, 'end': endTimeStr}),
+            startDate: DateTime.parse(c['season_start_date']),
+            endDate: DateTime.parse(c['season_end_date']),
+            currentEnrollment: c['current_students'] ?? 0,
+            maxCapacity: c['max_students'] ?? 30,
+            coachId: c['coach_id'],
+            roomName: c['room_name'],
+            schoolId: c['club_id'],
+          ));
+        }
+      }
+
+      return sessions;
+    } catch (e) {
+      debugPrint('❌ [ScheduleService] getActiveSessions Error: $e');
+      return [];
+    }
   }
 
   /// Génère le planning hebdomadaire groupé par jour

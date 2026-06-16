@@ -284,8 +284,23 @@ class AuthProviderV2 with ChangeNotifier {
 
       if (data == null) {
         debugPrint(
-            '[AuthProviderV2] User data null → ensureUserRowAdmin...');
-        await _ensureUserRow();
+            '[AuthProviderV2] User data null → checking for existing data by email...');
+        
+        // Tentative de récupération par email pour préserver le rôle avant migration
+        final existingByEmail = await _authService.adminClient
+            .from('users')
+            .select('role')
+            .eq('email', _currentUser!.email!)
+            .maybeSingle();
+        
+        String? roleToPreserve;
+        if (existingByEmail != null) {
+          roleToPreserve = existingByEmail['role'];
+          debugPrint('[AuthProviderV2] Role found for preservation: $roleToPreserve');
+        }
+
+        await _ensureUserRow(role: roleToPreserve);
+        
         final retryData =
             await _authService.getUserData(_currentUser!.uid);
         if (retryData != null) {
@@ -329,13 +344,13 @@ class AuthProviderV2 with ChangeNotifier {
     }
   }
 
-  Future<void> _ensureUserRow() async {
+  Future<void> _ensureUserRow({String? role}) async {
     if (_currentUser == null) return;
     debugPrint(
-        '[AuthProviderV2] _ensureUserRow: id=${_currentUser!.uid}');
+        '[AuthProviderV2] _ensureUserRow: id=${_currentUser!.uid} (preferred role: $role)');
     try {
       await _authService.ensureUserRowAdmin(
-          _currentUser!.uid, _currentUser!.email!);
+          _currentUser!.uid, _currentUser!.email!, role: role ?? 'parent');
       debugPrint('[AuthProviderV2] _ensureUserRow: Réussi via Admin');
     } catch (e) {
       debugPrint('[AuthProviderV2] _ensureUserRow: Échec: $e');

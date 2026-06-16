@@ -18,6 +18,7 @@ import 'providers/auth_provider_v2.dart';
 import 'providers/child_enrollment_provider.dart';
 import 'providers/course_provider_complete.dart';
 import 'providers/school_provider.dart';
+import 'providers/schedule_provider.dart';
 import 'services/fcm_service.dart';
 
 @pragma('vm:entry-point')
@@ -52,6 +53,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ChildEnrollmentProvider()),
         ChangeNotifierProvider(create: (_) => CourseProvider()),
         ChangeNotifierProvider(create: (_) => SchoolProvider()),
+        ChangeNotifierProvider(create: (_) => ScheduleProvider()),
       ],
       child: const CrecheApp(),
     ),

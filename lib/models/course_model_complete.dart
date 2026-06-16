@@ -19,7 +19,23 @@ enum CourseSeason {
   }
 
   Map<String, DateTime>? getDefaultDateRange() {
-    return null;
+    final now = DateTime.now();
+    final year = now.year;
+    switch (this) {
+      case CourseSeason.spring:
+        return {'start': DateTime(year, 3, 21), 'end': DateTime(year, 6, 20)};
+      case CourseSeason.summer:
+        return {'start': DateTime(year, 6, 21), 'end': DateTime(year, 9, 20)};
+      case CourseSeason.fall:
+        return {'start': DateTime(year, 9, 21), 'end': DateTime(year, 12, 20)};
+      case CourseSeason.winter:
+        return {'start': DateTime(year, 12, 21), 'end': DateTime(year + 1, 3, 20)};
+      case CourseSeason.schoolYear:
+        return {'start': DateTime(year, 9, 1), 'end': DateTime(year + 1, 6, 30)};
+      case CourseSeason.yearRound:
+      default:
+        return {'start': now, 'end': now.add(const Duration(days: 365))};
+    }
   }
 }
 
@@ -273,7 +289,7 @@ class CourseModel {
       'day_of_week': dayOfWeek,
       'start_time': startTime != null ? '${startTime!.hour}:${startTime!.minute.toString().padLeft(2, '0')}' : null,
       'end_time': endTime != null ? '${endTime!.hour}:${endTime!.minute.toString().padLeft(2, '0')}' : null,
-      'room_id': roomId,
+      'room_name': roomId,
       'coach_id': coachId,
       'recurrence': recurrence,
     };

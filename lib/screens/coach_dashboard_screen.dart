@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/course_model_complete.dart';
 import '../models/session_schedule_model.dart';
 import '../providers/course_provider_complete.dart';
+import '../providers/schedule_provider.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/interactive_weekly_timetable.dart';
 import '../widgets/enrollments_page.dart';
@@ -31,7 +31,7 @@ class _CoachDashboardScreenState extends State<CoachDashboardScreen> {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/bg_ghibli.jpg',
+              'assets/images/forest_bg_zoomed.jpg',
               fit: BoxFit.cover,
             ),
           ),
@@ -145,10 +145,7 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
   final ClubService _clubService = ClubService();
   List<Map<String, dynamic>> _schools = [];
   String? _selectedSchoolId;
-  StreamSubscription? _schedulesSub;
-  List<SessionSchedule> _schedules = [];
-  List<CourseModel> _allCourses = [];
-  bool _isLoading = false;
+  bool _isInit = false;
 
   @override
   void initState() {
@@ -157,78 +154,61 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
   }
 
   Future<void> _loadSchools() async {
-    if (mounted) setState(() => _isLoading = true);
     try {
       _schools = await _clubService.getSchools();
-      if (_schools.isNotEmpty) {
-        _selectedSchoolId = _schools.first['id'];
-        _initRealtime();
+      if (_schools.isNotEmpty && mounted) {
+        setState(() {
+          _selectedSchoolId = _schools.first['id'];
+          _isInit = true;
+        });
+        _refreshSchedule();
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('Error loading schools: $e');
     }
   }
 
-  void _initRealtime() {
-    final schoolId = _selectedSchoolId;
-    if (schoolId == null) return;
-
-    _schedulesSub?.cancel();
-    _schedulesSub = _clubService.adminClient
-        .from('session_schedules')
-        .stream(primaryKey: ['id'])
-        .eq('school_id', schoolId)
-        .listen(
-          (data) {
-            if (mounted) {
-              setState(() {
-                _schedules = data.map((d) => SessionSchedule.fromSupabase(d)).toList();
-              });
-            }
-          },
-          onError: (e) => debugPrint('❌ [CoachDashboard] Error in schedules stream: $e'),
-        );
-
-    _clubService.adminClient.from('courses').select().eq('club_id', schoolId).then((res) {
-      if (mounted) {
-        setState(() {
-          _allCourses = (res as List).map((d) => CourseModel.fromSupabase(d)).toList();
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _schedulesSub?.cancel();
-    super.dispose();
+  void _refreshSchedule() {
+    if (_selectedSchoolId != null) {
+      context.read<ScheduleProvider>().loadWeeklySchedule(schoolId: _selectedSchoolId);
+      context.read<CourseProvider>().loadUserCourses(_selectedSchoolId!); // Pour avoir la liste des cours du club
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheduleProvider = context.watch<ScheduleProvider>();
+    final courseProvider = context.watch<CourseProvider>();
+
+    // Aplatir le Map du provider en List pour le widget InteractiveWeeklyTimetable
+    final List<SessionSchedule> allSessions = [];
+    scheduleProvider.weeklySchedule.forEach((day, sessions) {
+      allSessions.addAll(sessions);
+    });
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(24),
           child: DropdownButtonFormField<String>(
-            initialValue: _selectedSchoolId,
+            value: _selectedSchoolId,
             items: _schools.map((s) => DropdownMenuItem<String>(value: s["id"].toString(), child: Text(s["name"]?.toString() ?? "Inconnu"))).toList(),
             onChanged: (val) {
               setState(() {
                 _selectedSchoolId = val;
-                _initRealtime();
               });
+              _refreshSchedule();
             },
             decoration: const InputDecoration(labelText: 'Sélectionner un Club'),
           ),
         ),
-        if (_isLoading)
+        if (scheduleProvider.isLoading || !_isInit)
           const Expanded(child: Center(child: CircularProgressIndicator()))
         else
           Expanded(
             child: InteractiveWeeklyTimetable(
-              schedules: _schedules,
-              courses: _allCourses,
+              schedules: allSessions,
+              courses: courseProvider.courses, // Utilise tous les cours chargés
               onEmptySlotTap: (day, slot) {},
               onSessionTap: (session) {},
             ),

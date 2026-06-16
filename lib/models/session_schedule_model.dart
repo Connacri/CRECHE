@@ -18,6 +18,7 @@ class SessionSchedule {
   final String? roomName;
   final String? schoolId;
   final bool isActive;
+  final String? courseTitle; // Nouveau champ pour le titre du cours
   final Map<String, dynamic>? recurrence;
   final Map<String, dynamic>? metadata;
 
@@ -38,6 +39,7 @@ class SessionSchedule {
     this.roomName,
     this.schoolId,
     this.isActive = true,
+    this.courseTitle,
     this.recurrence,
     this.metadata,
   });
@@ -58,6 +60,14 @@ class SessionSchedule {
 
   /// Désérialisation depuis Supabase
   factory SessionSchedule.fromSupabase(Map<String, dynamic> data) {
+    // Gestion du join avec courses pour le titre
+    String? title;
+    if (data['courses'] != null) {
+      title = data['courses']['title'];
+    } else if (data['course_title'] != null) {
+      title = data['course_title'];
+    }
+
     return SessionSchedule(
       id: data['id'] ?? '',
       courseId: data['course_id'] ?? '',
@@ -75,6 +85,7 @@ class SessionSchedule {
       roomName: data['room_name'],
       schoolId: data['school_id'],
       isActive: data['is_active'] ?? true,
+      courseTitle: title,
       recurrence: data['recurrence'],
       metadata: data['metadata'],
     );
@@ -149,10 +160,24 @@ class SessionSchedule {
   bool overlapsWith(SessionSchedule other) {
     if (dayOfWeek != other.dayOfWeek) return false;
     if (isCancelled || other.isCancelled) return false;
-    if (coachId == other.coachId || roomName == other.roomName) {
+
+    // Conflit si même coach ou même salle au même moment
+    final sameCoach = coachId != null && other.coachId != null && coachId == other.coachId;
+    final sameRoom = roomName != null && other.roomName != null && 
+                     roomName!.trim().isNotEmpty && other.roomName!.trim().isNotEmpty &&
+                     roomName == other.roomName;
+
+    if (sameCoach || sameRoom) {
       return timeSlot.overlaps(other.timeSlot);
     }
     return false;
+  }
+
+  /// Vérifie si deux sessions se chevauchent dans le temps (pour l'affichage)
+  bool overlapsInTime(SessionSchedule other) {
+    if (dayOfWeek != other.dayOfWeek) return false;
+    if (isCancelled || other.isCancelled) return false;
+    return timeSlot.overlaps(other.timeSlot);
   }
 }
 
@@ -217,8 +242,8 @@ class TimeSlot {
 
   factory TimeSlot.fromMap(Map<String, dynamic> map) {
     return TimeSlot(
-      start: _parseTime(map['start'] ?? map['start_time']),
-      end: _parseTime(map['end'] ?? map['end_time']),
+      start: parseTime(map['start'] ?? map['start_time']),
+      end: parseTime(map['end'] ?? map['end_time']),
     );
   }
 
@@ -229,7 +254,7 @@ class TimeSlot {
     };
   }
 
-  static TimeOfDay _parseTime(dynamic value) {
+  static TimeOfDay parseTime(dynamic value) {
     if (value is String) {
       final parts = value.split(':').map(int.parse).toList();
       return TimeOfDay(hour: parts[0], minute: parts.length > 1 ? parts[1] : 0);

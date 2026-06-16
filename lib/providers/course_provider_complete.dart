@@ -136,6 +136,13 @@ class CourseProvider extends ChangeNotifier {
     required String currentUserRole,
     String? clubId,
     int maxStudents = 30,
+    int? minAge,
+    int? maxAge,
+    int? dayOfWeek,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? roomId,
+    String? coachId,
     List<String> tags = const [],
     Map<String, dynamic>? metadata,
     CoursePricingType pricingType = CoursePricingType.session,
@@ -163,6 +170,13 @@ class CourseProvider extends ChangeNotifier {
         isActive: true,
         clubId: clubId,
         maxStudents: maxStudents,
+        minAge: minAge,
+        maxAge: maxAge,
+        dayOfWeek: dayOfWeek,
+        startTime: startTime,
+        endTime: endTime,
+        roomId: roomId,
+        coachId: coachId,
         tags: tags,
         metadata: {
            ...?metadata,
@@ -216,6 +230,13 @@ class CourseProvider extends ChangeNotifier {
     CourseLocation? location,
     List<File>? newImageFiles,
     int? maxStudents,
+    int? minAge,
+    int? maxAge,
+    int? dayOfWeek,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? roomId,
+    String? coachId,
     List<String>? tags,
     bool? isActive,
     String? clubId,
@@ -241,6 +262,13 @@ class CourseProvider extends ChangeNotifier {
       if (seasonEndDate != null) updates['season_end_date'] = seasonEndDate.toIso8601String();
       if (location != null) updates['location'] = location.toMap();
       if (maxStudents != null) updates['max_students'] = maxStudents;
+      if (minAge != null) updates['min_age'] = minAge;
+      if (maxAge != null) updates['max_age'] = maxAge;
+      if (dayOfWeek != null) updates['day_of_week'] = dayOfWeek;
+      if (startTime != null) updates['start_time'] = '${startTime.hour}:${startTime.minute.toString().padLeft(2, '0')}';
+      if (endTime != null) updates['end_time'] = '${endTime.hour}:${endTime.minute.toString().padLeft(2, '0')}';
+      if (roomId != null) updates['room_name'] = roomId;
+      if (coachId != null) updates['coach_id'] = coachId;
       if (tags != null) updates['tags'] = tags;
       if (isActive != null) updates['is_active'] = isActive;
       if (clubId != null) updates['club_id'] = clubId;

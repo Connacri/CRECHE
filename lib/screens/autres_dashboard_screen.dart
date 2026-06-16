@@ -29,7 +29,7 @@ class _AutresDashboardScreenState extends State<AutresDashboardScreen> {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/bg_ghibli.jpg'),
+            image: AssetImage('assets/images/forest_bg_zoomed.jpg'),
             fit: BoxFit.cover,
           ),
         ),

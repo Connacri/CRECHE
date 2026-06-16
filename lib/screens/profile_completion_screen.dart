@@ -236,6 +236,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       'city': _cityController.text.trim(),
       'organization_name': _organizationNameController.text.trim(),
       'profile_completed': true,
+      'role': authProvider.userRole, // ✅ Préserver le rôle actuel (club/school/etc)
     };
     debugPrint('[ProfileCompletion] updateUserProfile data: $data');
     final result = await authProvider.updateUserProfile(data);

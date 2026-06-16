@@ -301,8 +301,10 @@ class AuthService extends AdminSupabaseService {
   /// Utilise UPSERT → idempotent, safe à appeler plusieurs fois.
   Future<void> ensureUserRowAdmin(String uid, String email,
       {String role = 'parent'}) async {
-    debugPrint('[AuthService] ensureUserRowAdmin: id=$uid email=$email role=$role');
+    debugPrint(
+        '[AuthService] ensureUserRowAdmin: id=$uid email=$email role=$role');
     try {
+      // 1. Tentative normale par ID
       await adminClient.from('users').upsert(
         {
           'id': uid,
@@ -311,15 +313,55 @@ class AuthService extends AdminSupabaseService {
           'is_active': true,
           'updated_at': DateTime.now().toIso8601String(),
         },
-        // ✅ onConflict sur 'id' → mise à jour partielle si la ligne existe
-        // ignoreDuplicates=false pour que le updated_at soit rafraîchi
         onConflict: 'id',
         ignoreDuplicates: false,
       );
-      debugPrint('[AuthService] ensureUserRowAdmin: succès');
+      debugPrint('[AuthService] ensureUserRowAdmin: succès (ID)');
     } catch (e) {
-      // Ne pas laisser une erreur Supabase bloquer l'auth Firebase
-      debugPrint('[AuthService] ensureUserRowAdmin error (non-bloquant): $e');
+      final errorStr = e.toString();
+      // 2. Gestion du cas "email déjà utilisé par un autre ID" (Code 23505 = Unique Violation)
+      bool isConflict = errorStr.contains('23505') || 
+                        errorStr.contains('users_email_key') ||
+                        (e is supabase.PostgrestException && (e.code == '23505' || e.message.contains('users_email_key')));
+
+      if (isConflict) {
+        debugPrint(
+            '[AuthService] Conflit email détecté. Tentative de migration de l\'ancien ID vers le nouveau...');
+        try {
+          // On cherche l'ancien ID
+          final existing = await adminClient
+              .from('users')
+              .select('id')
+              .eq('email', email)
+              .maybeSingle();
+
+          if (existing != null) {
+            final oldId = existing['id'];
+            if (oldId != uid) {
+            debugPrint('[AuthService] Migration de l\'utilisateur: $oldId -> $uid (Role: $role)');
+            // On met à jour l'ID et le rôle de la ligne existante
+            // Note: Le ON UPDATE CASCADE sur les FK permet de propager ce changement partout
+            await adminClient
+                .from('users')
+                .update({
+                  'id': uid, 
+                  'role': role, // ✅ Mise à jour du rôle pour tous les types (coach, club, ecole, etc)
+                  'updated_at': DateTime.now().toIso8601String()
+                })
+                .eq('id', oldId);
+              debugPrint('[AuthService] Migration réussie. L\'utilisateur peut maintenant se connecter avec son nouvel UID.');
+            } else {
+              debugPrint('[AuthService] Conflit signalé mais l\'ID est déjà identique. Étrange.');
+            }
+          } else {
+            debugPrint('[AuthService] Conflit email mais aucune ligne trouvée par email. Possible race condition.');
+          }
+        } catch (e2) {
+          debugPrint('[AuthService] Échec CRITIQUE migration ID (vérifier ON UPDATE CASCADE): $e2');
+        }
+      } else {
+        debugPrint('[AuthService] ensureUserRowAdmin error (non-bloquant): $e');
+      }
     }
   }
 

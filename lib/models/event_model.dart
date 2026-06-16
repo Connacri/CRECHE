@@ -1,14 +1,25 @@
 import 'course_model_complete.dart';
 
 enum EventType {
-  competiton,
+  competition,
   stage,
+  porteOuverte,
+  reunion,
+  examen,
+  tournoi,
+  gala,
   formation,
   social,
   autre;
 
-  static EventType fromString(String v) =>
-      EventType.values.firstWhere((e) => e.name == v, orElse: () => EventType.autre);
+  static EventType fromString(String v) {
+    if (v == 'competiton') return EventType.competition;
+    if (v == 'porte_ouverte') return EventType.porteOuverte;
+    return EventType.values.firstWhere(
+      (e) => e.name == v,
+      orElse: () => EventType.autre,
+    );
+  }
 }
 
 enum EventStatus {
@@ -16,14 +27,25 @@ enum EventStatus {
   published,
   registrationOpen,
   registrationClosed,
-  inProgress,
+  ongoing,
   completed,
   cancelled;
 
-  static EventStatus fromString(String v) =>
-      EventStatus.values.firstWhere((e) => e.name == v, orElse: () => EventStatus.draft);
+  static EventStatus fromString(String v) {
+    if (v == 'registration_open') return EventStatus.registrationOpen;
+    if (v == 'registration_closed') return EventStatus.registrationClosed;
+    if (v == 'inProgress') return EventStatus.ongoing;
+    return EventStatus.values.firstWhere(
+      (e) => e.name == v,
+      orElse: () => EventStatus.draft,
+    );
+  }
 
-  String get supabaseValue => name;
+  String get supabaseValue {
+    if (this == EventStatus.registrationOpen) return 'registration_open';
+    if (this == EventStatus.registrationClosed) return 'registration_closed';
+    return name;
+  }
 }
 
 enum RegistrationStatus {

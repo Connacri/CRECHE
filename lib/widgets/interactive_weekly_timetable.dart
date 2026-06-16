@@ -57,7 +57,7 @@ class InteractiveWeeklyTimetable extends StatelessWidget {
                       children: hours.map((hour) => _buildHourRow(context, hour)).toList(),
                     ),
                     // Sessions positionnées
-                    ...schedules.map((session) => _buildSessionWidget(context, session)),
+                    ..._buildAllSessions(context),
                   ],
                 ),
               ),
@@ -66,6 +66,54 @@ class InteractiveWeeklyTimetable extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildAllSessions(BuildContext context) {
+    final widgets = <Widget>[];
+
+    for (var day in DayOfWeek.values) {
+      final daySessions = schedules.where((s) => s.dayOfWeek == day).toList();
+      if (daySessions.isEmpty) continue;
+
+      // Tri par heure de début
+      daySessions.sort((a, b) {
+        final startA = a.timeSlot.start.hour * 60 + a.timeSlot.start.minute;
+        final startB = b.timeSlot.start.hour * 60 + b.timeSlot.start.minute;
+        return startA.compareTo(startB);
+      });
+
+      // Attribution des colonnes (Greedy)
+      List<List<SessionSchedule>> columns = [];
+      Map<String, int> sessionToCol = {};
+
+      for (var session in daySessions) {
+        int assignedCol = -1;
+        for (int i = 0; i < columns.length; i++) {
+          if (!columns[i].any((s) => s.overlapsInTime(session))) {
+            assignedCol = i;
+            break;
+          }
+        }
+        if (assignedCol == -1) {
+          assignedCol = columns.length;
+          columns.add([session]);
+        } else {
+          columns[assignedCol].add(session);
+        }
+        sessionToCol[session.id] = assignedCol;
+      }
+
+      // Calcul de la largeur pour chaque session
+      for (var session in daySessions) {
+        final colIndex = sessionToCol[session.id]!;
+        
+        // Version simplifiée : si plusieurs sessions, on divise par le nombre total de colonnes créées pour ce jour
+        final usedColsInOverlap = columns.length; 
+
+        widgets.add(_buildSessionWidget(context, session, day.index, colIndex, usedColsInOverlap));
+      }
+    }
+    return widgets;
   }
 
   Widget _buildHourRow(BuildContext context, int hour) {
@@ -101,53 +149,59 @@ class InteractiveWeeklyTimetable extends StatelessWidget {
     );
   }
 
-  Widget _buildSessionWidget(BuildContext context, SessionSchedule session) {
-    final dayIndex = session.dayOfWeek.index;
+  Widget _buildSessionWidget(BuildContext context, SessionSchedule session, int dayIndex, int colIndex, int totalCols) {
     final startHour = session.timeSlot.start.hour;
     final startMinute = session.timeSlot.start.minute;
     final durationHours = session.timeSlot.duration.inMinutes / 60.0;
 
     // Calcul de la position
-    // L'heure 8 est à top: 0
     final top = (startHour - 8 + (startMinute / 60.0)) * 100;
     final height = durationHours * 100;
-    final left = 60 + (dayIndex * (740 / 7)); // 740 = 800 - 60
-    final width = 740 / 7;
+    
+    final dayColumnWidth = 740 / 7;
+    final sessionWidth = dayColumnWidth / totalCols;
+    final left = 60 + (dayIndex * dayColumnWidth) + (colIndex * sessionWidth);
 
     final course = courses.firstWhere((c) => c.id == session.courseId, orElse: () => CourseModel.mock());
+    final displayTitle = session.courseTitle ?? course.title;
     final coachName = coachesNames[session.coachId] ?? 'Coach non assigné';
 
     return Positioned(
       top: top,
       left: left,
-      width: width,
+      width: sessionWidth,
       height: height,
       child: Padding(
-        padding: const EdgeInsets.all(2.0),
+        padding: const EdgeInsets.all(1.0),
         child: GlassCard(
           onTap: () => onSessionTap(session),
-          opacity: 0.7,
-          padding: const EdgeInsets.all(8),
+          opacity: 0.8,
+          padding: const EdgeInsets.all(4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                course.title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                displayTitle,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold, 
+                  fontSize: totalCols > 1 ? 9 : 11,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const Spacer(),
-              Text(
-                coachName,
-                style: const TextStyle(fontSize: 9),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                session.timeSlot.displayTime,
-                style: const TextStyle(fontSize: 9),
-              ),
+              if (height > 40) ...[
+                const Spacer(),
+                Text(
+                  coachName,
+                  style: const TextStyle(fontSize: 8),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  session.timeSlot.displayTime,
+                  style: const TextStyle(fontSize: 8),
+                ),
+              ],
             ],
           ),
         ),

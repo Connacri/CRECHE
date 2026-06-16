@@ -75,7 +75,6 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
 
   void _save() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
 
     final schedule = SessionSchedule(
       id: widget.sessionToEdit?.id ?? "",
@@ -92,6 +91,20 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
     );
 
     final provider = context.read<CourseProvider>();
+
+    // Vérification des conflits
+    final conflict = provider.schedules.any((s) => s.id != schedule.id && s.overlapsWith(schedule));
+    if (conflict) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Conflit détecté : La salle ou le coach est déjà occupé sur ce créneau.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
     bool success;
     if (widget.sessionToEdit != null) {
       success = await provider.updateSchedule(schedule.id, schedule.toSupabase());

@@ -30,6 +30,9 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
   final _maxStudentsController = TextEditingController();
+  final _minAgeController = TextEditingController();
+  final _maxAgeController = TextEditingController();
+  final _roomController = TextEditingController();
 
   CourseCategory _selectedCategory = CourseCategory.other;
   CourseSeason _selectedSeason = CourseSeason.yearRound;
@@ -40,6 +43,14 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   final List<File> _selectedImages = [];
   bool _isLoadingLocation = false;
 
+  // Planning fields
+  int? _selectedDayOfWeek;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+  UserModel? _selectedCoach;
+  List<UserModel> _availableCoaches = [];
+  bool _isLoadingCoaches = false;
+
   List<UserModel> _availableClubs = [];
   UserModel? _selectedClub;
   bool _isLoadingClubs = false;
@@ -48,6 +59,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   void initState() {
     super.initState();
     _loadClubs();
+    _loadCoaches();
     if (widget.courseToEdit != null) {
       _loadCourseData();
     } else {
@@ -63,12 +75,41 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     _descriptionController.text = course.description;
     _priceController.text = course.price?.toString() ?? '';
     _maxStudentsController.text = course.maxStudents.toString();
+    _minAgeController.text = course.minAge?.toString() ?? '';
+    _maxAgeController.text = course.maxAge?.toString() ?? '';
+    _roomController.text = course.roomId ?? '';
     _selectedCategory = course.category;
     _selectedSeason = course.season;
     _selectedPricingType = course.pricingType;
     _seasonStartDate = course.seasonStartDate;
     _seasonEndDate = course.seasonEndDate;
     _selectedLocation = course.location;
+    _selectedDayOfWeek = course.dayOfWeek;
+    _startTime = course.startTime;
+    _endTime = course.endTime;
+  }
+
+  Future<void> _loadCoaches() async {
+    setState(() => _isLoadingCoaches = true);
+    try {
+      final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+      await courseProvider.loadCoaches();
+      if (mounted) {
+        setState(() {
+          _availableCoaches = courseProvider.coaches;
+          if (widget.courseToEdit?.coachId != null) {
+            _selectedCoach = _availableCoaches.cast<UserModel?>().firstWhere(
+              (c) => c?.uid == widget.courseToEdit!.coachId,
+              orElse: () => null,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading coaches: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingCoaches = false);
+    }
   }
 
   Future<void> _loadClubs() async {
@@ -230,6 +271,13 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         currentUserRole: authProvider.userData!['role'],
         clubId: _selectedClub?.uid,
         maxStudents: int.tryParse(_maxStudentsController.text) ?? 30,
+        minAge: int.tryParse(_minAgeController.text),
+        maxAge: int.tryParse(_maxAgeController.text),
+        dayOfWeek: _selectedDayOfWeek,
+        startTime: _startTime,
+        endTime: _endTime,
+        roomId: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
+        coachId: _selectedCoach?.uid,
         pricingType: _selectedPricingType,
       );
     } else {
@@ -246,6 +294,13 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         newImageFiles: _selectedImages,
         clubId: _selectedClub?.uid,
         maxStudents: int.tryParse(_maxStudentsController.text),
+        minAge: int.tryParse(_minAgeController.text),
+        maxAge: int.tryParse(_maxAgeController.text),
+        dayOfWeek: _selectedDayOfWeek,
+        startTime: _startTime,
+        endTime: _endTime,
+        roomId: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
+        coachId: _selectedCoach?.uid,
         pricingType: _selectedPricingType,
       );
     }
@@ -322,7 +377,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
             _isLoadingClubs
               ? const LinearProgressIndicator()
               : DropdownButtonFormField<UserModel>(
-                  initialValue: _selectedClub,
+                  value: _selectedClub,
                   decoration: const InputDecoration(
                     labelText: 'Club partenaire (Optionnel)',
                     prefixIcon: Icon(Icons.business),
@@ -343,7 +398,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 Expanded(
                   child: DropdownButtonFormField<CourseCategory>(
                     isExpanded: true,
-                    initialValue: _selectedCategory,
+                    value: _selectedCategory,
                     decoration: const InputDecoration(labelText: 'Catégorie', prefixIcon: Icon(Icons.category)),
                     items: CourseCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.displayName))).toList(),
                     onChanged: (val) => setState(() => _selectedCategory = val!),
@@ -353,7 +408,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 Expanded(
                   child: DropdownButtonFormField<CourseSeason>(
                     isExpanded: true,
-                    initialValue: _selectedSeason,
+                    value: _selectedSeason,
                     decoration: const InputDecoration(labelText: 'Saison', prefixIcon: Icon(Icons.calendar_today)),
                     items: CourseSeason.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName))).toList(),
                     onChanged: (val) {
@@ -384,7 +439,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 Expanded(
                   child: DropdownButtonFormField<CoursePricingType>(
                     isExpanded: true,
-                    initialValue: _selectedPricingType,
+                    value: _selectedPricingType,
                     decoration: const InputDecoration(labelText: 'Type de prix', prefixIcon: Icon(Icons.payments_outlined)),
                     items: CoursePricingType.values.map((p) => DropdownMenuItem(value: p, child: Text(p.displayName))).toList(),
                     onChanged: (val) => setState(() => _selectedPricingType = val!),
@@ -393,19 +448,105 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _maxStudentsController,
-                    decoration: const InputDecoration(labelText: 'Places max', prefixIcon: Icon(Icons.people)),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
+    Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: _maxStudentsController,
+            decoration: const InputDecoration(labelText: 'Places max', prefixIcon: Icon(Icons.people)),
+            keyboardType: TextInputType.number,
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 24),
+    Text('Public cible', style: Theme.of(context).textTheme.titleMedium),
+    const SizedBox(height: 16),
+    Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: _minAgeController,
+            decoration: const InputDecoration(labelText: 'Âge min', prefixIcon: Icon(Icons.child_care)),
+            keyboardType: TextInputType.number,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: TextFormField(
+            controller: _maxAgeController,
+            decoration: const InputDecoration(labelText: 'Âge max', prefixIcon: Icon(Icons.child_care)),
+            keyboardType: TextInputType.number,
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 24),
+    Text('Planning hebdomadaire', style: Theme.of(context).textTheme.titleMedium),
+    const SizedBox(height: 16),
+    DropdownButtonFormField<int>(
+      value: _selectedDayOfWeek,
+      decoration: const InputDecoration(labelText: 'Jour de la semaine', prefixIcon: Icon(Icons.calendar_view_week)),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('Non spécifié')),
+        DropdownMenuItem(value: 1, child: Text('Lundi')),
+        DropdownMenuItem(value: 2, child: Text('Mardi')),
+        DropdownMenuItem(value: 3, child: Text('Mercredi')),
+        DropdownMenuItem(value: 4, child: Text('Jeudi')),
+        DropdownMenuItem(value: 5, child: Text('Vendredi')),
+        DropdownMenuItem(value: 6, child: Text('Samedi')),
+        DropdownMenuItem(value: 7, child: Text('Dimanche')),
+      ],
+      onChanged: (val) => setState(() => _selectedDayOfWeek = val),
+    ),
+    const SizedBox(height: 16),
+    Row(
+      children: [
+        Expanded(
+          child: ListTile(
+            title: const Text('Début'),
+            subtitle: Text(_startTime?.format(context) ?? '--:--'),
+            onTap: () async {
+              final picked = await showTimePicker(context: context, initialTime: _startTime ?? const TimeOfDay(hour: 9, minute: 0));
+              if (picked != null) setState(() => _startTime = picked);
+            },
+            leading: const Icon(Icons.access_time),
+          ),
+        ),
+        Expanded(
+          child: ListTile(
+            title: const Text('Fin'),
+            subtitle: Text(_endTime?.format(context) ?? '--:--'),
+            onTap: () async {
+              final picked = await showTimePicker(context: context, initialTime: _endTime ?? const TimeOfDay(hour: 10, minute: 0));
+              if (picked != null) setState(() => _endTime = picked);
+            },
+            leading: const Icon(Icons.access_time_filled),
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 16),
+    TextFormField(
+      controller: _roomController,
+      decoration: const InputDecoration(labelText: 'Salle / Lieu précis', prefixIcon: Icon(Icons.room)),
+    ),
+    const SizedBox(height: 16),
+    _isLoadingCoaches
+      ? const LinearProgressIndicator()
+      : DropdownButtonFormField<UserModel>(
+          value: _selectedCoach,
+          decoration: const InputDecoration(labelText: 'Coach / Enseignant', prefixIcon: Icon(Icons.person)),
+          items: [
+            const DropdownMenuItem<UserModel>(value: null, child: Text('À définir')),
+            ..._availableCoaches.map((coach) => DropdownMenuItem(value: coach, child: Text(coach.name))),
+          ],
+          onChanged: (val) => setState(() => _selectedCoach = val),
+        ),
+    const SizedBox(height: 24),
+    Text('Période du cours', style: Theme.of(context).textTheme.titleMedium),
+    const SizedBox(height: 16),
+    Row(
               children: [
                 Expanded(
                   child: ListTile(

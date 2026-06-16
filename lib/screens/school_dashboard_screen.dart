@@ -11,6 +11,7 @@ import '../widgets/add_session_dialog.dart';
 import '../widgets/enrollments_page.dart';
 import '../widgets/my_courses_page.dart';
 import '../widgets/attendance_management_page.dart';
+import 'club_school_planning_screen.dart';
 import 'profile_screen.dart';
 
 class SchoolDashboard extends StatefulWidget {
@@ -65,9 +66,10 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
       case 0: return const _DashboardOverview();
       case 1: return const MyCoursesPage();
       case 2: return const EnrollmentsPage();
-      case 3: return const _PlanningManagementPage();
-      case 4: return const AttendanceManagementPage();
-      case 5: return const ProfileScreen();
+      case 3: return const ClubSchoolPlanningScreen(); // ✅ Planning Global Club
+      case 4: return const _PlanningManagementPage();
+      case 5: return const AttendanceManagementPage();
+      case 6: return const ProfileScreen();
       default: return const _DashboardOverview();
     }
   }
@@ -92,6 +94,7 @@ class _SchoolDashboardState extends State<SchoolDashboard> {
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Stats'),
             BottomNavigationBarItem(icon: Icon(Icons.school_outlined), activeIcon: Icon(Icons.school), label: 'Cours'),
             BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Inscrits'),
+            BottomNavigationBarItem(icon: Icon(Icons.event_note_outlined), activeIcon: Icon(Icons.event_note), label: 'Club'),
             BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: 'Planning'),
             BottomNavigationBarItem(icon: Icon(Icons.how_to_reg_outlined), activeIcon: Icon(Icons.how_to_reg), label: 'Présence'),
             BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),

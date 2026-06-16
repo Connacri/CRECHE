@@ -126,15 +126,20 @@ class _SchoolPlanningScreenState extends State<SchoolPlanningScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            session.courseId, // Remplacer par titre du cours via join si besoin
+            session.courseTitle ?? 'Cours #${session.courseId.substring(0, 5)}',
             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             '${session.timeSlot.start.format(context)} - ${session.timeSlot.end.format(context)}',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
           ),
-          if (session.roomName != null) Text('Salle: ${session.roomName}'),
-          if (session.coachId != null) Text('Coach: ${session.coachId}'),
+          if (session.roomName != null) 
+            Text(
+              'Salle: ${session.roomName}',
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            ),
         ],
       ),
     );
