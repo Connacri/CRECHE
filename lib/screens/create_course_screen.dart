@@ -619,15 +619,17 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(border: Border(left: BorderSide(color: Theme.of(context).dividerColor))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Aperçu', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 20),
-          Text(_titleController.text.isEmpty ? 'Titre' : _titleController.text, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 10),
-          Text(_descriptionController.text.isEmpty ? 'Description...' : _descriptionController.text),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Aperçu', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 20),
+            Text(_titleController.text.isEmpty ? 'Titre' : _titleController.text, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 10),
+            Text(_descriptionController.text.isEmpty ? 'Description...' : _descriptionController.text),
+          ],
+        ),
       ),
     );
   }
