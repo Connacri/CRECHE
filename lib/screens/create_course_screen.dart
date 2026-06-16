@@ -377,7 +377,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
             _isLoadingClubs
               ? const LinearProgressIndicator()
               : DropdownButtonFormField<UserModel>(
-                  value: _selectedClub,
+                  initialValue: _selectedClub,
                   decoration: const InputDecoration(
                     labelText: 'Club partenaire (Optionnel)',
                     prefixIcon: Icon(Icons.business),
@@ -398,7 +398,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 Expanded(
                   child: DropdownButtonFormField<CourseCategory>(
                     isExpanded: true,
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     decoration: const InputDecoration(labelText: 'Catégorie', prefixIcon: Icon(Icons.category)),
                     items: CourseCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.displayName))).toList(),
                     onChanged: (val) => setState(() => _selectedCategory = val!),
@@ -408,7 +408,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 Expanded(
                   child: DropdownButtonFormField<CourseSeason>(
                     isExpanded: true,
-                    value: _selectedSeason,
+                    initialValue: _selectedSeason,
                     decoration: const InputDecoration(labelText: 'Saison', prefixIcon: Icon(Icons.calendar_today)),
                     items: CourseSeason.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName))).toList(),
                     onChanged: (val) {
@@ -439,7 +439,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 Expanded(
                   child: DropdownButtonFormField<CoursePricingType>(
                     isExpanded: true,
-                    value: _selectedPricingType,
+                    initialValue: _selectedPricingType,
                     decoration: const InputDecoration(labelText: 'Type de prix', prefixIcon: Icon(Icons.payments_outlined)),
                     items: CoursePricingType.values.map((p) => DropdownMenuItem(value: p, child: Text(p.displayName))).toList(),
                     onChanged: (val) => setState(() => _selectedPricingType = val!),
@@ -485,7 +485,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     Text('Planning hebdomadaire', style: Theme.of(context).textTheme.titleMedium),
     const SizedBox(height: 16),
     DropdownButtonFormField<int>(
-      value: _selectedDayOfWeek,
+      initialValue: _selectedDayOfWeek,
       decoration: const InputDecoration(labelText: 'Jour de la semaine', prefixIcon: Icon(Icons.calendar_view_week)),
       items: [
         const DropdownMenuItem(value: null, child: Text('Non spécifié')),
@@ -535,7 +535,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     _isLoadingCoaches
       ? const LinearProgressIndicator()
       : DropdownButtonFormField<UserModel>(
-          value: _selectedCoach,
+          initialValue: _selectedCoach,
           decoration: const InputDecoration(labelText: 'Coach / Enseignant', prefixIcon: Icon(Icons.person)),
           items: [
             const DropdownMenuItem<UserModel>(value: null, child: Text('À définir')),

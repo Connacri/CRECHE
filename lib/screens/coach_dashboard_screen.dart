@@ -191,7 +191,7 @@ class _ClubTimetablePageState extends State<_ClubTimetablePage> {
         Padding(
           padding: const EdgeInsets.all(24),
           child: DropdownButtonFormField<String>(
-            value: _selectedSchoolId,
+            initialValue: _selectedSchoolId,
             items: _schools.map((s) => DropdownMenuItem<String>(value: s["id"].toString(), child: Text(s["name"]?.toString() ?? "Inconnu"))).toList(),
             onChanged: (val) {
               setState(() {
