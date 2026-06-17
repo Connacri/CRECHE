@@ -48,7 +48,14 @@ enum CoursePricingType {
   }
 }
 
-enum CourseLevel { beginner, intermediate, advanced, expert; }
+enum CourseLevel {
+  beginner, intermediate, advanced, expert;
+
+  String get displayName {
+    return name[0].toUpperCase() + name.substring(1);
+  }
+}
+
 enum CourseStatus { draft, scheduled, active, completed, cancelled; }
 
 class CourseLocation {
@@ -166,6 +173,7 @@ class CourseModel {
   final int? minAge;
   final int? maxAge;
   final CoursePricingType pricingType;
+  final CourseLevel? level; // À ajouter après pricingType
 
   // === CHAMPS PLANNING HEBDOMADAIRE ===
   final int? dayOfWeek;        // 1 = Lundi → 7 = Dimanche
@@ -198,6 +206,7 @@ class CourseModel {
     this.minAge,
     this.maxAge,
     this.pricingType = CoursePricingType.session,
+    this.level, // À ajouter après pricingType = CoursePricingType.session,
     // Planning
     this.dayOfWeek,
     this.startTime,
@@ -243,6 +252,12 @@ class CourseModel {
         (e) => e.name == data['pricing_type'],
         orElse: () => CoursePricingType.session,
       ),
+      level: data['level'] != null
+          ? CourseLevel.values.firstWhere(
+            (e) => e.name == data['level'],
+        orElse: () => CourseLevel.beginner,
+      )
+          : null,
       // Planning fields
       dayOfWeek: data['day_of_week'],
       startTime: _parseTime(data['start_time']),
@@ -285,6 +300,7 @@ class CourseModel {
       'min_age': minAge,
       'max_age': maxAge,
       'pricing_type': pricingType.name,
+      'level': level?.name, // À ajouter après 'pricing_type': pricingType.name,
       // Planning fields
       'day_of_week': dayOfWeek,
       'start_time': startTime != null ? '${startTime!.hour}:${startTime!.minute.toString().padLeft(2, '0')}' : null,
@@ -318,6 +334,7 @@ class CourseModel {
     int? minAge,
     int? maxAge,
     CoursePricingType? pricingType,
+    CourseLevel? level,
     // Planning
     int? dayOfWeek,
     TimeOfDay? startTime,
@@ -349,6 +366,7 @@ class CourseModel {
       minAge: minAge ?? this.minAge,
       maxAge: maxAge ?? this.maxAge,
       pricingType: pricingType ?? this.pricingType,
+      level: level ?? this.level, // À mettre après pricingType: pricingType ?? this.pricingType,
       // Planning
       dayOfWeek: dayOfWeek ?? this.dayOfWeek,
       startTime: startTime ?? this.startTime,
@@ -370,6 +388,7 @@ class CourseModel {
       seasonStartDate: DateTime.now().subtract(const Duration(days: 365)),
       seasonEndDate: DateTime.now().add(const Duration(days: 365)),
       location: CourseLocation(latitude: 0.0, longitude: 0.0, address: 'N/A'),
+      level: CourseLevel.beginner, // À ajouter après createdAt: DateTime.now(),
       images: [],
       createdBy: 'system',
       createdAt: DateTime.now(),

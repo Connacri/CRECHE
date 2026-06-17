@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:readmore/readmore.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:map_launcher/map_launcher.dart';
 
 import '../models/course_model_complete.dart';
 import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/modern_course_card_widget.dart';
 
 class CourseDetailsScreen extends StatefulWidget {
   final CourseModel course;
@@ -33,14 +34,57 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   bool _isLoadingCreator = true;
   bool _isLoadingCoach = false;
 
+  // Carousel controllers
+  int _currentPage = 0;
+  Timer? _autoScrollTimer;
+  bool _isCarouselPaused = false;
+  final CarouselController _carouselController = CarouselController();
+
   @override
   void initState() {
     super.initState();
     _course = widget.course;
     _loadCreatorInfo();
+    _startAutoScroll();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadEnrollmentData();
     });
+  }
+
+  @override
+  void dispose() {
+    _stopAutoScroll();
+    super.dispose();
+  }
+
+  void _startAutoScroll() {
+    _stopAutoScroll();
+    if (_course.images.length > 1) {
+      _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+        if (!_isCarouselPaused && mounted) {
+          final nextPage = (_currentPage + 1) % _course.images.length;
+          _carouselController.animateTo(
+            nextPage.toDouble(),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _stopAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+  }
+
+  void _toggleCarouselPause() {
+    setState(() {
+      _isCarouselPaused = !_isCarouselPaused;
+    });
+    if (!_isCarouselPaused) {
+      _startAutoScroll();
+    }
   }
 
   Future<void> _loadCreatorInfo() async {
@@ -53,7 +97,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
           _isLoadingCreator = false;
         });
       }
-      
+
       if (_course.coachId != null && _course.coachId!.isNotEmpty && _course.coachId != _course.createdBy) {
         _loadCoachInfo();
       }
@@ -148,6 +192,8 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final hasImages = _course.images.isNotEmpty;
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -170,23 +216,125 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
             ),
             child: IconButton(
               icon: const Icon(Icons.share, color: Colors.white),
-              onPressed: () {},
+              onPressed: () {
+                Share.share(
+                  'Découvrez le cours "${_course.title}" sur CRECHE !\n\n'
+                      '${_course.description}\n\n'
+                      'Lieu : ${_course.location.address}\n'
+                      'Tarif : ${_course.price?.toStringAsFixed(0)} ${_course.metadata?['currency'] ?? "DA"}',
+                );
+              },
             ),
           ),
         ],
       ),
       body: Stack(
         children: [
+          // Carousel d'images en arrière-plan avec CarouselView
           Positioned.fill(
-            child: _course.images.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: _course.images.first.supabaseUrl ?? '',
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(color: Colors.grey[300]),
-                  errorWidget: (context, url, error) => Image.asset('assets/images/meditation_bg.jpg', fit: BoxFit.cover),
-                )
-              : Image.asset('assets/images/meditation_bg.jpg', fit: BoxFit.cover),
+            child: hasImages
+                ? Stack(
+              children: [
+                CarouselView(
+                  controller: _carouselController,
+                  onIndexChanged: (index) {
+                    setState(() => _currentPage = index);
+                  },
+                  itemSnapping: true,
+                  itemExtent: double.infinity,
+                  shrinkExtent: 0.0,
+                  padding: EdgeInsets.zero,
+                  children: _course.images.map((image) {
+                    return CachedNetworkImage(
+                      imageUrl: image.supabaseUrl ?? '',
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Image.asset(
+                        'assets/images/meditation_bg.jpg',
+                        fit: BoxFit.cover,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                // GestureDetector pour capturer les taps sur le carousel
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: _toggleCarouselPause,
+                    behavior: HitTestBehavior.opaque,
+                  ),
+                ),
+                // Indicateurs de page
+                if (_course.images.length > 1)
+                  Positioned(
+                    bottom: 16,
+                    left: 0,
+                    right: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        _course.images.length,
+                            (index) => Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: _currentPage == index ? 12 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: _currentPage == index
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Indicateur de pause
+                if (_isCarouselPaused && _course.images.length > 1)
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.pause_circle_outline,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Pause',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            )
+                : Image.asset(
+              'assets/images/meditation_bg.jpg',
+              fit: BoxFit.cover,
+            ),
           ),
+          // Gradient overlay
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -207,7 +355,10 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 children: [
-                  const SizedBox(height: 200), // Push content down to show background
+                  // Espace pour l'image en arrière-plan
+                  SizedBox(
+                    height: hasImages ? 300 : 200,
+                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
                     child: GlassCard(
@@ -216,6 +367,61 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Miniatures du carousel
+                          if (hasImages && _course.images.length > 1) ...[
+                            SizedBox(
+                              height: 60,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _course.images.length,
+                                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  final isSelected = index == _currentPage;
+                                  final image = _course.images[index];
+                                  return GestureDetector(
+                                    onTap: () {
+                                      _carouselController.animateTo(
+                                        index.toDouble(),
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                      );
+                                    },
+                                    child: Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.white.withValues(alpha: 0.3),
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(9),
+                                        child: CachedNetworkImage(
+                                          imageUrl: image.supabaseUrl ?? '',
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => Container(
+                                            color: Colors.grey[800],
+                                          ),
+                                          errorWidget: (context, url, error) => Container(
+                                            color: Colors.grey[800],
+                                            child: const Icon(
+                                              Icons.broken_image,
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -226,7 +432,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                                   color: Colors.blueAccent,
                                 ),
                               _buildBadge(
-                                '${_course.availableSpots} places',
+                                '${_course.currentStudents}/${_course.maxStudents} inscrits',
                                 color: _course.availableSpots < 5 ? Colors.orange : Colors.green,
                               ),
                             ],
@@ -273,7 +479,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                             ),
                           ],
                           const SizedBox(height: 16),
-                          _buildInfoRow(Icons.location_on_outlined, _course.location.address),
+                          _buildLocationRow(),
                           const SizedBox(height: 12),
                           _buildInfoRow(
                             Icons.calendar_month_outlined,
@@ -303,9 +509,20 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                             trimMode: TrimMode.Line,
                             trimCollapsedText: '... Voir plus',
                             trimExpandedText: ' Voir moins',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
-                            moreStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                            lessStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                            moreStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent,
+                            ),
+                            lessStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent,
+                            ),
                           ),
                           if (_course.tags.isNotEmpty) ...[
                             const SizedBox(height: 24),
@@ -408,6 +625,44 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
     );
   }
 
+  Widget _buildLocationRow() {
+    final fullLocation = [
+      _course.location.address,
+      _course.location.city,
+      _course.location.country
+    ].where((e) => e != null && e.isNotEmpty).join(', ');
+
+    return Row(
+      children: [
+        const Icon(Icons.location_on_outlined, size: 16, color: Colors.white70),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            fullLocation,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+          ),
+        ),
+        IconButton(
+          onPressed: _openInMaps,
+          icon: const Icon(Icons.map_outlined, size: 20, color: Colors.blueAccent),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openInMaps() async {
+    final availableMaps = await MapLauncher.installedMaps;
+    if (availableMaps.isNotEmpty) {
+      await availableMaps.first.showMarker(
+        coords: Coords(_course.location.latitude, _course.location.longitude),
+        title: _course.title,
+        description: _course.location.address,
+      );
+    }
+  }
+
   Widget _buildBadge(String text, {Color? color}) {
     final colorScheme = Theme.of(context).colorScheme;
     final badgeColor = color ?? colorScheme.primary;
@@ -497,7 +752,6 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () {
-                        // Naviguer vers l'ajout d'enfant (via dashboard par ex)
                         Navigator.pop(context);
                       },
                       child: const Text('Ajouter un enfant dans votre profil'),
@@ -535,8 +789,8 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
                           color: isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.05) : Colors.transparent,
                           borderRadius: BorderRadius.circular(15),
                           border: Border.all(
-                            color: isSelected 
-                                ? Theme.of(context).colorScheme.primary 
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
                                 : Colors.grey.withValues(alpha: 0.2),
                             width: isSelected ? 2 : 1,
                           ),
@@ -580,7 +834,7 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
-              child: _isSubmitting 
+              child: _isSubmitting
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Confirmer l\'inscription'),
             ),
@@ -593,7 +847,7 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
 
   Future<void> _submitEnrollment() async {
     setState(() => _isSubmitting = true);
-    
+
     final childProvider = context.read<ChildEnrollmentProvider>();
     bool allSuccess = true;
 
@@ -630,6 +884,44 @@ class _EnrollmentBottomSheetState extends State<_EnrollmentBottomSheet> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Widget pour les chips enfants
+class ChildChip extends StatelessWidget {
+  final String name;
+  final Color primary;
+
+  const ChildChip({
+    super.key,
+    required this.name,
+    required this.primary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.child_care, size: 14, color: primary),
+          const SizedBox(width: 4),
+          Text(
+            name,
+            style: TextStyle(
+              color: primary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

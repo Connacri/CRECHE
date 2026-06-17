@@ -112,9 +112,9 @@ class _CourseCardState extends State<CourseCard> {
                     children: [
                       // Creator (Indispensable)
                       Text(
-                        _isLoadingCreator ? "..." : (_creatorName ?? "Club").toUpperCase(),
+                        _isLoadingCreator ? "..." : "Organisé par : ${_creatorName ?? 'Club'}".toUpperCase(),
                         style: TextStyle(
-                          fontSize: 9, 
+                          fontSize: 8,
                           color: cs.primary, 
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0.5,
@@ -131,6 +131,18 @@ class _CourseCardState extends State<CourseCard> {
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      // Description (Minimalist: Show description in black for white card)
+                      Text(
+                        widget.course.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.black87,
+                          fontSize: 10,
+                          height: 1.1,
                         ),
                       ),
                       const SizedBox(height: 4),
