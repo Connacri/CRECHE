@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/course_model_complete.dart';
+import '../services/auth_service.dart';
 
-class CourseCard extends StatelessWidget   {
+class CourseCard extends StatefulWidget {
   final CourseModel course;
   final VoidCallback onTap;
   final VoidCallback onFavorite;
@@ -20,12 +21,45 @@ class CourseCard extends StatelessWidget   {
     this.rating,
   });
 
+  @override
+  State<CourseCard> createState() => _CourseCardState();
+}
+
+class _CourseCardState extends State<CourseCard> {
+  String? _creatorName;
+  bool _isLoadingCreator = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCreatorInfo();
+  }
+
+  Future<void> _loadCreatorInfo() async {
+    try {
+      final authService = AuthService();
+      final userData = await authService.getUserData(widget.course.createdBy);
+      if (mounted) {
+        setState(() {
+          _creatorName = userData?['name'];
+          _isLoadingCreator = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingCreator = false;
+        });
+      }
+    }
+  }
+
   String get _levelLabel {
-    final min = course.minAge;
-    final max = course.maxAge;
+    final min = widget.course.minAge;
+    final max = widget.course.maxAge;
     if (min != null && max != null) return '$min – $max ans';
     if (min != null) return 'Dès $min ans';
-    return course.category.displayName;
+    return widget.course.category.displayName;
   }
 
   @override
@@ -34,16 +68,16 @@ class CourseCard extends StatelessWidget   {
     final cs = theme.colorScheme;
 
     return Container(
-      height: 220, // Fixed height to ensure stability and alignment
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      height: 160, // Minimalist: Lower height
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -51,125 +85,129 @@ class CourseCard extends StatelessWidget   {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: widget.onTap,
           child: Row(
             children: [
-              // ── ZONE IMAGE (Partie Gauche) ──────────────────────────────
+              // ── IMAGE ──────────────────────────────
               SizedBox(
-                width: 130,
+                width: 120,
                 child: _ImageHeader(
-                  imageUrl: course.images.isNotEmpty
-                      ? course.images.first.supabaseUrl
+                  imageUrl: widget.course.images.isNotEmpty
+                      ? widget.course.images.first.supabaseUrl
                       : null,
-                  isFavorited: isFavorited,
-                  onFavorite: onFavorite,
-                  rating: rating,
+                  isFavorited: widget.isFavorited,
+                  onFavorite: widget.onFavorite,
+                  rating: widget.rating,
                   primary: cs.primary,
+                  category: widget.course.category.displayName,
                 ),
               ),
 
-              // ── ZONE CONTENU (Partie Droite) ────────────────────────────
+              // ── CONTENT ────────────────────────────
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Titre & Badge Niveau
+                      // Creator (Indispensable)
+                      Text(
+                        _isLoadingCreator ? "..." : (_creatorName ?? "Club").toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9, 
+                          color: cs.primary, 
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      // Title
+                      Text(
+                        widget.course.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Location & Age
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Icon(Icons.location_on, size: 10, color: Colors.grey[400]),
+                          const SizedBox(width: 2),
                           Expanded(
                             child: Text(
-                              course.title,
+                              widget.course.location.city ?? widget.course.location.address,
+                              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                                letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _levelLabel,
+                            style: TextStyle(
+                              color: cs.secondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const Spacer(),
+                      
+                      // Bottom Row: Price & Spots
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${(widget.course.price ?? 0).toStringAsFixed(0)} ${widget.course.metadata?['currency'] ?? "DA"}',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                              Text(
+                                widget.course.pricingType.displayName,
+                                style: const TextStyle(fontSize: 8, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: (widget.course.availableSpots < 5 ? Colors.orange : Colors.green).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${widget.course.availableSpots} places',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: widget.course.availableSpots < 5 ? Colors.orange : Colors.green,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      Text(
-                        _levelLabel,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                      ),
-                      // Prix + CTA
-                      Text(
-                        '${(course.price ?? 0).toStringAsFixed(0)} DA / ${course.pricingType.displayName.toLowerCase()}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                          color: cs.onSurface,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
 
-                      // Description (Flexible but constrained)
-                      Expanded(
-                        child: Text(
-                          course.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                            height: 1.3,
-                          ),
+                      // Enrolled Children (Minimalist version - just dots or small text if needed, but let's keep it simple)
+                      if (widget.enrolledChildren.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${widget.enrolledChildren.length} enfant(s) inscrit(s)',
+                          style: TextStyle(fontSize: 8, color: cs.primary, fontWeight: FontWeight.bold),
                         ),
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Enfants inscrits (Compact Row)
-                      if (enrolledChildren.isNotEmpty) ...[
-                        SizedBox(
-                          height: 18,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: enrolledChildren.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 4),
-                            itemBuilder: (context, index) => ChildChip(
-                              name: enrolledChildren[index],
-                              primary: cs.primary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
                       ],
-
-
-
-                      const SizedBox(height: 8),
-                        Align(alignment: Alignment.centerRight,
-                          child: SizedBox(
-                                height: 32,
-                                child: FilledButton(
-                                  onPressed: onTap,
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10)),
-                                    backgroundColor: cs.primary,
-                                  ),
-                                  child: const Text("S'inscrire",
-                                      style: TextStyle(
-                                          fontSize: 11, fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                        ),
-
                     ],
                   ),
                 ),
@@ -188,6 +226,7 @@ class _ImageHeader extends StatelessWidget {
   final VoidCallback onFavorite;
   final double? rating;
   final Color primary;
+  final String category;
 
   const _ImageHeader({
     required this.imageUrl,
@@ -195,6 +234,7 @@ class _ImageHeader extends StatelessWidget {
     required this.onFavorite,
     required this.rating,
     required this.primary,
+    required this.category,
   });
 
   @override
@@ -207,7 +247,6 @@ class _ImageHeader extends StatelessWidget {
             child: _buildImage(cs),
           ),
         ),
-        // Gradient overlay for better text contrast
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -217,9 +256,25 @@ class _ImageHeader extends StatelessWidget {
                 colors: [
                   Colors.black.withValues(alpha: 0.1),
                   Colors.transparent,
-                  Colors.black.withValues(alpha: 0.2),
+                  Colors.black.withValues(alpha: 0.3),
                 ],
               ),
+            ),
+          ),
+        ),
+        // Category Badge on top of image
+        Positioned(
+          top: 10,
+          left: 10,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              category,
+              style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -227,7 +282,7 @@ class _ImageHeader extends StatelessWidget {
         if (rating != null)
           Positioned(
             top: 10,
-            left: 10,
+            right: 10,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
@@ -235,16 +290,12 @@ class _ImageHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
-                mainAxisSize:
-                    MainAxisSize.min, // Fix: Use min size to avoid overflow
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.star_rounded, color: Colors.amber, size: 12),
                   const SizedBox(width: 2),
                   Text(rating!.toStringAsFixed(1),
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold)),
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -261,16 +312,11 @@ class _ImageHeader extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.9),
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2)),
+                  BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2)),
                 ],
               ),
               child: Icon(
-                  isFavorited
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
+                  isFavorited ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                   color: isFavorited ? Colors.red : Colors.grey.shade600,
                   size: 16),
             ),
@@ -293,10 +339,12 @@ class _ImageHeader extends StatelessWidget {
     }
     return Container(
         color: primary.withValues(alpha: 0.05),
-        child: Icon(Icons.image_outlined,
-            color: primary.withValues(alpha: 0.2), size: 40));
+        child: Icon(Icons.image_outlined, color: primary.withValues(alpha: 0.2), size: 40));
   }
 }
+
+
+
 
 class ChildChip extends StatelessWidget {
   final String name;

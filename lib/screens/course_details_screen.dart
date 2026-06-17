@@ -2,10 +2,13 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:readmore/readmore.dart';
 
 import '../models/course_model_complete.dart';
 import '../providers/auth_provider_v2.dart';
 import '../providers/child_enrollment_provider.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/modern_course_card_widget.dart';
 
@@ -25,14 +28,59 @@ class CourseDetailsScreen extends StatefulWidget {
 
 class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   late CourseModel _course;
+  String? _creatorName;
+  String? _coachName;
+  bool _isLoadingCreator = true;
+  bool _isLoadingCoach = false;
 
   @override
   void initState() {
     super.initState();
     _course = widget.course;
+    _loadCreatorInfo();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadEnrollmentData();
     });
+  }
+
+  Future<void> _loadCreatorInfo() async {
+    try {
+      final authService = AuthService();
+      final userData = await authService.getUserData(_course.createdBy);
+      if (mounted) {
+        setState(() {
+          _creatorName = userData?['name'] ?? 'Créateur inconnu';
+          _isLoadingCreator = false;
+        });
+      }
+      
+      if (_course.coachId != null && _course.coachId!.isNotEmpty && _course.coachId != _course.createdBy) {
+        _loadCoachInfo();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _creatorName = 'Erreur chargement';
+          _isLoadingCreator = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadCoachInfo() async {
+    if (mounted) setState(() => _isLoadingCoach = true);
+    try {
+      final authService = AuthService();
+      final userData = await authService.getUserData(_course.coachId!);
+      if (mounted) {
+        setState(() {
+          _coachName = userData?['name'];
+          _isLoadingCoach = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingCoach = false);
+    }
   }
 
   Future<void> _loadEnrollmentData() async {
@@ -44,6 +92,19 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
         childProvider.loadChildren(userId),
         childProvider.loadEnrollments(userId),
       ]);
+    }
+  }
+
+  String _getDayName(int? day) {
+    switch (day) {
+      case 1: return 'Lundi';
+      case 2: return 'Mardi';
+      case 3: return 'Mercredi';
+      case 4: return 'Jeudi';
+      case 5: return 'Vendredi';
+      case 6: return 'Samedi';
+      case 7: return 'Dimanche';
+      default: return 'Non défini';
     }
   }
 
@@ -142,124 +203,208 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
             ),
           ),
           SafeArea(
-            child: Column(
-              children: [
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: GlassCard(
-                    color: Colors.black45,
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildBadge(_course.category.displayName, color: Colors.white70),
-                            _buildBadge(
-                              '${_course.availableSpots} places restantes',
-                              color: _course.availableSpots < 5 ? Colors.orange : Colors.green,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _course.title,
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on_outlined, size: 16, color: Colors.white70),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                _course.location.address,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_month_outlined, size: 16, color: Colors.white70),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Saison : ${_course.season.displayName}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _course.description,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 24),
-                        // Enfants inscrits (Compact Row)
-                        if (widget.enrolledChildren.isNotEmpty) ...[
-                          SizedBox(
-                            height: 18,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: widget.enrolledChildren.length,
-                              separatorBuilder: (_, __) =>
-                              const SizedBox(width: 4),
-                              itemBuilder: (context, index) => ChildChip(
-                                name: widget.enrolledChildren[index],
-                                primary: cs.inversePrimary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Tarif',
-                                  style: TextStyle(fontSize: 12, color: Colors.white70),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  const SizedBox(height: 200), // Push content down to show background
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: GlassCard(
+                      color: Colors.black45,
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildBadge(_course.category.displayName, color: Colors.white70),
+                              if (_course.minAge != null)
+                                _buildBadge(
+                                  '${_course.minAge}${_course.maxAge != null ? "-${_course.maxAge}" : "+"} ans',
+                                  color: Colors.blueAccent,
                                 ),
-                                Text(
-                                  '${_course.price?.toStringAsFixed(0) ?? "0"} DA / ${_course.pricingType.displayName.toLowerCase()}',
-                                  style: const TextStyle(
+                              _buildBadge(
+                                '${_course.availableSpots} places',
+                                color: _course.availableSpots < 5 ? Colors.orange : Colors.green,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _course.title,
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.business_outlined, size: 16, color: Colors.white70),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _isLoadingCreator ? 'Chargement...' : 'Organisé par : $_creatorName',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white70,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_course.coachId != null && (_isLoadingCoach || _coachName != null)) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline, size: 16, color: Colors.white70),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    _isLoadingCoach ? 'Chargement coach...' : 'Coach : $_coachName',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.white70,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            FilledButton(
-                              onPressed: _handleEnrollment,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                              ),
-                              child: const Text('S\'inscrire'),
+                          ],
+                          const SizedBox(height: 16),
+                          _buildInfoRow(Icons.location_on_outlined, _course.location.address),
+                          const SizedBox(height: 12),
+                          _buildInfoRow(
+                            Icons.calendar_month_outlined,
+                            'Saison : ${_course.season.displayName} (${DateFormat('dd/MM').format(_course.seasonStartDate)} au ${DateFormat('dd/MM').format(_course.seasonEndDate)})',
+                          ),
+                          if (_course.hasWeeklySchedule) ...[
+                            const SizedBox(height: 12),
+                            _buildInfoRow(
+                              Icons.access_time_outlined,
+                              '${_getDayName(_course.dayOfWeek)} : ${_course.startTime?.format(context)} - ${_course.endTime?.format(context)}',
                             ),
                           ],
-                        ),
-                      ],
+                          if (_course.roomId != null && _course.roomId!.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildInfoRow(Icons.meeting_room_outlined, 'Salle : ${_course.roomId}'),
+                          ],
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Description',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          ReadMoreText(
+                            _course.description,
+                            trimLines: 3,
+                            colorClickableText: Colors.blueAccent,
+                            trimMode: TrimMode.Line,
+                            trimCollapsedText: '... Voir plus',
+                            trimExpandedText: ' Voir moins',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+                            moreStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                            lessStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                          ),
+                          if (_course.tags.isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _course.tags.map((tag) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white24),
+                                ),
+                                child: Text(
+                                  '#$tag',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                                ),
+                              )).toList(),
+                            ),
+                          ],
+                          const SizedBox(height: 24),
+                          // Enfants inscrits (Compact Row)
+                          if (widget.enrolledChildren.isNotEmpty) ...[
+                            const Text(
+                              'Inscriptions actives :',
+                              style: TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 24,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: widget.enrolledChildren.length,
+                                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                itemBuilder: (context, index) => ChildChip(
+                                  name: widget.enrolledChildren[index],
+                                  primary: cs.inversePrimary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Tarif',
+                                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                                    ),
+                                    Text(
+                                      '${_course.price?.toStringAsFixed(0) ?? "0"} ${_course.metadata?['currency'] ?? "DA"} / ${_course.pricingType.displayName.toLowerCase()}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 20,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              FilledButton(
+                                onPressed: _handleEnrollment,
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                  backgroundColor: cs.primary,
+                                ),
+                                child: const Text('S\'inscrire', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.white70),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+          ),
+        ),
+      ],
     );
   }
 
