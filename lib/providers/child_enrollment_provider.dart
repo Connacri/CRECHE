@@ -133,7 +133,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
         _children = data;
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getChildrenStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [ChildEnrollmentProvider] getChildrenStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "children" table in Supabase.');
+        }
+      },
     );
 
     _enrollmentsSubscription?.cancel();
@@ -142,7 +147,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
         _enrollments = data;
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getEnrollmentsStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [ChildEnrollmentProvider] getEnrollmentsStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "enrollments" table in Supabase.');
+        }
+      },
     );
   }
 
@@ -153,7 +163,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
         _dailyActivities = data;
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getDailyActivitiesStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [ChildEnrollmentProvider] getDailyActivitiesStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "daily_activities" table in Supabase.');
+        }
+      },
     );
   }
 
@@ -164,7 +179,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
         _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] getSchedulesByOwnerStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [ChildEnrollmentProvider] getSchedulesByOwnerStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "session_schedules" table in Supabase.');
+        }
+      },
     );
   }
 
@@ -183,7 +203,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
             debugPrint('🔄 [ChildEnrollmentProvider] Enrollments changed, reloading...');
             loadOwnerEnrollmentsDetailed(ownerId);
           },
-          onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] Enrollments Stream Error: $e'),
+          onError: (e) {
+            debugPrint('❌ [ChildEnrollmentProvider] Enrollments Stream Error: $e');
+            if (e.toString().contains('1006')) {
+              debugPrint('💡 TIP: Ensure Realtime is enabled for "enrollments" table in Supabase.');
+            }
+          },
         );
   }
 
@@ -200,7 +225,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
             _expenses = data;
             notifyListeners();
           },
-          onError: (e) => debugPrint('❌ [ChildEnrollmentProvider] Expenses Stream Error: $e'),
+          onError: (e) {
+            debugPrint('❌ [ChildEnrollmentProvider] Expenses Stream Error: $e');
+            if (e.toString().contains('1006')) {
+              debugPrint('💡 TIP: Ensure Realtime is enabled for "club_expenses" table in Supabase.');
+            }
+          },
         );
   }
 

@@ -58,7 +58,12 @@ class CourseProvider extends ChangeNotifier {
         _courses = data;
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [CourseProvider] getCoursesStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [CourseProvider] getCoursesStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "courses" table in Supabase (check "supabase_realtime" publication).');
+        }
+      },
     );
   }
 
@@ -69,7 +74,12 @@ class CourseProvider extends ChangeNotifier {
         _userCourses = data;
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [CourseProvider] getUserCoursesStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [CourseProvider] getUserCoursesStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "courses" table in Supabase.');
+        }
+      },
     );
   }
 
@@ -80,7 +90,12 @@ class CourseProvider extends ChangeNotifier {
         _schedules = data.where((s) => s.schoolId == ownerId || s.coachId == ownerId).toList();
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [CourseProvider] getSchedulesByOwnerStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [CourseProvider] getSchedulesByOwnerStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "session_schedules" table in Supabase.');
+        }
+      },
     );
   }
 
