@@ -424,13 +424,15 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                 ]
                     : daySessions.map((session) => GestureDetector(
                   onTap: () => _showSessionDetails(session),
-                  child: _buildMobileSessionCard(
-                    session,
-                    theme,
-                    daySessions,
-                    hourHeight,
-                  ),
-                )).toList(),
+                  child: _buildSessionBar(
+                  session,
+                  theme,
+                  dayWidth,
+                  hourHeight,
+                  false,
+                  true,
+                ),
+            )).toList(),
               ),
             ),
 
@@ -885,20 +887,19 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ),
           ElevatedButton.icon(
             onPressed: () async {
-              // Close the dialog first
-              Navigator.of(context).pop();
-
-              final courseProvider = context.read<CourseProvider>();
-              await courseProvider.loadCourseById(session.courseId);
-
-              if (!mounted) return;
-              if (courseProvider.selectedCourse != null) {
-                Navigator.of(ctx).push(
-                  MaterialPageRoute(
-                    builder: (_) => CourseDetailsScreen(course: courseProvider.selectedCourse!),
-                  ),
-                );
-              }
+                // Close the dialog first
+                // Close the dialog first
+                Navigator.of(context).pop();
+                final courseProvider = context.read<CourseProvider>();
+                await courseProvider.loadCourseById(session.courseId);
+                if (!mounted) return;
+                if (courseProvider.selectedCourse != null) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CourseDetailsScreen(course: courseProvider.selectedCourse!),
+                    ),
+                  );
+                }
             },
             icon: const Icon(Icons.info_outline),
             label: const Text('Détails'),
@@ -906,9 +907,10 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ElevatedButton.icon(
             onPressed: () async {
               // Close the dialog first
-              Navigator.of(context).pop();
+              final BuildContext ctx = context;
+              Navigator.of(ctx).pop();
 
-              final courseProvider = context.read<CourseProvider>();
+              final courseProvider = ctx.read<CourseProvider>();
               await courseProvider.loadCourseById(session.courseId);
 
               if (!mounted) return;
