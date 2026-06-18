@@ -34,6 +34,7 @@ class _LocationPickerDialogWindowsState
   List<LocationSearchResult> _searchResults = [];
   bool _isSearching = false;
   bool _isLoadingCurrentLocation = false;
+  bool _satelliteMode = false; // Satellite view toggle
 
   // Marqueur de sélection
   final List<Marker> _markers = [];
@@ -301,25 +302,12 @@ class _LocationPickerDialogWindowsState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme
-            .of(context)
-            .colorScheme
-            .primaryContainer,
-        border: Border(
-          bottom: BorderSide(color: Theme
-              .of(context)
-              .dividerColor),
-        ),
+        color: Theme.of(context).colorScheme.primaryContainer,
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.location_on,
-            color: Theme
-                .of(context)
-                .colorScheme
-                .onPrimaryContainer,
-          ),
+          Icon(Icons.location_on, color: Theme.of(context).colorScheme.onPrimaryContainer),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -327,53 +315,39 @@ class _LocationPickerDialogWindowsState
               children: [
                 Text(
                   'Sélectionner une localisation',
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                    color: Theme
-                        .of(context)
-                        .colorScheme
-                        .onPrimaryContainer,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 if (_selectedAddress != null)
                   Text(
                     _selectedAddress!,
-                    style: Theme
-                        .of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(
-                      color:
-                      Theme
-                          .of(context)
-                          .colorScheme
-                          .onPrimaryContainer,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   )
-                else
-                  if (_isLoadingCurrentLocation)
-                    Text(
-                      'Recherche de votre position...',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                        color:
-                        Theme
-                            .of(context)
-                            .colorScheme
-                            .onPrimaryContainer,
-                      ),
+                else if (_isLoadingCurrentLocation)
+                  Text(
+                    'Recherche de votre position...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                     ),
+                  ),
               ],
             ),
+          ),
+          // Satellite toggle button
+          IconButton(
+            tooltip: _satelliteMode ? 'Vue cartographique' : 'Vue satellite',
+            icon: Icon(_satelliteMode ? Icons.map : Icons.satellite),
+            onPressed: () {
+              setState(() {
+                _satelliteMode = !_satelliteMode;
+              });
+            },
           ),
           IconButton(
             icon: const Icon(Icons.close),
@@ -478,7 +452,6 @@ class _LocationPickerDialogWindowsState
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        // API flutter_map version stable
         initialCenter: _selectedPosition ?? LatLng(35.3967, 0.1403),
         initialZoom: 13.0,
         minZoom: 3.0,
@@ -487,7 +460,10 @@ class _LocationPickerDialogWindowsState
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          // Switch between OSM and satellite tiles based on _satelliteMode
+          urlTemplate: _satelliteMode
+              ? 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+              : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.hospitaldz.app',
           maxZoom: 19,
         ),

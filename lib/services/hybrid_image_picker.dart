@@ -6,9 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 
 class HybridImagePickerService {
-  static final ImagePicker _picker = ImagePicker();
-
-  /// Sélectionne une image en fonction de la plateforme
+  // Enhanced image picker service supporting single and multiple image selection.
+  /// Picks a single image, optionally with cropping.
   static Future<File?> pickImage({
     bool crop = false,
     CropAspectRatio? aspectRatio,
@@ -16,37 +15,70 @@ class HybridImagePickerService {
     ImageSource source = ImageSource.gallery,
   }) async {
     final bool isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
-
     if (isDesktop) {
-      debugPrint('ℹ️ [HybridPicker] Utilisation de FilePicker sur Desktop');
+      debugPrint('ℹ️ [HybridPicker] Using FilePicker for single image on Desktop');
       return await _pickImageWithFilePicker(crop: crop, aspectRatio: aspectRatio, context: context);
     }
-
     try {
-      debugPrint('ℹ️ [HybridPicker] Utilisation de ImagePicker sur Mobile');
+      debugPrint('ℹ️ [HybridPicker] Using ImagePicker for single image on Mobile');
       final XFile? pickedXFile = await _picker.pickImage(
         source: source,
         maxWidth: 1920,
         maxHeight: 1080,
         imageQuality: 85,
       );
-
       if (pickedXFile == null) return null;
-
       File pickedFile = File(pickedXFile.path);
-
       if (crop) {
         if (!context.mounted) return pickedFile;
         return await _cropImage(pickedFile, aspectRatio: aspectRatio, context: context);
       }
-
       return pickedFile;
     } catch (e) {
-      debugPrint('❌ [HybridPicker] Erreur ImagePicker: $e');
+      debugPrint('❌ [HybridPicker] ImagePicker error: $e');
       if (!context.mounted) return null;
+      // Fallback to FilePicker if ImagePicker fails
       return await _pickImageWithFilePicker(crop: crop, aspectRatio: aspectRatio, context: context);
     }
   }
+
+  /// Picks multiple images (no cropping).
+  static Future<List<File>?> pickMultipleImages({
+    required BuildContext context,
+  }) async {
+    final bool isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    if (isDesktop) {
+      debugPrint('ℹ️ [HybridPicker] Using FilePicker for multiple images on Desktop');
+      try {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          allowMultiple: true,
+        );
+        if (result == null) return null;
+        return result.paths.whereType<String>().map((p) => File(p)).toList();
+      } catch (e) {
+        debugPrint('❌ [HybridPicker] FilePicker multiple images error: $e');
+        return null;
+      }
+    }
+    try {
+      debugPrint('ℹ️ [HybridPicker] Using ImagePicker for multiple images on Mobile');
+      final List<XFile>? pickedFiles = await _picker.pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      if (pickedFiles == null) return null;
+      return pickedFiles.map((x) => File(x.path)).toList();
+    } catch (e) {
+      debugPrint('❌ [HybridPicker] pickMultiImage error: $e');
+      return null;
+    }
+  }
+
+  static final ImagePicker _picker = ImagePicker();
+
+
 
   /// Méthode interne pour picking d'image via FilePicker (Desktop ou Fallback)
   static Future<File?> _pickImageWithFilePicker({

@@ -37,6 +37,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   CourseCategory _selectedCategory = CourseCategory.other;
   CourseSeason _selectedSeason = CourseSeason.yearRound;
   CoursePricingType _selectedPricingType = CoursePricingType.session;
+  CourseLevel? _selectedLevel;
   DateTime _seasonStartDate = DateTime.now();
   DateTime _seasonEndDate = DateTime.now().add(const Duration(days: 365));
   CourseLocation? _selectedLocation;
@@ -81,6 +82,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     _selectedCategory = course.category;
     _selectedSeason = course.season;
     _selectedPricingType = course.pricingType;
+    _selectedLevel = course.level;
     _seasonStartDate = course.seasonStartDate;
     _seasonEndDate = course.seasonEndDate;
     _selectedLocation = course.location;
@@ -213,11 +215,10 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   }
 
   Future<void> _pickImages() async {
-    final image = await HybridImagePickerService.pickImage(context: context);
-
-    if (image != null) {
+    final images = await HybridImagePickerService.pickMultipleImages(context: context);
+    if (images != null && images.isNotEmpty) {
       setState(() {
-        _selectedImages.add(image);
+        _selectedImages.addAll(images);
       });
     }
   }
@@ -279,6 +280,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         roomId: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
         coachId: _selectedCoach?.uid,
         pricingType: _selectedPricingType,
+        level: _selectedLevel,
       );
     } else {
       success = await courseProvider.updateCourse(
@@ -302,6 +304,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         roomId: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
         coachId: _selectedCoach?.uid,
         pricingType: _selectedPricingType,
+        level: _selectedLevel,
       );
     }
 
@@ -406,25 +409,34 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: DropdownButtonFormField<CourseSeason>(
+                  child: DropdownButtonFormField<CourseLevel>(
                     isExpanded: true,
-                    initialValue: _selectedSeason,
-                    decoration: const InputDecoration(labelText: 'Saison', prefixIcon: Icon(Icons.calendar_today)),
-                    items: CourseSeason.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName))).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedSeason = val;
-                          final dates = val.getDefaultDateRange();
-                          _seasonStartDate = dates!['start']!;
-                          _seasonEndDate = dates['end']!;
-                        });
-                      }
-                    },
+                    initialValue: _selectedLevel,
+                    decoration: const InputDecoration(labelText: 'Niveau', prefixIcon: Icon(Icons.trending_up)),
+                    items: CourseLevel.values.map((l) => DropdownMenuItem(value: l, child: Text(l.displayName))).toList(),
+                    onChanged: (val) => setState(() => _selectedLevel = val),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<CourseSeason>(
+              isExpanded: true,
+              initialValue: _selectedSeason,
+              decoration: const InputDecoration(labelText: 'Saison', prefixIcon: Icon(Icons.calendar_today)),
+              items: CourseSeason.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName))).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedSeason = val;
+                    final dates = val.getDefaultDateRange();
+                    _seasonStartDate = dates!['start']!;
+                    _seasonEndDate = dates['end']!;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 16),
             const SizedBox(height: 16),
             Row(
               children: [

@@ -52,6 +52,18 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant CourseDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.course.id != widget.course.id || oldWidget.course.images.length != widget.course.images.length) {
+      setState(() {
+        _course = widget.course;
+        _currentPage = 0;
+      });
+      _startAutoScroll();
+    }
+  }
+
+  @override
   void dispose() {
     _stopAutoScroll();
     super.dispose();
@@ -63,8 +75,8 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
       _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
         if (!_isCarouselPaused && mounted) {
           final nextPage = (_currentPage + 1) % _course.images.length;
-          _carouselController.animateTo(
-            nextPage.toDouble(),
+          _carouselController.animateToItem(
+            nextPage,
             duration: const Duration(milliseconds: 600),
             curve: Curves.easeInOut,
           );
@@ -233,101 +245,105 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
           // Carousel d'images en arrière-plan avec CarouselView
           Positioned.fill(
             child: hasImages
-                ? Stack(
-              children: [
-                CarouselView(
-                  controller: _carouselController,
-                  onIndexChanged: (index) {
-                    setState(() => _currentPage = index);
-                  },
-                  itemSnapping: true,
-                  itemExtent: double.infinity,
-                  shrinkExtent: 0.0,
-                  padding: EdgeInsets.zero,
-                  children: _course.images.map((image) {
-                    return CachedNetworkImage(
-                      imageUrl: image.supabaseUrl ?? '',
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: Colors.grey[300],
-                        child: const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Image.asset(
-                        'assets/images/meditation_bg.jpg',
-                        fit: BoxFit.cover,
-                      ),
-                    );
-                  }).toList(),
-                ),
-                // GestureDetector pour capturer les taps sur le carousel
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: _toggleCarouselPause,
-                    behavior: HitTestBehavior.opaque,
-                  ),
-                ),
-                // Indicateurs de page
-                if (_course.images.length > 1)
-                  Positioned(
-                    bottom: 16,
-                    left: 0,
-                    right: 0,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        _course.images.length,
-                            (index) => Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: _currentPage == index ? 12 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _currentPage == index
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                // Indicateur de pause
-                if (_isCarouselPaused && _course.images.length > 1)
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.pause_circle_outline,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Pause',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                ? LayoutBuilder(
+              builder: (context, constraints) {
+                return Stack(
+                  children: [
+                    CarouselView(
+                      controller: _carouselController,
+                      onIndexChanged: (index) {
+                        setState(() => _currentPage = index);
+                      },
+                      itemSnapping: true,
+                      itemExtent: constraints.maxWidth,
+                      shrinkExtent: 0.0,
+                      padding: EdgeInsets.zero,
+                      children: _course.images.map((image) {
+                        return CachedNetworkImage(
+                          imageUrl: image.supabaseUrl ?? '',
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
                             ),
                           ),
-                        ],
+                          errorWidget: (context, url, error) => Image.asset(
+                            'assets/images/meditation_bg.jpg',
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    // GestureDetector pour capturer les taps sur le carousel
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: _toggleCarouselPause,
+                        behavior: HitTestBehavior.opaque,
                       ),
                     ),
-                  ),
-              ],
+                    // Indicateurs de page
+                    if (_course.images.length > 1)
+                      Positioned(
+                        bottom: 16,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            _course.images.length,
+                                (index) => Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: _currentPage == index ? 12 : 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: _currentPage == index
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    // Indicateur de pause
+                    if (_isCarouselPaused && _course.images.length > 1)
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.pause_circle_outline,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'Pause',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }
             )
                 : Image.asset(
               'assets/images/meditation_bg.jpg',
@@ -380,8 +396,8 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                                   final image = _course.images[index];
                                   return GestureDetector(
                                     onTap: () {
-                                      _carouselController.animateTo(
-                                        index.toDouble(),
+                                      _carouselController.animateToItem(
+                                        index,
                                         duration: const Duration(milliseconds: 300),
                                         curve: Curves.easeInOut,
                                       );
@@ -422,10 +438,14 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                             ),
                             const SizedBox(height: 16),
                           ],
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.spaceBetween,
                             children: [
                               _buildBadge(_course.category.displayName, color: Colors.white70),
+                              if (_course.level != null)
+                                _buildBadge(_course.level!.displayName, color: Colors.purpleAccent),
                               if (_course.minAge != null)
                                 _buildBadge(
                                   '${_course.minAge}${_course.maxAge != null ? "-${_course.maxAge}" : "+"} ans',
@@ -653,13 +673,28 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   }
 
   Future<void> _openInMaps() async {
-    final availableMaps = await MapLauncher.installedMaps;
-    if (availableMaps.isNotEmpty) {
-      await availableMaps.first.showMarker(
-        coords: Coords(_course.location.latitude, _course.location.longitude),
-        title: _course.title,
-        description: _course.location.address,
-      );
+    try {
+      final availableMaps = await MapLauncher.installedMaps;
+      if (availableMaps.isNotEmpty) {
+        await availableMaps.first.showMarker(
+          coords: Coords(_course.location.latitude, _course.location.longitude),
+          title: _course.title,
+          description: _course.location.address,
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Aucune application de cartographie installée')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error launching map: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'ouvrir la carte. Veuillez redémarrer l\'application.')),
+        );
+      }
     }
   }
 

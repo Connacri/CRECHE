@@ -15,9 +15,8 @@ class ClubSchoolPlanningScreen extends StatefulWidget {
 }
 
 class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
-  static const int START_HOUR = 8;
-  static const int END_HOUR = 20;
-  static const int TOTAL_HOURS = END_HOUR - START_HOUR;
+  int _startHour = 8;
+  int _endHour = 22;
 
   @override
   void initState() {
@@ -29,10 +28,43 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
     });
   }
 
+  void _calculateHourRange(Map<DayOfWeek, List<SessionSchedule>> schedule) {
+    int minStart = 8;
+    int maxEnd = 22;
+
+    bool first = true;
+    for (var sessions in schedule.values) {
+      for (var session in sessions) {
+        final startHour = session.timeSlot.start.hour;
+        final endHour = session.timeSlot.end.minute > 0 
+            ? session.timeSlot.end.hour + 1 
+            : session.timeSlot.end.hour;
+
+        if (first) {
+          minStart = startHour;
+          maxEnd = endHour;
+          first = false;
+        } else {
+          if (startHour < minStart) minStart = startHour;
+          if (endHour > maxEnd) maxEnd = endHour;
+        }
+      }
+    }
+
+    // Garder une marge ou des valeurs par défaut raisonnables
+    _startHour = minStart.clamp(0, 8);
+    _endHour = maxEnd.clamp(20, 24);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ScheduleProvider>();
     final schedule = provider.weeklySchedule;
+    
+    // Calcul de la plage horaire dynamique
+    _calculateHourRange(schedule);
+    final totalHours = _endHour - _startHour;
+
     final theme = Theme.of(context);
     final screenSize = MediaQuery.of(context).size;
     final isDesktop = screenSize.width >= 900;
@@ -42,7 +74,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       appBar: _buildAppBar(theme, provider, isDesktop),
       body: provider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _buildScheduleGrid(schedule, theme, screenSize, isDesktop),
+          : _buildScheduleGrid(schedule, theme, screenSize, isDesktop, totalHours),
       floatingActionButton: _buildFAB(theme),
     );
   }
@@ -117,6 +149,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       ThemeData theme,
       Size screenSize,
       bool isDesktop,
+      int totalHours,
       ) {
     final isMobile = screenSize.width < 600;
     final isTablet = screenSize.width >= 600 && screenSize.width < 900;
@@ -134,7 +167,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
         if (isDesktop) {
           // Desktop : Occupe toute la largeur
           dayWidth = (availableWidth - 60) / 7; // -60 pour l'espace des heures
-          hourHeight = (availableHeight - 100) / TOTAL_HOURS;
+          hourHeight = (availableHeight - 100) / totalHours;
           hourHeight = hourHeight.clamp(40.0, 80.0);
           headerHeight = 60.0;
         } else if (isTablet) {
@@ -186,6 +219,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                       dayWidth,
                       hourHeight,
                       headerHeight,
+                      totalHours,
                     ),
                   ),
                 ),
@@ -204,6 +238,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       double dayWidth,
       double hourHeight,
       double headerHeight,
+      int totalHours,
       ) {
     final days = DayOfWeek.values;
 
@@ -218,8 +253,8 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           children: [
             // 1. Grille de fond (Heures et lignes)
             Column(
-              children: List.generate(TOTAL_HOURS, (hourIndex) {
-                final hour = START_HOUR + hourIndex;
+              children: List.generate(totalHours, (hourIndex) {
+                final hour = _startHour + hourIndex;
                 return _buildHourRow(
                   hour,
                   days,
@@ -273,7 +308,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       List<SessionSchedule> daySessions,
       ) {
     // Calcul de la position top par rapport au début de la grille
-    final startMinutes = (session.timeSlot.start.hour - START_HOUR) * 60 + session.timeSlot.start.minute;
+    final startMinutes = (session.timeSlot.start.hour - _startHour) * 60 + session.timeSlot.start.minute;
     final top = (startMinutes / 60.0) * hourHeight;
 
     // Calcul de la hauteur totale selon la durée

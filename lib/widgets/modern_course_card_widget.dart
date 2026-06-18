@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../models/course_model_complete.dart';
 import '../services/auth_service.dart';
+import '../providers/auth_provider_v2.dart';
 
 class CourseCard extends StatefulWidget {
   final CourseModel course;
@@ -57,174 +59,218 @@ class _CourseCardState extends State<CourseCard> {
   String get _levelLabel {
     final min = widget.course.minAge;
     final max = widget.course.maxAge;
-    if (min != null && max != null) return '$min – $max ans';
-    if (min != null) return 'Dès $min ans';
-    return widget.course.category.displayName;
+    final level = widget.course.level;
+
+    String label = '';
+    if (level != null) {
+      label += '${level.displayName} • ';
+    }
+
+    if (min != null && max != null) {
+      label += '$min – $max ans';
+    } else if (min != null) {
+      label += 'Dès $min ans';
+    } else if (label.isEmpty) {
+      label = widget.course.category.displayName;
+    } else {
+      label = label.substring(0, label.length - 3); // Remove trailing bullet
+    }
+
+    return label;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final authProvider = context.watch<AuthProviderV2>();
+    final isParent = authProvider.userRole == 'parent';
+    final isDisabled = !widget.course.isActive && isParent;
 
-    return Container(
-      height: 160, // Minimalist: Lower height
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onTap,
-          child: Row(
-            children: [
-              // ── IMAGE ──────────────────────────────
-              SizedBox(
-                width: 120,
-                child: _ImageHeader(
-                  imageUrl: widget.course.images.isNotEmpty
-                      ? widget.course.images.first.supabaseUrl
-                      : null,
-                  isFavorited: widget.isFavorited,
-                  onFavorite: widget.onFavorite,
-                  rating: widget.rating,
-                  primary: cs.primary,
-                  category: widget.course.category.displayName,
-                ),
+    return ColorFiltered(
+      colorFilter: isDisabled
+          ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
+          : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+      child: Opacity(
+        opacity: isDisabled ? 0.6 : 1.0,
+        child: Container(
+          height: 160, // Minimalist: Lower height
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isDisabled ? null : widget.onTap,
+              child: Row(
+                children: [
+                  // ── IMAGE ──────────────────────────────
+                  SizedBox(
+                    width: 120,
+                    child: _ImageHeader(
+                      imageUrl: widget.course.images.isNotEmpty
+                          ? widget.course.images.first.supabaseUrl
+                          : null,
+                      isFavorited: widget.isFavorited,
+                      onFavorite: widget.onFavorite,
+                      rating: widget.rating,
+                      primary: cs.primary,
+                      category: widget.course.category.displayName,
+                    ),
+                  ),
 
-              // ── CONTENT ────────────────────────────
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Creator (Indispensable)
-                      Text(
-                        _isLoadingCreator ? "..." : "Organisé par : ${_creatorName ?? 'Club'}".toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 8,
-                          color: cs.primary, 
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      // Title
-                      Text(
-                        widget.course.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      // Description (Minimalist: Show description in black for white card)
-                      Text(
-                        widget.course.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.black87,
-                          fontSize: 10,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Location & Age
-                      Row(
+                  // ── CONTENT ────────────────────────────
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.location_on, size: 10, color: Colors.grey[400]),
-                          const SizedBox(width: 2),
-                          Expanded(
-                            child: Text(
-                              widget.course.location.city ?? widget.course.location.address,
-                              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _levelLabel,
-                            style: TextStyle(
-                              color: cs.secondary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      const Spacer(),
-                      
-                      // Bottom Row: Price & Spots
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          // Creator (Indispensable)
+                          Row(
                             children: [
-                              Text(
-                                '${(widget.course.price ?? 0).toStringAsFixed(0)} ${widget.course.metadata?['currency'] ?? "DA"}',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
-                                  color: cs.onSurface,
+                              Expanded(
+                                child: Text(
+                                  _isLoadingCreator ? "..." : "Organisé par : ${_creatorName ?? 'Club'}".toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 8, 
+                                    color: cs.primary, 
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              if (isDisabled)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    "INDISPONIBLE",
+                                    style: TextStyle(color: Colors.red, fontSize: 7, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          // Title
+                          Text(
+                            widget.course.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          // Description (Minimalist: Show description in black for white card)
+                          Text(
+                            widget.course.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.black87,
+                              fontSize: 10,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Location & Age
+                          Row(
+                            children: [
+                              Icon(Icons.location_on, size: 10, color: Colors.grey[400]),
+                              const SizedBox(width: 2),
+                              Expanded(
+                                child: Text(
+                                  widget.course.location.city ?? widget.course.location.address,
+                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Text(
-                                widget.course.pricingType.displayName,
-                                style: const TextStyle(fontSize: 8, color: Colors.grey),
+                                _levelLabel,
+                                style: TextStyle(
+                                  color: cs.secondary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: (widget.course.availableSpots < 5 ? Colors.orange : Colors.green).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${widget.course.availableSpots} places',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: widget.course.availableSpots < 5 ? Colors.orange : Colors.green,
+                          
+                          const Spacer(),
+                          
+                          // Bottom Row: Price & Spots
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${(widget.course.price ?? 0).toStringAsFixed(0)} ${widget.course.metadata?['currency'] ?? "DA"}',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                  Text(
+                                    widget.course.pricingType.displayName,
+                                    style: const TextStyle(fontSize: 8, color: Colors.grey),
+                                  ),
+                                ],
                               ),
-                            ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: (widget.course.availableSpots < 5 ? Colors.orange : Colors.green).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${widget.course.availableSpots} places',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: widget.course.availableSpots < 5 ? Colors.orange : Colors.green,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+
+                          // Enrolled Children (Minimalist version - just dots or small text if needed, but let's keep it simple)
+                          if (widget.enrolledChildren.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${widget.enrolledChildren.length} enfant(s) inscrit(s)',
+                              style: TextStyle(fontSize: 8, color: cs.primary, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ],
                       ),
-
-                      // Enrolled Children (Minimalist version - just dots or small text if needed, but let's keep it simple)
-                      if (widget.enrolledChildren.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '${widget.enrolledChildren.length} enfant(s) inscrit(s)',
-                          style: TextStyle(fontSize: 8, color: cs.primary, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

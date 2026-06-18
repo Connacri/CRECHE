@@ -161,6 +161,7 @@ class CourseProvider extends ChangeNotifier {
     List<String> tags = const [],
     Map<String, dynamic>? metadata,
     CoursePricingType pricingType = CoursePricingType.session,
+    CourseLevel? level,
     Function(int current, int total)? onImageUploadProgress,
   }) async {
     try {
@@ -198,6 +199,7 @@ class CourseProvider extends ChangeNotifier {
            'currency': currency,
         },
         pricingType: pricingType,
+        level: level,
       );
 
       final courseId = await _courseService.createCourse(newCourse);
@@ -257,6 +259,7 @@ class CourseProvider extends ChangeNotifier {
     String? clubId,
     Map<String, dynamic>? metadata,
     CoursePricingType? pricingType,
+    CourseLevel? level,
     Function(int current, int total)? onImageUploadProgress,
   }) async {
     try {
@@ -289,6 +292,7 @@ class CourseProvider extends ChangeNotifier {
       if (clubId != null) updates['club_id'] = clubId;
       if (metadata != null) updates['metadata'] = metadata;
       if (pricingType != null) updates['pricing_type'] = pricingType.name;
+      if (level != null) updates['level'] = level.name;
 
       if (newImageFiles != null && newImageFiles.isNotEmpty) {
         final uploadedImages = await _imageService.uploadMultipleCourseImages(

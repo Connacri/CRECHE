@@ -4,6 +4,8 @@
 // Initialise automatiquement la carte sur la position actuelle
 // ============================================================================
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 
@@ -29,8 +31,12 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
   List<LocationSearchResult> _searchResults = [];
   bool _isSearching = false;
   bool _isLoadingCurrentLocation = false;
+  bool _isLoadingAddress = false;
+  bool _satelliteMode = false;
   bool _mapReady = false;
   bool _initialLocationSet = false;
+  Timer? _searchDebounce;
+  GeoPoint? _lastMarkerPosition;
 
   @override
   void initState() {
@@ -49,8 +55,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
       _selectedAddress = widget.initialLocation!.address;
       _initialLocationSet = true;
 
-      debugPrint('🔵 [LocationPicker] Position initiale fournie: ${initialPosition
-          .latitude}, ${initialPosition.longitude}');
+      debugPrint('🔵 [LocationPicker] Position initiale fournie: ${initialPosition.latitude}, ${initialPosition.longitude}');
     } else {
       // Position par défaut (Mascara, Algérie) - sera remplacée par la position actuelle
       initialPosition = GeoPoint(latitude: 35.3967, longitude: 0.1403);
@@ -75,6 +80,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _mapController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -84,14 +90,16 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     if (!mounted) return;
 
     debugPrint('🔵 [LocationPicker] _loadCurrentLocation - DÉBUT');
-    setState(() => _isLoadingCurrentLocation = true);
+    setState(() {
+      _isLoadingCurrentLocation = true;
+      _isLoadingAddress = true;
+    });
 
     try {
       final position = await _locationService.getCurrentPosition();
 
       if (position != null && mounted) {
-        debugPrint('✅ [LocationPicker] Position obtenue: ${position
-            .latitude}, ${position.longitude}');
+        debugPrint('✅ [LocationPicker] Position obtenue: ${position.latitude}, ${position.longitude}');
 
         setState(() {
           _selectedPosition = position;
@@ -109,16 +117,28 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         );
 
         if (mounted) {
-          setState(() => _selectedAddress = address);
+          setState(() {
+            _selectedAddress = address;
+            _isLoadingAddress = false;
+          });
           debugPrint('✅ [LocationPicker] Adresse: $address');
         }
       } else {
-        debugPrint(
-            '⚠️ [LocationPicker] Position NULL, utilisation position par défaut');
+        debugPrint('⚠️ [LocationPicker] Position NULL, utilisation position par défaut');
+        if (mounted) {
+          setState(() {
+            _isLoadingAddress = false;
+          });
+        }
       }
     } catch (e, stackTrace) {
       debugPrint('❌ [LocationPicker] Erreur chargement position: $e');
       debugPrint('❌ [LocationPicker] StackTrace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _isLoadingAddress = false;
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoadingCurrentLocation = false);
@@ -132,8 +152,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     if (!_mapReady) return;
 
     try {
-      debugPrint('🔵 [LocationPicker] Centrage carte sur: ${position
-          .latitude}, ${position.longitude}');
+      debugPrint('🔵 [LocationPicker] Centrage carte sur: ${position.latitude}, ${position.longitude}');
 
       await _mapController.moveTo(position, animate: true);
       await _mapController.setZoom(zoomLevel: 15);
@@ -197,9 +216,14 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
   }
 
   Future<void> _onMapTap(GeoPoint position) async {
+    // Masquer le clavier si ouvert
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _selectedPosition = position;
       _selectedAddress = null;
+      _isLoadingAddress = true;
+      _searchResults = [];
     });
 
     await _addMarkerAtPosition(position);
@@ -210,7 +234,10 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     );
 
     if (mounted) {
-      setState(() => _selectedAddress = address);
+      setState(() {
+        _selectedAddress = address;
+        _isLoadingAddress = false;
+      });
     }
   }
 
@@ -218,11 +245,13 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     if (!_mapReady) return;
 
     try {
-      // Supprimer tous les marqueurs existants
-      try {
-        await _mapController.removeMarker(position);
-      } catch (e) {
-        // Ignorer l'erreur si le marqueur n'existe pas
+      // Supprimer le dernier marqueur ajouté
+      if (_lastMarkerPosition != null) {
+        try {
+          await _mapController.removeMarker(_lastMarkerPosition!);
+        } catch (e) {
+          debugPrint('⚠️ Erreur suppression marqueur: $e');
+        }
       }
 
       // Ajouter le nouveau marqueur
@@ -237,8 +266,9 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         ),
       );
 
-      debugPrint('✅ [LocationPicker] Marqueur ajouté à: ${position
-          .latitude}, ${position.longitude}');
+      _lastMarkerPosition = position;
+
+      debugPrint('✅ [LocationPicker] Marqueur ajouté à: ${position.latitude}, ${position.longitude}');
     } catch (e) {
       debugPrint('❌ [LocationPicker] Erreur ajout marqueur: $e');
     }
@@ -323,41 +353,54 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (_selectedAddress != null)
+                if (_isLoadingAddress)
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Recherche de l\'adresse...',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                      ),
+                    ],
+                  )
+                else if (_selectedAddress != null)
                   Text(
                     _selectedAddress!,
-                    style: Theme
-                        .of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(
-                      color:
-                      Theme
-                          .of(context)
-                          .colorScheme
-                          .onPrimaryContainer,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   )
-                else
-                  if (_isLoadingCurrentLocation)
-                    Text(
-                      'Recherche de votre position...',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                        color:
-                        Theme
-                            .of(context)
-                            .colorScheme
-                            .onPrimaryContainer,
-                      ),
-                    ),
+                else if (_isLoadingCurrentLocation)
+                  Text(
+                    'Recherche de votre position...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                  ),
               ],
             ),
+          ),
+          IconButton(
+            icon: Icon(_satelliteMode ? Icons.satellite_alt : Icons.map),
+            tooltip: _satelliteMode ? 'Vue standard' : 'Vue satellite',
+            onPressed: () {
+              setState(() {
+                _satelliteMode = !_satelliteMode;
+              });
+              _applyTileLayer();
+            },
           ),
           IconButton(
             icon: const Icon(Icons.close),
@@ -402,9 +445,14 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                 ),
               ),
               onChanged: (value) {
-                if (value.length >= 3) {
-                  _searchLocation(value);
-                }
+                if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
+                _searchDebounce = Timer(const Duration(milliseconds: 600), () {
+                  if (value.length >= 3) {
+                    _searchLocation(value);
+                  } else if (value.isEmpty) {
+                    setState(() => _searchResults = []);
+                  }
+                });
               },
             ),
           ),
@@ -487,11 +535,18 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         roadConfiguration: const RoadOption(
           roadColor: Colors.blue,
         ),
+        // Tile layer will be set dynamically via _applyTileLayer()
       ),
+      onGeoPointClicked: (geoPoint) async {
+        await _onMapTap(geoPoint);
+      },
       onMapIsReady: (isReady) async {
         if (isReady && mounted) {
           debugPrint('✅ [LocationPicker] Carte prête');
           setState(() => _mapReady = true);
+
+          // Apply the appropriate tile layer based on current mode
+          await _applyTileLayer();
 
           // Si on a une position initiale fournie, ajouter le marqueur
           if (_initialLocationSet && _selectedPosition != null) {
@@ -505,13 +560,57 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
           }
         }
       },
-      onGeoPointClicked: (geoPoint) async {
-        await _onMapTap(geoPoint);
-      },
     );
   }
 
-  Widget _buildFooter(BuildContext context) {
+  /// Applies the appropriate tile layer based on [_satelliteMode].
+  /// Uses `MapController.changeTileLayer` to switch between the default OSM tiles
+  /// and a satellite tile source.
+  Future<void> _applyTileLayer() async {
+    if (!_mapReady) return;
+    try {
+      if (_satelliteMode) {
+        // Satellite tile source (ArcGIS World Imagery)
+        await _mapController.changeTileLayer(
+          tileLayer: CustomTile(
+            sourceName: "arcgis_satellite",
+            tileExtension: ".png",
+            minZoomLevel: 1,
+            maxZoomLevel: 20,
+            urlsServers: [
+              TileURLs(
+                url:
+                    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+              ),
+            ],
+          ),
+        );
+        debugPrint('✅ Satellite tile layer applied');
+      } else {
+        // Default OSM tile layer – reset to plugin default by providing null or
+        // a basic OSM tile configuration.
+        await _mapController.changeTileLayer(
+          tileLayer: CustomTile(
+            sourceName: "osm",
+            tileExtension: ".png",
+            minZoomLevel: 1,
+            maxZoomLevel: 19,
+            urlsServers: [
+              TileURLs(
+                url:
+                    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+              ),
+            ],
+          ),
+        );
+        debugPrint('✅ Standard OSM tile layer applied');
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to change tile layer: $e');
+    }
+  }
+
+Widget _buildFooter(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -539,45 +638,34 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                       .textTheme
                       .labelSmall,
                 ),
-                if (_selectedAddress != null)
+                if (_isLoadingAddress)
+                  Text(
+                    'Recherche de l\'adresse...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                  )
+                else if (_selectedAddress != null)
                   Text(
                     _selectedAddress!,
-                    style: Theme
-                        .of(context)
-                        .textTheme
-                        .bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   )
+                else if (_isLoadingCurrentLocation)
+                  Text(
+                    'Recherche de votre position...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                  )
                 else
-                  if (_isLoadingCurrentLocation)
-                    Text(
-                      'Recherche de votre position...',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                        color: Theme
-                            .of(context)
-                            .colorScheme
-                            .secondary,
-                      ),
-                    )
-                  else
-                    Text(
-                      'Cliquez sur la carte pour sélectionner',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                        color: Theme
-                            .of(context)
-                            .colorScheme
-                            .secondary,
-                      ),
-                    ),
+                  Text(
+                    'Cliquez sur la carte pour sélectionner',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                  ),
               ],
             ),
           ),

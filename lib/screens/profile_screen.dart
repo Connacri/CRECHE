@@ -500,15 +500,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           label: const Text('Se déconnecter', style: TextStyle(color: Colors.red)),
           style: TextButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 60),
+
+
         TextButton.icon(
           onPressed: _confirmDeleteAccount,
-          icon: const Icon(Icons.delete_forever, color: Colors.red),
-          label: const Text('Supprimer mon compte définitivement', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          style: TextButton.styleFrom(
-            minimumSize: const Size(double.infinity, 50),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
+         // icon: const Icon(Icons.delete_forever, color: Colors.red),
+          label: const Text('Supprimer mon compte définitivement', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 8)),
+          // style: TextButton.styleFrom(
+          //   minimumSize: const Size(double.infinity, 50),
+          //   padding: const EdgeInsets.symmetric(vertical: 12),
+          // ),
         ),
       ],
     );
