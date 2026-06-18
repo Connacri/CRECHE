@@ -63,7 +63,7 @@ class HybridImagePickerService {
     }
     try {
       debugPrint('ℹ️ [HybridPicker] Using ImagePicker for multiple images on Mobile');
-      final List<XFile>? pickedFiles = await _picker.pickMultiImage(
+      final pickedFiles = await _picker.pickMultiImage(
         maxWidth: 1920,
         maxHeight: 1080,
         imageQuality: 85,

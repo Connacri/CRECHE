@@ -860,7 +860,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
   }
 
   void _showSessionDetails(SessionSchedule session) {
-    final theme = Theme.of(context);
+
     
     showDialog(
       context: context,
@@ -885,18 +885,15 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ),
           ElevatedButton.icon(
             onPressed: () async {
-              final navigator = Navigator.of(context);
+              // Close the dialog first
+              Navigator.of(context).pop();
+
               final courseProvider = context.read<CourseProvider>();
-              
-              // On ferme le dialogue d'abord
-              navigator.pop();
-              
               await courseProvider.loadCourseById(session.courseId);
-              
-              if (courseProvider.selectedCourse != null && mounted) {
-                if (!mounted) return;
-                Navigator.push(
-                  context,
+
+              if (!mounted) return;
+              if (courseProvider.selectedCourse != null) {
+                Navigator.of(ctx).push(
                   MaterialPageRoute(
                     builder: (_) => CourseDetailsScreen(course: courseProvider.selectedCourse!),
                   ),
@@ -908,17 +905,15 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ),
           ElevatedButton.icon(
             onPressed: () async {
-              final navigator = Navigator.of(context);
+              // Close the dialog first
+              Navigator.of(context).pop();
+
               final courseProvider = context.read<CourseProvider>();
-              
-              navigator.pop();
-              
               await courseProvider.loadCourseById(session.courseId);
-              
-              if (courseProvider.selectedCourse != null && mounted) {
-                if (!mounted) return;
-                Navigator.push(
-                  context,
+
+              if (!mounted) return;
+              if (courseProvider.selectedCourse != null) {
+                Navigator.of(ctx).push(
                   MaterialPageRoute(
                     builder: (_) => CreateCourseScreen(courseToEdit: courseProvider.selectedCourse),
                   ),
