@@ -30,7 +30,12 @@ class SchoolProvider extends ChangeNotifier {
         _currentSchoolSlots = data;
         notifyListeners();
       },
-      onError: (e) => debugPrint('❌ [SchoolProvider] getSchoolSlotsStream Error: $e'),
+      onError: (e) {
+        debugPrint('❌ [SchoolProvider] getSchoolSlotsStream Error: $e');
+        if (e.toString().contains('1006')) {
+          debugPrint('💡 TIP: Ensure Realtime is enabled for "school_available_slots" table in Supabase.');
+        }
+      },
     );
   }
 

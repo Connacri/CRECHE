@@ -18,7 +18,8 @@ class SessionSchedule {
   final String? roomName;
   final String? schoolId;
   final bool isActive;
-  final String? courseTitle; // Nouveau champ pour le titre du cours
+  final String? courseTitle;
+  final String? courseCategory;
   final Map<String, dynamic>? recurrence;
   final Map<String, dynamic>? metadata;
 
@@ -40,6 +41,7 @@ class SessionSchedule {
     this.schoolId,
     this.isActive = true,
     this.courseTitle,
+    this.courseCategory,
     this.recurrence,
     this.metadata,
   });
@@ -60,12 +62,15 @@ class SessionSchedule {
 
   /// Désérialisation depuis Supabase
   factory SessionSchedule.fromSupabase(Map<String, dynamic> data) {
-    // Gestion du join avec courses pour le titre
+    // Gestion du join avec courses pour le titre et catégorie
     String? title;
+    String? category;
     if (data['courses'] != null) {
       title = data['courses']['title'];
-    } else if (data['course_title'] != null) {
+      category = data['courses']['category'];
+    } else {
       title = data['course_title'];
+      category = data['course_category'];
     }
 
     return SessionSchedule(
@@ -86,6 +91,7 @@ class SessionSchedule {
       schoolId: data['school_id'],
       isActive: data['is_active'] ?? true,
       courseTitle: title,
+      courseCategory: category,
       recurrence: data['recurrence'],
       metadata: data['metadata'],
     );
@@ -131,6 +137,8 @@ class SessionSchedule {
     String? roomName,
     String? schoolId,
     bool? isActive,
+    String? courseTitle,
+    String? courseCategory,
     Map<String, dynamic>? recurrence,
     Map<String, dynamic>? metadata,
   }) {
@@ -151,6 +159,8 @@ class SessionSchedule {
       roomName: roomName ?? this.roomName,
       schoolId: schoolId ?? this.schoolId,
       isActive: isActive ?? this.isActive,
+      courseTitle: courseTitle ?? this.courseTitle,
+      courseCategory: courseCategory ?? this.courseCategory,
       recurrence: recurrence ?? this.recurrence,
       metadata: metadata ?? this.metadata,
     );

@@ -13,7 +13,7 @@ class ScheduleService {
       // 1. Fetch from session_schedules
       var sessionQuery = _supabase
           .from('session_schedules')
-          .select('*, courses(title)')
+          .select('*, courses(title, category)')
           .eq('is_active', true);
 
       if (courseId != null) sessionQuery = sessionQuery.eq('course_id', courseId);
@@ -77,6 +77,7 @@ class ScheduleService {
             coachId: c['coach_id'],
             roomName: c['room_name'],
             schoolId: c['club_id'],
+            courseCategory: c['category'],
           ));
         }
       }

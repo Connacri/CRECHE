@@ -15,8 +15,7 @@ class ClubSchoolPlanningScreen extends StatefulWidget {
 }
 
 class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
-  int _startHour = 8;
-  int _endHour = 22;
+  String _selectedFilter = 'Tous';
 
   @override
   void initState() {
@@ -28,42 +27,38 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
     });
   }
 
-  void _calculateHourRange(Map<DayOfWeek, List<SessionSchedule>> schedule) {
-    int minStart = 8;
-    int maxEnd = 22;
-
-    bool first = true;
-    for (var sessions in schedule.values) {
-      for (var session in sessions) {
-        final startHour = session.timeSlot.start.hour;
-        final endHour = session.timeSlot.end.minute > 0 
-            ? session.timeSlot.end.hour + 1 
-            : session.timeSlot.end.hour;
-
-        if (first) {
-          minStart = startHour;
-          maxEnd = endHour;
-          first = false;
-        } else {
-          if (startHour < minStart) minStart = startHour;
-          if (endHour > maxEnd) maxEnd = endHour;
-        }
-      }
-    }
-
-    // Garder une marge ou des valeurs par défaut raisonnables
-    _startHour = minStart.clamp(0, 8);
-    _endHour = maxEnd.clamp(20, 24);
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ScheduleProvider>();
-    final schedule = provider.weeklySchedule;
+    Map<DayOfWeek, List<SessionSchedule>> schedule = provider.weeklySchedule;
     
-    // Calcul de la plage horaire dynamique
-    _calculateHourRange(schedule);
-    final totalHours = _endHour - _startHour;
+    // Application du filtre
+    if (_selectedFilter != 'Tous') {
+      final filteredSchedule = <DayOfWeek, List<SessionSchedule>>{};
+      
+      schedule.forEach((day, sessions) {
+        final filteredSessions = sessions.where((session) {
+          if (_selectedFilter == 'Cours') {
+            // Catégories considérées comme "Cours" (Académique/Pro)
+            return !['arts', 'music', 'cooking', 'crafts', 'personalDevelopment'].contains(session.courseCategory);
+          } else if (_selectedFilter == 'Ateliers') {
+            // Catégories considérées comme "Ateliers" (Loisirs/Créativité)
+            return ['arts', 'music', 'cooking', 'crafts', 'personalDevelopment'].contains(session.courseCategory);
+          }
+          return true;
+        }).toList();
+        
+        if (filteredSessions.isNotEmpty) {
+          filteredSchedule[day] = filteredSessions;
+        }
+      });
+      
+      schedule = filteredSchedule;
+    }
+
+    final startHour = provider.minHour;
+    final endHour = provider.maxHour;
+    final totalHours = endHour - startHour;
 
     final theme = Theme.of(context);
     final screenSize = MediaQuery.of(context).size;
@@ -74,7 +69,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       appBar: _buildAppBar(theme, provider, isDesktop),
       body: provider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _buildScheduleGrid(schedule, theme, screenSize, isDesktop, totalHours),
+          : _buildScheduleGrid(schedule, theme, screenSize, isDesktop, totalHours, startHour),
       floatingActionButton: _buildFAB(theme),
     );
   }
@@ -97,11 +92,11 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                _buildFilterChip(theme, 'Tous', true),
+                _buildFilterChip(theme, 'Tous', _selectedFilter == 'Tous'),
                 const SizedBox(width: 8),
-                _buildFilterChip(theme, 'Cours', false),
+                _buildFilterChip(theme, 'Cours', _selectedFilter == 'Cours'),
                 const SizedBox(width: 8),
-                _buildFilterChip(theme, 'Ateliers', false),
+                _buildFilterChip(theme, 'Ateliers', _selectedFilter == 'Ateliers'),
               ],
             ),
           ),
@@ -119,9 +114,13 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
 
   Widget _buildFilterChip(ThemeData theme, String label, bool selected) {
     return FilterChip(
-      label: Text(label, style: TextStyle(fontSize: 12)),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
-      onSelected: (_) {},
+      onSelected: (val) {
+        if (val) {
+          setState(() => _selectedFilter = label);
+        }
+      },
       backgroundColor: theme.colorScheme.surface,
       selectedColor: theme.colorScheme.primaryContainer,
       checkmarkColor: theme.colorScheme.primary,
@@ -135,7 +134,11 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
 
   Widget _buildFAB(ThemeData theme) {
     return FloatingActionButton.extended(
-      onPressed: () {},
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CreateCourseScreen()),
+        );
+      },
       backgroundColor: theme.colorScheme.primary,
       foregroundColor: theme.colorScheme.onPrimary,
       icon: const Icon(Icons.add),
@@ -150,6 +153,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       Size screenSize,
       bool isDesktop,
       int totalHours,
+      int startHour,
       ) {
     final isMobile = screenSize.width < 600;
     final isTablet = screenSize.width >= 600 && screenSize.width < 900;
@@ -220,6 +224,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                       hourHeight,
                       headerHeight,
                       totalHours,
+                      startHour,
                     ),
                   ),
                 ),
@@ -239,6 +244,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       double hourHeight,
       double headerHeight,
       int totalHours,
+      int startHour,
       ) {
     final days = DayOfWeek.values;
 
@@ -254,7 +260,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
             // 1. Grille de fond (Heures et lignes)
             Column(
               children: List.generate(totalHours, (hourIndex) {
-                final hour = _startHour + hourIndex;
+                final hour = startHour + hourIndex;
                 return _buildHourRow(
                   hour,
                   days,
@@ -285,6 +291,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                             dayWidth,
                             hourHeight,
                             daySessions,
+                            startHour,
                           );
                         }).toList(),
                       ),
@@ -306,9 +313,10 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
       double dayWidth,
       double hourHeight,
       List<SessionSchedule> daySessions,
+      int startHour,
       ) {
     // Calcul de la position top par rapport au début de la grille
-    final startMinutes = (session.timeSlot.start.hour - _startHour) * 60 + session.timeSlot.start.minute;
+    final startMinutes = (session.timeSlot.start.hour - startHour) * 60 + session.timeSlot.start.minute;
     final top = (startMinutes / 60.0) * hourHeight;
 
     // Calcul de la hauteur totale selon la durée
@@ -371,7 +379,7 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(
+                  FaIcon(
                     _getDayIcon(day),
                     size: 20,
                     color: theme.colorScheme.primary,
@@ -424,13 +432,11 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
                 ]
                     : daySessions.map((session) => GestureDetector(
                   onTap: () => _showSessionDetails(session),
-                  child: _buildSessionBar(
+                  child: _buildMobileSessionCard(
                   session,
                   theme,
-                  dayWidth,
+                  daySessions,
                   hourHeight,
-                  false,
-                  true,
                 ),
             )).toList(),
               ),
@@ -449,23 +455,22 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
     );
   }
 
-  IconData _getDayIcon(DayOfWeek day) {
+  FaIconData _getDayIcon(DayOfWeek day) {
     switch (day) {
       case DayOfWeek.monday:
-        return FontAwesomeIcons.calendar.data;
-
+        return FontAwesomeIcons.calendar;
       case DayOfWeek.tuesday:
-        return FontAwesomeIcons.calendar.data;
+        return FontAwesomeIcons.calendar;
       case DayOfWeek.wednesday:
-        return FontAwesomeIcons.calendar.data;
+        return FontAwesomeIcons.calendar;
       case DayOfWeek.thursday:
-        return FontAwesomeIcons.calendar.data;
+        return FontAwesomeIcons.calendar;
       case DayOfWeek.friday:
-        return FontAwesomeIcons.calendar.data;
+        return FontAwesomeIcons.calendar;
       case DayOfWeek.saturday:
-        return FontAwesomeIcons.calendar.data;
+        return FontAwesomeIcons.calendar;
       case DayOfWeek.sunday:
-        return FontAwesomeIcons.calendar.data;
+        return FontAwesomeIcons.calendar;
     }
   }
 
@@ -888,13 +893,13 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ElevatedButton.icon(
             onPressed: () async {
                 // Close the dialog first
-                // Close the dialog first
-                Navigator.of(context).pop();
+                final NavigatorState navigator = Navigator.of(context);
+                navigator.pop();
                 final courseProvider = context.read<CourseProvider>();
                 await courseProvider.loadCourseById(session.courseId);
                 if (!mounted) return;
                 if (courseProvider.selectedCourse != null) {
-                  Navigator.of(context).push(
+                  navigator.push(
                     MaterialPageRoute(
                       builder: (_) => CourseDetailsScreen(course: courseProvider.selectedCourse!),
                     ),
@@ -907,15 +912,15 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
           ElevatedButton.icon(
             onPressed: () async {
               // Close the dialog first
-              final BuildContext ctx = context;
-              Navigator.of(ctx).pop();
+              final NavigatorState navigator = Navigator.of(context);
+              navigator.pop();
 
-              final courseProvider = ctx.read<CourseProvider>();
+              final courseProvider = context.read<CourseProvider>();
               await courseProvider.loadCourseById(session.courseId);
 
               if (!mounted) return;
               if (courseProvider.selectedCourse != null) {
-                Navigator.of(ctx).push(
+                navigator.push(
                   MaterialPageRoute(
                     builder: (_) => CreateCourseScreen(courseToEdit: courseProvider.selectedCourse),
                   ),
@@ -959,9 +964,11 @@ class _ClubSchoolPlanningScreenState extends State<ClubSchoolPlanningScreen> {
               }
 
               if (mounted && success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Supprimé avec succès')),
-                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Supprimé avec succès')),
+                  );
+                }
               }
             },
             child: const Text('Supprimer', style: TextStyle(color: Colors.red)),

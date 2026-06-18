@@ -19,6 +19,29 @@ class ScheduleProvider with ChangeNotifier {
   Map<DayOfWeek, List<SessionSchedule>> get weeklySchedule => _weeklySchedule;
   bool get isLoading => _isLoading;
 
+  int get minHour {
+    int min = 8;
+    for (var sessions in _weeklySchedule.values) {
+      for (var session in sessions) {
+        if (session.timeSlot.start.hour < min) min = session.timeSlot.start.hour;
+      }
+    }
+    return min.clamp(0, 8);
+  }
+
+  int get maxHour {
+    int max = 22;
+    for (var sessions in _weeklySchedule.values) {
+      for (var session in sessions) {
+        final endHour = session.timeSlot.end.minute > 0 
+            ? session.timeSlot.end.hour + 1 
+            : session.timeSlot.end.hour;
+        if (endHour > max) max = endHour;
+      }
+    }
+    return max.clamp(20, 24);
+  }
+
   String? get currentCoachId => _currentCoachId;
   String? get currentCourseId => _currentCourseId;
   String? get currentSchoolId => _currentSchoolId;
@@ -47,9 +70,16 @@ class ScheduleProvider with ChangeNotifier {
             );
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.channelError) {
+            debugPrint('❌ [ScheduleProvider] Realtime Channel Error: $error');
+            if (error?.toString().contains('1006') ?? false) {
+              debugPrint('💡 TIP: Check if "session_schedules" is in "supabase_realtime" publication.');
+            }
+          }
+        });
 
-    // S'abonner aux changements des cours (car certains ont le planning intégré)
+    // S'abonner aux changements des cours
     _courseSubscription = _supabase
         .channel('public:courses')
         .onPostgresChanges(
@@ -65,7 +95,11 @@ class ScheduleProvider with ChangeNotifier {
             );
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.channelError) {
+             debugPrint('❌ [ScheduleProvider] Realtime Channel Error (courses): $error');
+          }
+        });
   }
 
   @override
