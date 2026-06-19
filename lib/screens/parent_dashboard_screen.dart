@@ -479,7 +479,7 @@ class _CoursesPage extends StatelessWidget {
         
         final unreadCount = courseProvider.unreadModificationsCount;
         final children = childProvider.children;
-
+//
         return DefaultTabController(
           length: 6, // Added one tab for cleaner separation
           child: Column(
