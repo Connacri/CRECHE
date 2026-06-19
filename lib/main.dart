@@ -68,7 +68,7 @@ class CrecheApp extends StatelessWidget {
     return Consumer<LocaleProvider>(
       builder: (context, localeProvider, child) {
         return MaterialApp(
-          title: 'Crèche App',
+          title: 'Sch App',
           debugShowCheckedModeBanner: false,
           locale: localeProvider.locale,
           localizationsDelegates: const [

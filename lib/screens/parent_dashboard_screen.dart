@@ -437,33 +437,212 @@ class _CalendarSectionState extends State<_CalendarSection> {
 class _CoursesPage extends StatelessWidget {
   const _CoursesPage();
 
+  bool _isModified(CourseModel course) {
+    return course.updatedAt.isAfter(course.createdAt.add(const Duration(minutes: 2)));
+  }
+
+  bool _isActiveNow(CourseModel course) {
+    final now = DateTime.now();
+    return course.isActive && 
+           !course.seasonEndDate.isBefore(now) && 
+           !course.seasonStartDate.isAfter(now);
+  }
+
+  bool _isUpcoming(CourseModel course) {
+    final now = DateTime.now();
+    return course.isActive && course.seasonStartDate.isAfter(now);
+  }
+
+  bool _isFinished(CourseModel course) {
+    final now = DateTime.now();
+    return course.seasonEndDate.isBefore(now);
+  }
+
+  bool _isDeactivated(CourseModel course) {
+    return !course.isActive;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer2<CourseProvider, ChildEnrollmentProvider>(
       builder: (context, courseProvider, childProvider, _) {
-        final courses = courseProvider.courses;
+        final allCourses = courseProvider.courses;
+        final activeCourses = allCourses.where(_isActiveNow).toList();
+        final upcomingCourses = allCourses.where(_isUpcoming).toList();
+        final finishedCourses = allCourses.where(_isFinished).toList();
+        
+        // Tab "Modifiés": only ACTIVE courses that have been edited
+        final modifiedActiveCourses = allCourses.where((c) => c.isActive && _isModified(c)).toList();
+        
+        // Tab "Désactivés": only courses where isActive is false
+        final deactivatedCourses = allCourses.where(_isDeactivated).toList();
+        
+        final unreadCount = courseProvider.unreadModificationsCount;
         final children = childProvider.children;
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(24),
-          itemCount: courses.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 20),
-          itemBuilder: (context, i) {
-            final course = courses[i];
-            
-            final enrolledChildrenNames = children
-                .where((child) => childProvider.isChildEnrolledInCourse(child.id, course.id))
-                .map((child) => child.firstName)
-                .toList();
+        return DefaultTabController(
+          length: 6, // Added one tab for cleaner separation
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: GlassCard(
+                  opacity: 0.15,
+                  blur: 10,
+                  borderRadius: BorderRadius.circular(16),
+                  padding: const EdgeInsets.all(4),
+                  child: TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.center,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    dividerColor: Colors.transparent,
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.bold, 
+                      fontSize: 13,
+                      letterSpacing: 0.5,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600, 
+                      fontSize: 13,
+                    ),
+                    tabs: [
+                      const Tab(text: 'Tous'),
+                      const Tab(text: 'Actifs'),
+                      const Tab(text: 'À venir'),
+                      const Tab(text: 'Finis'),
+                      const Tab(text: 'Désactivés'),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Modifiés'),
+                            if (unreadCount > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.2),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  unreadCount.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white, 
+                                    fontSize: 10, 
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildCourseList(context, allCourses, children, childProvider, courseProvider),
+                    _buildCourseList(context, activeCourses, children, childProvider, courseProvider),
+                    _buildCourseList(context, upcomingCourses, children, childProvider, courseProvider),
+                    _buildCourseList(context, finishedCourses, children, childProvider, courseProvider),
+                    _buildCourseList(context, deactivatedCourses, children, childProvider, courseProvider, isDeactivatedTab: true),
+                    _buildCourseList(context, modifiedActiveCourses, children, childProvider, courseProvider),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-            return CourseCard(
+  Widget _buildCourseList(
+    BuildContext context, 
+    List<CourseModel> courses, 
+    List<ChildModel> children, 
+    ChildEnrollmentProvider childProvider,
+    CourseProvider courseProvider,
+    {bool isDeactivatedTab = false}
+  ) {
+    if (courses.isEmpty) {
+      return const Center(
+        child: Text('Aucun cours trouvé dans cette catégorie'),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(24),
+      itemCount: courses.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 20),
+      itemBuilder: (context, i) {
+        final course = courses[i];
+        
+        final enrolledChildrenNames = children
+            .where((child) => childProvider.isChildEnrolledInCourse(child.id, course.id))
+            .map((child) => child.firstName)
+            .toList();
+
+        // The blue dot ONLY applies to ACTIVE courses that were EDITED (modified)
+        final isUnread = !isDeactivatedTab && 
+                         course.isActive && 
+                         courseProvider.isCourseUnread(course.id, course.updatedAt, course.createdAt);
+
+        return Stack(
+          children: [
+            CourseCard(
               course: course,
               enrolledChildren: enrolledChildrenNames,
               onTap: () {
+                // Mark as read when clicking
+                if (isUnread) {
+                  courseProvider.markCourseAsRead(course.id, course.updatedAt);
+                }
                 Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(course: course, enrolledChildren: enrolledChildrenNames,)));
-              }, onFavorite: () {  },
-            );
-          },
+              }, 
+              onFavorite: () {  },
+            ),
+            if (isUnread)
+              Positioned(
+                top: 15,
+                right: 15,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );

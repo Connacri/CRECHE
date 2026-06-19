@@ -85,7 +85,12 @@ class _CourseCardState extends State<CourseCard> {
     final cs = theme.colorScheme;
     final authProvider = context.watch<AuthProviderV2>();
     final isParent = authProvider.userRole == 'parent';
-    final isDisabled = !widget.course.isActive && isParent;
+    
+    // Logic updated to follow user request: 
+    // - Courses finished (past end date) or deactivated by coach/admin appear in gray.
+    final isFinished = widget.course.seasonEndDate.isBefore(DateTime.now());
+    final isDeactivated = !widget.course.isActive;
+    final isDisabled = (isDeactivated || isFinished) && isParent;
 
     return ColorFiltered(
       colorFilter: isDisabled
@@ -94,7 +99,7 @@ class _CourseCardState extends State<CourseCard> {
       child: Opacity(
         opacity: isDisabled ? 0.6 : 1.0,
         child: Container(
-          height: 160, // Minimalist: Lower height
+          height: 180, // Increased height to comfortably fit all information
           margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -113,10 +118,11 @@ class _CourseCardState extends State<CourseCard> {
             child: InkWell(
               onTap: isDisabled ? null : widget.onTap,
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // ── IMAGE ──────────────────────────────
                   SizedBox(
-                    width: 120,
+                    width: 110,
                     child: _ImageHeader(
                       imageUrl: widget.course.images.isNotEmpty
                           ? widget.course.images.first.supabaseUrl
@@ -132,11 +138,12 @@ class _CourseCardState extends State<CourseCard> {
                   // ── CONTENT ────────────────────────────
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Optimized padding
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute space evenly
                         children: [
-                          // Creator (Indispensable)
+                          // Creator & Badge
                           Row(
                             children: [
                               Expanded(
@@ -166,7 +173,7 @@ class _CourseCardState extends State<CourseCard> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 2),
+                          
                           // Title
                           Text(
                             widget.course.title,
@@ -174,14 +181,14 @@ class _CourseCardState extends State<CourseCard> {
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 15,
+                              fontSize: 14,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          // Description (Minimalist: Show description in black for white card)
+                          
+                          // Description
                           Text(
                             widget.course.description,
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: Colors.black87,
@@ -189,33 +196,51 @@ class _CourseCardState extends State<CourseCard> {
                               height: 1.1,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          // Location & Age
-                          Row(
+                          
+                          // Info Row (Dates & Location)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.location_on, size: 10, color: Colors.grey[400]),
-                              const SizedBox(width: 2),
-                              Expanded(
-                                child: Text(
-                                  widget.course.location.city ?? widget.course.location.address,
-                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_today, size: 10, color: cs.primary),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      "Du ${widget.course.seasonStartDate.day}/${widget.course.seasonStartDate.month} au ${widget.course.seasonEndDate.day}/${widget.course.seasonEndDate.month}",
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: cs.primary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _levelLabel,
-                                style: TextStyle(
-                                  color: cs.secondary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on, size: 10, color: Colors.grey[400]),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      widget.course.location.city ?? widget.course.location.address,
+                                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          
-                          const Spacer(),
+
+                          Text(
+                            _levelLabel,
+                            style: TextStyle(
+                              color: cs.secondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
                           
                           // Bottom Row: Price & Spots
                           Row(
@@ -255,15 +280,11 @@ class _CourseCardState extends State<CourseCard> {
                               ),
                             ],
                           ),
-
-                          // Enrolled Children (Minimalist version - just dots or small text if needed, but let's keep it simple)
-                          if (widget.enrolledChildren.isNotEmpty) ...[
-                            const SizedBox(height: 4),
+                          if (widget.enrolledChildren.isNotEmpty)
                             Text(
                               '${widget.enrolledChildren.length} enfant(s) inscrit(s)',
                               style: TextStyle(fontSize: 8, color: cs.primary, fontWeight: FontWeight.bold),
                             ),
-                          ],
                         ],
                       ),
                     ),

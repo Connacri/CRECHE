@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/course_model_complete.dart';
 import '../models/user_model.dart';
 import '../models/session_schedule_model.dart';
@@ -47,8 +48,43 @@ class CourseProvider extends ChangeNotifier {
   StreamSubscription? _userCoursesSubscription;
   StreamSubscription? _schedulesSubscription;
 
+  // Granular "Read" tracking
+  Set<String> _viewedCourseModificationIds = {};
+  static const String _viewedPrefsKey = 'viewed_course_modifications';
+
   CourseProvider() {
     _initRealtime();
+    _loadViewedModifications();
+  }
+
+  Future<void> _loadViewedModifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_viewedPrefsKey) ?? [];
+    _viewedCourseModificationIds = list.toSet();
+    notifyListeners();
+  }
+
+  Future<void> markCourseAsRead(String courseId, DateTime updatedAt) async {
+    final key = '${courseId}_${updatedAt.toIso8601String()}';
+    if (!_viewedCourseModificationIds.contains(key)) {
+      _viewedCourseModificationIds.add(key);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_viewedPrefsKey, _viewedCourseModificationIds.toList());
+      notifyListeners();
+    }
+  }
+
+  bool isCourseUnread(String courseId, DateTime updatedAt, DateTime createdAt) {
+    // A course is modified if updatedAt > createdAt + 2min buffer
+    if (!updatedAt.isAfter(createdAt.add(const Duration(minutes: 2)))) return false;
+    
+    final key = '${courseId}_${updatedAt.toIso8601String()}';
+    return !_viewedCourseModificationIds.contains(key);
+  }
+
+  int get unreadModificationsCount {
+    // Only count ACTIVE courses that are unread
+    return _courses.where((c) => c.isActive && isCourseUnread(c.id, c.updatedAt, c.createdAt)).length;
   }
 
   void _initRealtime() {
@@ -110,7 +146,6 @@ class CourseProvider extends ChangeNotifier {
   Future<void> loadCourses({bool refresh = false}) async {
     if (_isLoading) return;
     if (refresh) {
-      _courses.clear();
       _lastDocumentTimestamp = null;
       _hasMoreCourses = true;
     }
@@ -123,6 +158,19 @@ class CourseProvider extends ChangeNotifier {
         limit: 10,
         lastDocumentTimestamp: _lastDocumentTimestamp,
       );
+      
+      if (refresh) {
+        _courses = newCourses;
+      } else {
+        // Merge avoiding duplicates
+        final existingIds = _courses.map((c) => c.id).toSet();
+        for (var c in newCourses) {
+          if (!existingIds.contains(c.id)) {
+            _courses.add(c);
+          }
+        }
+      }
+
       if (newCourses.length < 10) {
         _hasMoreCourses = false;
       }
