@@ -86,6 +86,8 @@ class EnrollmentModel {
   final double? paidAmount;
   final List<AttendanceRecord> attendanceHistory;
   final Map<String, dynamic>? metadata;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   EnrollmentModel({
     required this.id,
@@ -102,6 +104,8 @@ class EnrollmentModel {
     this.paidAmount,
     this.attendanceHistory = const [],
     this.metadata,
+    this.createdAt,
+    this.updatedAt,
   });
 
   int get attendanceCount =>
@@ -146,6 +150,8 @@ class EnrollmentModel {
               .toList() ??
           [],
       metadata: data['metadata'],
+      createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
+      updatedAt: data['updated_at'] != null ? DateTime.parse(data['updated_at']) : null,
     );
   }
 
@@ -164,6 +170,8 @@ class EnrollmentModel {
       'paid_amount': paidAmount,
       'attendance_history': attendanceHistory.map((a) => a.toMap()).toList(),
       'metadata': metadata,
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
@@ -182,6 +190,8 @@ class EnrollmentModel {
     double? paidAmount,
     List<AttendanceRecord>? attendanceHistory,
     Map<String, dynamic>? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return EnrollmentModel(
       id: id ?? this.id,
@@ -198,6 +208,8 @@ class EnrollmentModel {
       paidAmount: paidAmount ?? this.paidAmount,
       attendanceHistory: attendanceHistory ?? this.attendanceHistory,
       metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

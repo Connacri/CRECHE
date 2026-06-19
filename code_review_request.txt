@@ -1,11 +1,883 @@
-I have updated the version string to 1.2.73 (derived from the latest git tag) across the repository.
+enum UserRole {
+  admin,
+  parent,
+  coach,
+  school,
+  transporteur,
+  fournisseur,
+  user,
+  autres,
+  unknown;
 
-Files modified:
-- README.md: Updated version title from V1.2.11 to V1.2.73.
-- windows/innosetup/setup.iss: Updated MyAppVersion from 1.2.8 to 1.2.73.
-- windows/inno-setup.iss: Updated MyAppVersion from 1.2.0 to 1.2.73.
-- .github/workflows/build.yml: Updated the default fallback LATEST_TAG from v1.2.0 to v1.2.73 and updated the associated comment.
+  static UserRole fromJson(String json) {
+    switch (json.toLowerCase()) {
+      case 'admin':
+        return UserRole.admin;
+      case 'parent':
+        return UserRole.parent;
+      case 'coach':
+        return UserRole.coach;
+      case 'school':
+      case 'club':
+      case 'organisation':
+        return UserRole.school;
+      case 'transporteur':
+        return UserRole.transporteur;
+      case 'fournisseur':
+        return UserRole.fournisseur;
+      case 'user':
+        return UserRole.user;
+      case 'autres':
+        return UserRole.autres;
+      default:
+        return UserRole.unknown;
+    }
+  }
 
-Verification:
-- Grep confirmed no old versions (1.2.11, 1.2.8, 1.2.0) remain in these files.
-- 'flutter test' passed.
+  String toJson() => name;
+
+  String get displayName {
+    switch (this) {
+      case UserRole.admin:
+        return 'Administrateur';
+      case UserRole.parent:
+        return 'Parent';
+      case UserRole.coach:
+        return 'Coach';
+      case UserRole.school:
+        return 'École/Club';
+      case UserRole.transporteur:
+        return 'Transporteur';
+      case UserRole.fournisseur:
+        return 'Fournisseur';
+      case UserRole.user:
+        return 'Utilisateur';
+      case UserRole.autres:
+        return 'Autres';
+      case UserRole.unknown:
+        return 'Inconnu';
+    }
+  }
+}
+
+class AppLocation {
+  final double latitude;
+  final double longitude;
+  final String address;
+  final String? city;
+  final String? country;
+
+  AppLocation({
+    required this.latitude,
+    required this.longitude,
+    required this.address,
+    this.city,
+    this.country,
+  });
+
+  bool get hasLocation => latitude != 0.0 || longitude != 0.0;
+
+  factory AppLocation.fromMap(Map<String, dynamic> map) {
+    return AppLocation(
+      latitude: map['latitude']?.toDouble() ?? 0.0,
+      longitude: map['longitude']?.toDouble() ?? 0.0,
+      address: map['address'] ?? '',
+      city: map['city'],
+      country: map['country'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
+      'city': city,
+      'country': country,
+    };
+  }
+}
+
+class UserProfileImages {
+  final String? profileImageSupabase;
+  final String? profileImageLocal;
+  final String? coverImageSupabase;
+  final String? coverImageLocal;
+  final DateTime? lastUpdated;
+  final bool isSynced;
+
+  UserProfileImages({
+    this.profileImageSupabase,
+    this.profileImageLocal,
+    this.coverImageSupabase,
+    this.coverImageLocal,
+    this.lastUpdated,
+    this.isSynced = false,
+  });
+
+  String? get profileImage => profileImageSupabase ?? profileImageLocal;
+  String? get coverImage => coverImageSupabase ?? coverImageLocal;
+
+  factory UserProfileImages.fromMap(Map<String, dynamic> map) {
+    return UserProfileImages(
+      profileImageSupabase: map['profileImageSupabase'] ?? map['profile_image_supabase'],
+      profileImageLocal: map['profileImageLocal'] ?? map['profile_image_local'],
+      coverImageSupabase: map['coverImageSupabase'] ?? map['cover_image_supabase'],
+      coverImageLocal: map['coverImageLocal'] ?? map['cover_image_local'],
+      lastUpdated: map['lastUpdated'] != null ? DateTime.parse(map['lastUpdated'].toString()) :
+                  (map['last_updated'] != null ? DateTime.parse(map['last_updated'].toString()) : null),
+      isSynced: map['isSynced'] ?? map['is_synced'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'profileImageSupabase': profileImageSupabase,
+      'profileImageLocal': profileImageLocal,
+      'coverImageSupabase': coverImageSupabase,
+      'coverImageLocal': coverImageLocal,
+      'lastUpdated': lastUpdated?.toIso8601String(),
+      'isSynced': isSynced,
+    };
+  }
+}
+
+class UserModel {
+  final String uid;
+  final String email;
+  final String name;
+  final UserRole role;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool isActive;
+  final DateTime? deactivatedAt;
+  final DateTime? scheduledDeletionDate;
+  final UserProfileImages profileImages;
+  final AppLocation? location;
+  final String? bio;
+  final String? phoneNumber;
+  final Map<String, dynamic>? metadata;
+  final bool profileCompleted;
+  final String? palmares;
+  final List<String>? diplomas;
+  final List<String>? certificates;
+  final String? cvUrl;
+  final String? postalCode;
+  final String? organizationName;
+  final String? licenseNumber;
+  final String? firstName;
+  final String? lastName;
+  final String? address;
+  final String? city;
+  final String? country;
+
+  UserModel({
+    required this.uid,
+    required this.email,
+    required this.name,
+    required this.role,
+    required this.createdAt,
+    required this.updatedAt,
+    this.isActive = true,
+    this.deactivatedAt,
+    this.scheduledDeletionDate,
+    required this.profileImages,
+    this.location,
+    this.bio,
+    this.phoneNumber,
+    this.metadata,
+    this.profileCompleted = false,
+    this.palmares,
+    this.diplomas,
+    this.certificates,
+    this.cvUrl,
+    this.postalCode,
+    this.organizationName,
+    this.licenseNumber,
+    this.firstName,
+    this.lastName,
+    this.address,
+    this.city,
+    this.country,
+  });
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is String) return DateTime.parse(value);
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  static DateTime? _parseDateTimeNullable(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return DateTime.parse(value);
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  factory UserModel.fromSupabase(Map<String, dynamic> data) {
+    final locationData = data['location'];
+    final hasFlatLocation =
+        data['address'] != null ||
+        data['city'] != null ||
+        data['country'] != null;
+
+    return UserModel(
+      uid: data['id'] ?? data['uid'] ?? '',
+      email: data['email'] ?? '',
+      name: data['name'] ?? '',
+      role: UserRole.fromJson(data['role'] ?? 'parent'),
+      createdAt: _parseDateTime(data['created_at']),
+      updatedAt: _parseDateTime(data['updated_at']),
+      isActive: data['is_active'] ?? true,
+      deactivatedAt: _parseDateTimeNullable(data['deactivated_at']),
+      scheduledDeletionDate: _parseDateTimeNullable(data['scheduled_deletion_date']),
+      profileImages: data['profile_images'] != null
+          ? UserProfileImages.fromMap(data['profile_images'])
+          : UserProfileImages(),
+      location: locationData != null
+          ? AppLocation.fromMap(locationData)
+          : hasFlatLocation
+          ? AppLocation(
+              latitude: 0.0,
+              longitude: 0.0,
+              address: data['address'] ?? '',
+              city: data['city'],
+              country: data['country'],
+            )
+          : null,
+      bio: data['bio'],
+      phoneNumber: data['phone_number'] ?? data['phone'],
+      metadata: data['metadata'],
+      profileCompleted: data['profile_completed'] ?? false,
+      palmares: data['palmares'],
+      diplomas: data['diplomas'] != null ? List<String>.from(data['diplomas']) : null,
+      certificates: data['certificates'] != null ? List<String>.from(data['certificates']) : null,
+      cvUrl: data['cv_url'],
+      postalCode: data['postal_code'],
+      organizationName: data['organization_name'],
+      licenseNumber: data['license_number'],
+      firstName: data['first_name'],
+      lastName: data['last_name'],
+      address: data['address'],
+      city: data['city'],
+      country: data['country'],
+    );
+  }
+
+  Map<String, dynamic> toSupabase() {
+    return {
+      'email': email,
+      'name': name,
+      'role': role.toJson(),
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'is_active': isActive,
+      'deactivated_at': deactivatedAt?.toIso8601String(),
+      'scheduled_deletion_date': scheduledDeletionDate?.toIso8601String(),
+      'profile_images': profileImages.toMap(),
+      'location': location?.toMap(),
+      'bio': bio,
+      'phone_number': phoneNumber,
+      'metadata': metadata,
+      'profile_completed': profileCompleted,
+      'palmares': palmares,
+      'diplomas': diplomas ?? [],
+      'certificates': certificates ?? [],
+      'cv_url': cvUrl,
+      'postal_code': postalCode,
+      'organization_name': organizationName,
+      'license_number': licenseNumber,
+      'first_name': firstName,
+      'last_name': lastName,
+      'address': address,
+      'city': city,
+      'country': country,
+    };
+  }
+
+  UserModel copyWith({
+    String? uid,
+    String? email,
+    String? name,
+    UserRole? role,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isActive,
+    DateTime? deactivatedAt,
+    DateTime? scheduledDeletionDate,
+    UserProfileImages? profileImages,
+    AppLocation? location,
+    String? bio,
+    String? phoneNumber,
+    Map<String, dynamic>? metadata,
+    bool? profileCompleted,
+    String? palmares,
+    List<String>? diplomas,
+    List<String>? certificates,
+    String? cvUrl,
+    String? postalCode,
+    String? organizationName,
+    String? licenseNumber,
+    String? firstName,
+    String? lastName,
+    String? address,
+    String? city,
+    String? country,
+  }) {
+    return UserModel(
+      uid: uid ?? this.uid,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      role: role ?? this.role,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isActive: isActive ?? this.isActive,
+      deactivatedAt: deactivatedAt ?? this.deactivatedAt,
+      scheduledDeletionDate:
+          scheduledDeletionDate ?? this.scheduledDeletionDate,
+      profileImages: profileImages ?? this.profileImages,
+      location: location ?? this.location,
+      bio: bio ?? this.bio,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      metadata: metadata ?? this.metadata,
+      profileCompleted: profileCompleted ?? this.profileCompleted,
+      palmares: palmares ?? this.palmares,
+      diplomas: diplomas ?? this.diplomas,
+      certificates: certificates ?? this.certificates,
+      cvUrl: cvUrl ?? this.cvUrl,
+      postalCode: postalCode ?? this.postalCode,
+      organizationName: organizationName ?? this.organizationName,
+      licenseNumber: licenseNumber ?? this.licenseNumber,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      address: address ?? this.address,
+      city: city ?? this.city,
+      country: country ?? this.country,
+    );
+  }
+
+  int? getDaysUntilDeletion() {
+    return scheduledDeletionDate?.difference(DateTime.now()).inDays;
+  }
+
+  bool canReactivate() {
+    if (!isActive && scheduledDeletionDate != null) {
+      return DateTime.now().isBefore(scheduledDeletionDate!);
+    }
+    return false;
+  }
+}
+enum EnrollmentStatus {
+  pending,
+  approved,
+  rejected,
+  cancelled,
+  completed;
+
+  String get displayName {
+    switch (this) {
+      case EnrollmentStatus.pending:
+        return 'En attente';
+      case EnrollmentStatus.approved:
+        return 'Approuvée';
+      case EnrollmentStatus.rejected:
+        return 'Refusée';
+      case EnrollmentStatus.cancelled:
+        return 'Annulée';
+      case EnrollmentStatus.completed:
+        return 'Terminée';
+    }
+  }
+}
+
+enum PaymentStatus {
+  pending,
+  partial,
+  paid,
+  refunded;
+
+  String get displayName {
+    switch (this) {
+      case PaymentStatus.pending:
+        return 'En attente';
+      case PaymentStatus.partial:
+        return 'Partiel';
+      case PaymentStatus.paid:
+        return 'Payé';
+      case PaymentStatus.refunded:
+        return 'Remboursé';
+    }
+  }
+}
+
+class AttendanceRecord {
+  final DateTime date;
+  final bool isPresent;
+  final String? notes;
+
+  AttendanceRecord({
+    required this.date,
+    required this.isPresent,
+    this.notes,
+  });
+
+  factory AttendanceRecord.fromMap(Map<String, dynamic> map) {
+    return AttendanceRecord(
+      date: map['date'] is String
+          ? DateTime.parse(map['date'])
+          : DateTime.fromMillisecondsSinceEpoch(0),
+      isPresent: map['isPresent'] ?? map['is_present'] ?? false,
+      notes: map['notes'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'date': date.toIso8601String(),
+      'is_present': isPresent,
+      'notes': notes,
+    };
+  }
+}
+
+class EnrollmentModel {
+  final String id;
+  final String courseId;
+  final String childId;
+  final String parentId;
+  final EnrollmentStatus status;
+  final DateTime enrolledAt;
+  final DateTime? approvedAt;
+  final String? approvedBy;
+  final String? rejectionReason;
+  final PaymentStatus paymentStatus;
+  final double? totalAmount;
+  final double? paidAmount;
+  final List<AttendanceRecord> attendanceHistory;
+  final Map<String, dynamic>? metadata;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  EnrollmentModel({
+    required this.id,
+    required this.courseId,
+    required this.childId,
+    required this.parentId,
+    required this.status,
+    required this.enrolledAt,
+    this.approvedAt,
+    this.approvedBy,
+    this.rejectionReason,
+    required this.paymentStatus,
+    this.totalAmount,
+    this.paidAmount,
+    this.attendanceHistory = const [],
+    this.metadata,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  int get attendanceCount =>
+      attendanceHistory.where((a) => a.isPresent).length;
+
+  double get attendanceRate {
+    if (attendanceHistory.isEmpty) return 0;
+    return (attendanceCount / attendanceHistory.length) * 100;
+  }
+
+  double get remainingAmount {
+    if (totalAmount == null) return 0;
+    return totalAmount! - (paidAmount ?? 0);
+  }
+
+  bool get isFullyPaid => remainingAmount <= 0;
+
+  factory EnrollmentModel.fromSupabase(Map<String, dynamic> data) {
+    return EnrollmentModel(
+      id: data['id'] ?? '',
+      courseId: data['course_id'] ?? '',
+      childId: data['child_id'] ?? '',
+      parentId: data['parent_id'] ?? '',
+      status: EnrollmentStatus.values.firstWhere(
+        (s) => s.name == data['status'],
+        orElse: () => EnrollmentStatus.pending,
+      ),
+      enrolledAt: DateTime.parse(data['enrolled_at']),
+      approvedAt: data['approved_at'] != null
+          ? DateTime.parse(data['approved_at'])
+          : null,
+      approvedBy: data['approved_by'],
+      rejectionReason: data['rejection_reason'],
+      paymentStatus: PaymentStatus.values.firstWhere(
+        (p) => p.name == data['payment_status'],
+        orElse: () => PaymentStatus.pending,
+      ),
+      totalAmount: data['total_amount']?.toDouble(),
+      paidAmount: data['paid_amount']?.toDouble(),
+      attendanceHistory: (data['attendance_history'] as List<dynamic>?)
+              ?.map((a) => AttendanceRecord.fromMap(a))
+              .toList() ??
+          [],
+      metadata: data['metadata'],
+      createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
+      updatedAt: data['updated_at'] != null ? DateTime.parse(data['updated_at']) : null,
+    );
+  }
+
+  Map<String, dynamic> toSupabase() {
+    return {
+      'course_id': courseId,
+      'child_id': childId,
+      'parent_id': parentId,
+      'status': status.name,
+      'enrolled_at': enrolledAt.toIso8601String(),
+      'approved_at': approvedAt?.toIso8601String(),
+      'approved_by': approvedBy,
+      'rejection_reason': rejectionReason,
+      'payment_status': paymentStatus.name,
+      'total_amount': totalAmount,
+      'paid_amount': paidAmount,
+      'attendance_history': attendanceHistory.map((a) => a.toMap()).toList(),
+      'metadata': metadata,
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
+    };
+  }
+
+  EnrollmentModel copyWith({
+    String? id,
+    String? courseId,
+    String? childId,
+    String? parentId,
+    EnrollmentStatus? status,
+    DateTime? enrolledAt,
+    DateTime? approvedAt,
+    String? approvedBy,
+    String? rejectionReason,
+    PaymentStatus? paymentStatus,
+    double? totalAmount,
+    double? paidAmount,
+    List<AttendanceRecord>? attendanceHistory,
+    Map<String, dynamic>? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return EnrollmentModel(
+      id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
+      childId: childId ?? this.childId,
+      parentId: parentId ?? this.parentId,
+      status: status ?? this.status,
+      enrolledAt: enrolledAt ?? this.enrolledAt,
+      approvedAt: approvedAt ?? this.approvedAt,
+      approvedBy: approvedBy ?? this.approvedBy,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      totalAmount: totalAmount ?? this.totalAmount,
+      paidAmount: paidAmount ?? this.paidAmount,
+      attendanceHistory: attendanceHistory ?? this.attendanceHistory,
+      metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+import 'package:flutter/material.dart';
+
+/// Modèle pour représenter une session de cours planifiée
+class SessionSchedule {
+  final String id;
+  final String courseId;
+  final String? enrollmentId;
+  final DayOfWeek dayOfWeek;
+  final TimeSlot timeSlot;
+  final DateTime startDate;
+  final DateTime endDate;
+  final bool isCancelled;
+  final String? cancellationReason;
+  final int currentEnrollment;
+  final int maxCapacity;
+  final String? location;
+  final String? coachId;
+  final String? roomName;
+  final String? schoolId;
+  final bool isActive;
+  final String? courseTitle;
+  final String? courseCategory;
+  final Map<String, dynamic>? recurrence;
+  final Map<String, dynamic>? metadata;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  SessionSchedule({
+    required this.id,
+    required this.courseId,
+    this.enrollmentId,
+    required this.dayOfWeek,
+    required this.timeSlot,
+    required this.startDate,
+    required this.endDate,
+    this.isCancelled = false,
+    this.cancellationReason,
+    required this.currentEnrollment,
+    required this.maxCapacity,
+    this.location,
+    this.coachId,
+    this.roomName,
+    this.schoolId,
+    this.isActive = true,
+    this.courseTitle,
+    this.courseCategory,
+    this.recurrence,
+    this.metadata,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  /// Vérifie si la session est planifiée pour une date donnée
+  bool isScheduledFor(DateTime date) {
+    if (isCancelled) return false;
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final normalizedStart = DateTime(startDate.year, startDate.month, startDate.day);
+    final normalizedEnd = DateTime(endDate.year, endDate.month, endDate.day);
+
+    if (normalizedDate.isBefore(normalizedStart) || normalizedDate.isAfter(normalizedEnd)) {
+      return false;
+    }
+
+    return date.weekday == dayOfWeek.index + 1;
+  }
+
+  /// Désérialisation depuis Supabase
+  factory SessionSchedule.fromSupabase(Map<String, dynamic> data) {
+    // Gestion du join avec courses pour le titre et catégorie
+    String? title;
+    String? category;
+    if (data['courses'] != null) {
+      title = data['courses']['title'];
+      category = data['courses']['category'];
+    } else {
+      title = data['course_title'];
+      category = data['course_category'];
+    }
+
+    return SessionSchedule(
+      id: data['id'] ?? '',
+      courseId: data['course_id'] ?? '',
+      enrollmentId: data['enrollment_id'],
+      dayOfWeek: DayOfWeek.values[data['day_of_week'] ?? 0],
+      timeSlot: TimeSlot.fromMap(data['time_slot'] ?? {}),
+      startDate: DateTime.parse(data['start_date'] ?? DateTime.now().toIso8601String()),
+      endDate: DateTime.parse(data['end_date'] ?? DateTime.now().add(const Duration(days: 365)).toIso8601String()),
+      isCancelled: data['is_cancelled'] ?? false,
+      cancellationReason: data['cancellation_reason'],
+      currentEnrollment: data['current_enrollment'] ?? 0,
+      maxCapacity: data['max_capacity'] ?? 30,
+      location: data['location'],
+      coachId: data['coach_id'],
+      roomName: data['room_name'],
+      schoolId: data['school_id'],
+      isActive: data['is_active'] ?? true,
+      courseTitle: title,
+      courseCategory: category,
+      recurrence: data['recurrence'],
+      metadata: data['metadata'],
+      createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
+      updatedAt: data['updated_at'] != null ? DateTime.parse(data['updated_at']) : null,
+    );
+  }
+
+  /// Sérialisation vers Supabase
+  Map<String, dynamic> toSupabase() {
+    return {
+      'course_id': courseId,
+      'enrollment_id': enrollmentId,
+      'day_of_week': dayOfWeek.index,
+      'time_slot': timeSlot.toMap(),
+      'start_date': startDate.toIso8601String(),
+      'end_date': endDate.toIso8601String(),
+      'is_cancelled': isCancelled,
+      'cancellation_reason': cancellationReason,
+      'current_enrollment': currentEnrollment,
+      'max_capacity': maxCapacity,
+      'location': location,
+      'coach_id': coachId,
+      'room_name': roomName,
+      'school_id': schoolId,
+      'is_active': isActive,
+      'recurrence': recurrence ?? {'freq': 'weekly', 'exceptions': []},
+      'metadata': metadata,
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
+    };
+  }
+
+  SessionSchedule copyWith({
+    String? id,
+    String? courseId,
+    String? enrollmentId,
+    DayOfWeek? dayOfWeek,
+    TimeSlot? timeSlot,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isCancelled,
+    String? cancellationReason,
+    int? currentEnrollment,
+    int? maxCapacity,
+    String? location,
+    String? coachId,
+    String? roomName,
+    String? schoolId,
+    bool? isActive,
+    String? courseTitle,
+    String? courseCategory,
+    Map<String, dynamic>? recurrence,
+    Map<String, dynamic>? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return SessionSchedule(
+      id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
+      enrollmentId: enrollmentId ?? this.enrollmentId,
+      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      timeSlot: timeSlot ?? this.timeSlot,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      isCancelled: isCancelled ?? this.isCancelled,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
+      currentEnrollment: currentEnrollment ?? this.currentEnrollment,
+      maxCapacity: maxCapacity ?? this.maxCapacity,
+      location: location ?? this.location,
+      coachId: coachId ?? this.coachId,
+      roomName: roomName ?? this.roomName,
+      schoolId: schoolId ?? this.schoolId,
+      isActive: isActive ?? this.isActive,
+      courseTitle: courseTitle ?? this.courseTitle,
+      courseCategory: courseCategory ?? this.courseCategory,
+      recurrence: recurrence ?? this.recurrence,
+      metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  /// Méthode de chevauchement optimisée pour le planning hebdomadaire
+  bool overlapsWith(SessionSchedule other) {
+    if (dayOfWeek != other.dayOfWeek) return false;
+    if (isCancelled || other.isCancelled) return false;
+
+    // Conflit si même coach ou même salle au même moment
+    final sameCoach = coachId != null && other.coachId != null && coachId == other.coachId;
+    final sameRoom = roomName != null && other.roomName != null &&
+                     roomName!.trim().isNotEmpty && other.roomName!.trim().isNotEmpty &&
+                     roomName == other.roomName;
+
+    if (sameCoach || sameRoom) {
+      return timeSlot.overlaps(other.timeSlot);
+    }
+    return false;
+  }
+
+  /// Vérifie si deux sessions se chevauchent dans le temps (pour l'affichage)
+  bool overlapsInTime(SessionSchedule other) {
+    if (dayOfWeek != other.dayOfWeek) return false;
+    if (isCancelled || other.isCancelled) return false;
+    return timeSlot.overlaps(other.timeSlot);
+  }
+}
+
+/// Énumération des jours de la semaine
+enum DayOfWeek {
+  monday,
+  tuesday,
+  wednesday,
+  thursday,
+  friday,
+  saturday,
+  sunday;
+
+  String get displayName {
+    switch (this) {
+      case DayOfWeek.monday: return 'Lundi';
+      case DayOfWeek.tuesday: return 'Mardi';
+      case DayOfWeek.wednesday: return 'Mercredi';
+      case DayOfWeek.thursday: return 'Jeudi';
+      case DayOfWeek.friday: return 'Vendredi';
+      case DayOfWeek.saturday: return 'Samedi';
+      case DayOfWeek.sunday: return 'Dimanche';
+    }
+  }
+
+  String get shortName {
+    switch (this) {
+      case DayOfWeek.monday: return 'Lun';
+      case DayOfWeek.tuesday: return 'Mar';
+      case DayOfWeek.wednesday: return 'Mer';
+      case DayOfWeek.thursday: return 'Jeu';
+      case DayOfWeek.friday: return 'Ven';
+      case DayOfWeek.saturday: return 'Sam';
+      case DayOfWeek.sunday: return 'Dim';
+    }
+  }
+
+  static DayOfWeek fromDateTime(DateTime date) => DayOfWeek.values[date.weekday - 1];
+}
+
+/// Modèle pour un créneau horaire (optimisé pour planning hebdomadaire)
+class TimeSlot {
+  final TimeOfDay start;
+  final TimeOfDay end;
+
+  TimeSlot({required this.start, required this.end});
+
+  Duration get duration => Duration(
+        hours: end.hour - start.hour,
+        minutes: end.minute - start.minute,
+      );
+
+  String get displayTime => "${start.formatAsString()} - ${end.formatAsString()}";
+
+  bool overlaps(TimeSlot other) {
+    final s1 = start.hour * 60 + start.minute;
+    final e1 = end.hour * 60 + end.minute;
+    final s2 = other.start.hour * 60 + other.start.minute;
+    final e2 = other.end.hour * 60 + other.end.minute;
+    return s1 < e2 && s2 < e1;
+  }
+
+  factory TimeSlot.fromMap(Map<String, dynamic> map) {
+    return TimeSlot(
+      start: parseTime(map['start'] ?? map['start_time']),
+      end: parseTime(map['end'] ?? map['end_time']),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'start': '${start.hour}:${start.minute.toString().padLeft(2, '0')}',
+      'end': '${end.hour}:${end.minute.toString().padLeft(2, '0')}',
+    };
+  }
+
+  static TimeOfDay parseTime(dynamic value) {
+    if (value is String) {
+      final parts = value.split(':').map(int.parse).toList();
+      return TimeOfDay(hour: parts[0], minute: parts.length > 1 ? parts[1] : 0);
+    }
+    return const TimeOfDay(hour: 9, minute: 0);
+  }
+}
+
+extension TimeOfDayExtension on TimeOfDay {
+  String formatAsString() => "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
+}
