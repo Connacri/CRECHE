@@ -162,6 +162,14 @@ class UserModel {
   final List<String>? diplomas;
   final List<String>? certificates;
   final String? cvUrl;
+  final String? postalCode;
+  final String? organizationName;
+  final String? licenseNumber;
+  final String? firstName;
+  final String? lastName;
+  final String? address;
+  final String? city;
+  final String? country;
 
   UserModel({
     required this.uid,
@@ -183,6 +191,14 @@ class UserModel {
     this.diplomas,
     this.certificates,
     this.cvUrl,
+    this.postalCode,
+    this.organizationName,
+    this.licenseNumber,
+    this.firstName,
+    this.lastName,
+    this.address,
+    this.city,
+    this.country,
   });
 
   static DateTime _parseDateTime(dynamic value) {
@@ -246,6 +262,14 @@ class UserModel {
       diplomas: data['diplomas'] != null ? List<String>.from(data['diplomas']) : null,
       certificates: data['certificates'] != null ? List<String>.from(data['certificates']) : null,
       cvUrl: data['cv_url'],
+      postalCode: data['postal_code'],
+      organizationName: data['organization_name'],
+      licenseNumber: data['license_number'],
+      firstName: data['first_name'],
+      lastName: data['last_name'],
+      address: data['address'],
+      city: data['city'],
+      country: data['country'],
     );
   }
 
@@ -269,6 +293,14 @@ class UserModel {
       'diplomas': diplomas ?? [],
       'certificates': certificates ?? [],
       'cv_url': cvUrl,
+      'postal_code': postalCode,
+      'organization_name': organizationName,
+      'license_number': licenseNumber,
+      'first_name': firstName,
+      'last_name': lastName,
+      'address': address,
+      'city': city,
+      'country': country,
     };
   }
 
@@ -292,6 +324,14 @@ class UserModel {
     List<String>? diplomas,
     List<String>? certificates,
     String? cvUrl,
+    String? postalCode,
+    String? organizationName,
+    String? licenseNumber,
+    String? firstName,
+    String? lastName,
+    String? address,
+    String? city,
+    String? country,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -314,6 +354,14 @@ class UserModel {
       diplomas: diplomas ?? this.diplomas,
       certificates: certificates ?? this.certificates,
       cvUrl: cvUrl ?? this.cvUrl,
+      postalCode: postalCode ?? this.postalCode,
+      organizationName: organizationName ?? this.organizationName,
+      licenseNumber: licenseNumber ?? this.licenseNumber,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      address: address ?? this.address,
+      city: city ?? this.city,
+      country: country ?? this.country,
     );
   }
 

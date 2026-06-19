@@ -22,6 +22,8 @@ class SessionSchedule {
   final String? courseCategory;
   final Map<String, dynamic>? recurrence;
   final Map<String, dynamic>? metadata;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   SessionSchedule({
     required this.id,
@@ -44,6 +46,8 @@ class SessionSchedule {
     this.courseCategory,
     this.recurrence,
     this.metadata,
+    this.createdAt,
+    this.updatedAt,
   });
 
   /// Vérifie si la session est planifiée pour une date donnée
@@ -94,6 +98,8 @@ class SessionSchedule {
       courseCategory: category,
       recurrence: data['recurrence'],
       metadata: data['metadata'],
+      createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
+      updatedAt: data['updated_at'] != null ? DateTime.parse(data['updated_at']) : null,
     );
   }
 
@@ -117,6 +123,8 @@ class SessionSchedule {
       'is_active': isActive,
       'recurrence': recurrence ?? {'freq': 'weekly', 'exceptions': []},
       'metadata': metadata,
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
@@ -141,6 +149,8 @@ class SessionSchedule {
     String? courseCategory,
     Map<String, dynamic>? recurrence,
     Map<String, dynamic>? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return SessionSchedule(
       id: id ?? this.id,
@@ -163,6 +173,8 @@ class SessionSchedule {
       courseCategory: courseCategory ?? this.courseCategory,
       recurrence: recurrence ?? this.recurrence,
       metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
