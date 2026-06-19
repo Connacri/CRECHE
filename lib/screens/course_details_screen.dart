@@ -251,9 +251,6 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                   children: [
                     CarouselView(
                       controller: _carouselController,
-                      onIndexChanged: (index) {
-                        setState(() => _currentPage = index);
-                      },
                       itemSnapping: true,
                       itemExtent: constraints.maxWidth,
                       shrinkExtent: 0.0,
