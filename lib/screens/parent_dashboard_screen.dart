@@ -31,23 +31,33 @@ class ParentDashboard extends StatefulWidget {
 class _ParentDashboardState extends State<ParentDashboard> {
   int _selectedIndex = 0;
   bool _isLoading = true;
+  bool _isDataLoaded = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
+      _checkAndLoadData();
     });
   }
 
+  void _checkAndLoadData() {
+    final authProvider = context.read<AuthProviderV2>();
+    if (authProvider.userData != null && !_isDataLoaded) {
+      _loadData();
+    }
+  }
+
   Future<void> _loadData() async {
+    if (_isDataLoaded) return;
     setState(() => _isLoading = true);
     try {
       final authProvider = context.read<AuthProviderV2>();
       if (authProvider.userData != null) {
         final uid = authProvider.userData!['id'];
         final childProvider = context.read<ChildEnrollmentProvider>();
-        childProvider.subscribeToParentData(uid);
+        
+        // On attend que les données de base soient là
         await Future.wait([
           childProvider.loadChildren(uid),
           childProvider.loadEnrollments(uid),
@@ -55,9 +65,15 @@ class _ParentDashboardState extends State<ParentDashboard> {
           childProvider.loadDailyActivities(uid, DateTime.now()),
           context.read<CourseProvider>().loadCourses(),
         ]);
+        
+        // On s'abonne aux changements temps réel ensuite
+        childProvider.subscribeToParentData(uid);
+        
+        _isDataLoaded = true;
       }
       setState(() => _isLoading = false);
     } catch (e) {
+      debugPrint('❌ Error loading dashboard data: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -67,6 +83,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
     final auth = context.watch<AuthProviderV2>();
     final childProvider = context.watch<ChildEnrollmentProvider>();
     
+    // Auto-load if data is not loaded yet and user data is available
+    if (auth.userData != null && !_isDataLoaded && !_isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    }
+
     final isGlobalLoading = auth.isLoading || childProvider.isLoading;
 
     return Scaffold(
@@ -574,7 +595,16 @@ class _CalendarSectionState extends State<_CalendarSection> {
                 initialDate: _selectedDate,
                 firstDate: DateTime.now().subtract(const Duration(days: 30)),
                 lastDate: DateTime.now().add(const Duration(days: 30)),
-                onDateSelected: (date) => setState(() => _selectedDate = date),
+                onDateSelected: (date) {
+                  setState(() => _selectedDate = date);
+                  debugPrint('📆 [Calendar] Date changed to: $date');
+                  // 🔄 Mettre à jour les activités pour la nouvelle date sélectionnée
+                  final auth = context.read<AuthProviderV2>();
+                  if (auth.userData != null) {
+                    final uid = auth.userData!['id'];
+                    context.read<ChildEnrollmentProvider>().loadDailyActivities(uid, date);
+                  }
+                },
                 leftMargin: 20,
                 monthColor: Colors.blueGrey,
                 dayColor: Colors.teal[200],
@@ -584,8 +614,8 @@ class _CalendarSectionState extends State<_CalendarSection> {
                 locale: Localizations.localeOf(context).languageCode,
               ),
               const SizedBox(height: 20),
-              Consumer<ChildEnrollmentProvider>(
-                builder: (context, provider, _) {
+              Consumer2<ChildEnrollmentProvider, CourseProvider>(
+                builder: (context, provider, courseProvider, _) {
                   final schedules = provider.getSchedulesForDate(_selectedDate);
                   if (schedules.isEmpty) {
                     return const Padding(
@@ -599,7 +629,25 @@ class _CalendarSectionState extends State<_CalendarSection> {
                     itemCount: schedules.length,
                     itemBuilder: (context, i) {
                       final schedule = schedules[i];
+                      final course = courseProvider.courses.firstWhere(
+                        (c) => c.id == schedule.courseId,
+                        orElse: () => CourseModel.mock(),
+                      );
+
+                      final enrolledChildrenNames = provider.children
+                          .where((child) => provider.isChildEnrolledInCourse(child.id, schedule.courseId))
+                          .map((child) => child.firstName.capitalize())
+                          .toList();
+
                       return ListTile(
+                        onTap: () {
+                          if (course.id.isNotEmpty && course.id != 'mock-id') {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(
+                              course: course,
+                              enrolledChildren: enrolledChildrenNames,
+                            )));
+                          }
+                        },
                         leading: Container(
                           width: 40,
                           height: 40,
@@ -611,11 +659,32 @@ class _CalendarSectionState extends State<_CalendarSection> {
                             child: Text(
                               schedule.timeSlot.displayTime,
                               style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ),
-                        title: Text('Cours #${schedule.courseId.substring(0, 5)}'),
-                        subtitle: Text(schedule.location ?? 'Salle non définie'),
+                        title: Text(
+                          schedule.courseTitle ?? 'Cours #${schedule.courseId.substring(0, 5)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(schedule.location ?? 'Salle non définie', style: const TextStyle(fontSize: 12)),
+                            if (enrolledChildrenNames.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  'Pour: ${enrolledChildrenNames.join(", ")}',
+                                  style: TextStyle(
+                                    fontSize: 11, 
+                                    color: Theme.of(context).colorScheme.primary, 
+                                    fontWeight: FontWeight.w600
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                         trailing: const Icon(Icons.chevron_right, size: 16),
                       );
                     },
@@ -1007,7 +1076,7 @@ class _BillingPage extends StatelessWidget {
                     // ✅ FIX : lookup via CourseProvider
                     final course = courseProvider.courses.firstWhere(
                           (c) => c.id == e.courseId,
-                      orElse: CourseModel.mock,
+                      orElse: () => CourseModel.mock(),
                     );
                     return Column(
                       children: [

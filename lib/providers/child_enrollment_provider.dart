@@ -145,6 +145,8 @@ class ChildEnrollmentProvider with ChangeNotifier {
     _enrollmentsSubscription = _supabaseChildService.getEnrollmentsStream(parentId).listen(
       (data) {
         _enrollments = data;
+        // 🔄 Recharger les horaires dès que les inscriptions changent
+        loadAllSchedulesForParent(parentId);
         notifyListeners();
       },
       onError: (e) {
@@ -377,6 +379,9 @@ class ChildEnrollmentProvider with ChangeNotifier {
     if (parentId.isEmpty) return;
     try {
       _setLoading(true);
+      // Fetch initial data once to have it immediately
+      _children = await _supabaseChildService.getChildren(parentId);
+      // Then subscribe for updates
       subscribeToParentData(parentId);
       _setLoading(false);
     } catch (e) {
@@ -415,6 +420,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
   }) async {
     try {
       _setLoading(true);
+      debugPrint('🆕 [ChildEnrollmentProvider] Attempting to create enrollment:');
+      debugPrint('   - Course ID: $courseId');
+      debugPrint('   - Child ID: $childId');
+      debugPrint('   - Parent ID: $parentId');
+      debugPrint('   - Total Amount: $totalAmount');
+
       final enrollment = EnrollmentModel(
         id: "",
         courseId: courseId,
@@ -425,12 +436,19 @@ class ChildEnrollmentProvider with ChangeNotifier {
         paymentStatus: PaymentStatus.pending,
         totalAmount: totalAmount,
         paidAmount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
-      await _supabaseChildService.createEnrollment(enrollment);
+      
+      final realId = await _supabaseChildService.createEnrollment(enrollment);
+      debugPrint('✅ [ChildEnrollmentProvider] Enrollment created successfully. ID: $realId');
+      
       _setLoading(false);
       return true;
     } catch (e) {
+      debugPrint('❌ [ChildEnrollmentProvider] createEnrollment Error: $e');
       _setLoading(false);
+      _setError('Erreur d\'inscription: $e');
       return false;
     }
   }
@@ -539,7 +557,13 @@ class ChildEnrollmentProvider with ChangeNotifier {
   }
 
   List<SessionSchedule> getSchedulesForDate(DateTime date) {
-    return _schedules.where((s) => s.isScheduledFor(date) && !s.isCancelled).toList();
+    final filtered = _schedules.where((s) => s.isScheduledFor(date) && !s.isCancelled).toList();
+    debugPrint('📅 [ChildEnrollmentProvider] getSchedulesForDate(${date.toIso8601String().split('T')[0]}): Found ${filtered.length} schedules.');
+    for (var s in filtered) {
+       final childCount = _children.where((child) => isChildEnrolledInCourse(child.id, s.courseId)).length;
+       debugPrint('   - Schedule: ${s.courseTitle}, Children enrolled: $childCount');
+    }
+    return filtered;
   }
 
   List<EnrollmentModel> getEnrollmentsForChild(String childId) => _enrollments.where((e) => e.childId == childId).toList();
@@ -663,6 +687,9 @@ class ChildEnrollmentProvider with ChangeNotifier {
   Future<void> loadDailyActivities(String parentId, DateTime date) async {
     try {
       _setLoading(true);
+      // Fetch initial data once
+      _dailyActivities = await _supabaseChildService.getDailyActivities(parentId, date);
+      // Then subscribe
       subscribeToDailyActivities(parentId, date);
       _setLoading(false);
     } catch (e) {

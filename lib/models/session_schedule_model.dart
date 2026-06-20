@@ -52,16 +52,30 @@ class SessionSchedule {
 
   /// Vérifie si la session est planifiée pour une date donnée
   bool isScheduledFor(DateTime date) {
-    if (isCancelled) return false;
+    debugPrint('🔍 [SessionSchedule] Checking schedule $id ($courseTitle) for date ${date.toIso8601String().split('T')[0]}');
+    if (isCancelled) {
+      debugPrint('   - Cancelled: true');
+      return false;
+    }
+    
+    // Normalisation pour comparer uniquement les dates sans l'heure
     final normalizedDate = DateTime(date.year, date.month, date.day);
     final normalizedStart = DateTime(startDate.year, startDate.month, startDate.day);
     final normalizedEnd = DateTime(endDate.year, endDate.month, endDate.day);
 
+    debugPrint('   - Range: ${normalizedStart.toIso8601String().split('T')[0]} to ${normalizedEnd.toIso8601String().split('T')[0]}');
+
+    // Si la date est hors de la période de validité du planning
     if (normalizedDate.isBefore(normalizedStart) || normalizedDate.isAfter(normalizedEnd)) {
+      debugPrint('   - Out of range: true');
       return false;
     }
 
-    return date.weekday == dayOfWeek.index + 1;
+    // Le jour de la semaine doit correspondre
+    final matchesDay = date.weekday == dayOfWeek.index + 1;
+    debugPrint('   - Day match: $matchesDay (Target: ${date.weekday}, Schedule Day: ${dayOfWeek.index + 1})');
+    
+    return matchesDay;
   }
 
   /// Désérialisation depuis Supabase

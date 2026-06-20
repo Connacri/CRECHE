@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/child_model_complete.dart';
 import '../models/enrollment_model_complete.dart';
@@ -270,8 +271,28 @@ class SupabaseChildService extends AdminSupabaseService {
   }
 
   Future<String> createEnrollment(EnrollmentModel enrollment) async {
-    final response = await adminClient.from('enrollments').insert(enrollment.toSupabase()).select().single();
-    return response['id'] as String;
+    try {
+      final data = enrollment.toSupabase();
+      debugPrint('🛰️ [SupabaseChildService] createEnrollment (Supabase): $data');
+      
+      final response = await adminClient
+          .from('enrollments')
+          .insert(data)
+          .select()
+          .single();
+          
+      debugPrint('🛰️ [SupabaseChildService] Supabase response: $response');
+      return response['id'] as String;
+    } catch (e) {
+      debugPrint('❌ [SupabaseChildService] createEnrollment Error: $e');
+      if (e is PostgrestException) {
+        debugPrint('   - Code: ${e.code}');
+        debugPrint('   - Message: ${e.message}');
+        debugPrint('   - Details: ${e.details}');
+        debugPrint('   - Hint: ${e.hint}');
+      }
+      rethrow;
+    }
   }
 
   Future<void> updateEnrollment(String enrollmentId, Map<String, dynamic> updates) async {
@@ -279,11 +300,77 @@ class SupabaseChildService extends AdminSupabaseService {
   }
 
   Future<List<SessionSchedule>> getSchedulesForParent(String parentId) async {
-    final enrollmentsResponse = await adminClient.from('enrollments').select('course_id').eq('parent_id', parentId).eq('status', 'approved');
+    // 1. Récupérer les inscriptions pour identifier les cours concernés
+    final enrollmentsResponse = await adminClient
+        .from('enrollments')
+        .select('course_id')
+        .eq('parent_id', parentId)
+        .or('status.eq.approved,status.eq.pending');
+        
     final courseIds = (enrollmentsResponse as List).map((e) => e['course_id'] as String).toList();
     if (courseIds.isEmpty) return [];
-    final schedulesResponse = await adminClient.from('session_schedules').select().inFilter('course_id', courseIds);
-    return (schedulesResponse as List).map((data) => SessionSchedule.fromSupabase(data)).toList();
+    
+    // 2. Récupérer les sessions explicites (table session_schedules)
+    final schedulesResponse = await adminClient
+        .from('session_schedules')
+        .select('*, courses(*)')
+        .inFilter('course_id', courseIds);
+
+    final List<SessionSchedule> sessions = (schedulesResponse as List)
+        .map((data) => SessionSchedule.fromSupabase(data))
+        .toList();
+
+    // 3. Récupérer les cours qui ont un planning intégré (champs day_of_week, start_time, etc.)
+    final coursesWithPlanningResponse = await adminClient
+        .from('courses')
+        .select()
+        .inFilter('id', courseIds)
+        .not('day_of_week', 'is', null)
+        .not('start_time', 'is', null)
+        .not('end_time', 'is', null)
+        .eq('is_active', true);
+
+    final courseData = coursesWithPlanningResponse as List;
+    
+    for (var c in courseData) {
+      final courseId = c['id'] as String;
+      final rawDay = c['day_of_week'] as int;
+      final dayIndex = rawDay - 1; // 1-7 -> 0-6
+      
+      if (dayIndex < 0 || dayIndex > 6) continue;
+
+      final startTimeStr = c['start_time'] as String;
+      final endTimeStr = c['end_time'] as String;
+      final parsedStart = TimeSlot.parseTime(startTimeStr);
+      
+      // Éviter les doublons si une session explicite existe déjà pour ce créneau
+      final exists = sessions.any((s) => 
+        s.courseId == courseId && 
+        s.dayOfWeek.index == dayIndex && 
+        s.timeSlot.start.hour == parsedStart.hour &&
+        s.timeSlot.start.minute == parsedStart.minute
+      );
+
+      if (!exists) {
+        sessions.add(SessionSchedule(
+          id: 'course-$courseId',
+          courseId: courseId,
+          courseTitle: c['title'],
+          dayOfWeek: DayOfWeek.values[dayIndex],
+          timeSlot: TimeSlot.fromMap({'start': startTimeStr, 'end': endTimeStr}),
+          startDate: DateTime.parse(c['season_start_date']),
+          endDate: DateTime.parse(c['season_end_date']),
+          currentEnrollment: c['current_students'] ?? 0,
+          maxCapacity: c['max_students'] ?? 30,
+          coachId: c['coach_id'],
+          roomName: c['room_name'],
+          schoolId: c['club_id'],
+          courseCategory: c['category'],
+        ));
+      }
+    }
+
+    return sessions;
   }
 
   Future<List<DailyActivity>> getDailyActivities(String parentId, DateTime date) async {
