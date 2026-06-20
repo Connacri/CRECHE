@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -36,7 +37,7 @@ void main() async {
   if (kIsWeb || Platform.isAndroid || Platform.isIOS) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
-
+  await dotenv.load();
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.anonKey,
@@ -59,6 +60,8 @@ void main() async {
     ),
   );
 }
+
+
 
 class CrecheApp extends StatelessWidget {
   const CrecheApp({super.key});

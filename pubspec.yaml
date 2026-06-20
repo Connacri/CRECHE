@@ -54,6 +54,7 @@ dependencies:
   google_maps_flutter: ^2.17.1
   google_maps_flutter_web: ^0.6.2+3
   flutter_map_animations: ^0.8.0
+  flutter_dotenv: ^6.0.1
 
 
 
@@ -75,6 +76,7 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
+    - .env
     - assets/
     - assets/images/
     - assets/fonts/
