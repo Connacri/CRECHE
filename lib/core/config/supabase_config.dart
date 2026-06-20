@@ -26,19 +26,21 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 // }
 
 class SupabaseConfig {
-  // Supprimez les valeurs par défaut en dur
-  static final String url = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: dotenv.env['SUPABASE_URL'] ?? '', // Plus de fallback
-  );
+  static String get url {
+    const fromEnv = String.fromEnvironment('SUPABASE_URL');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['SUPABASE_URL'] ?? '';
+  }
 
-  static  String anonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-  );
+  static String get anonKey {
+    const fromEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  }
 
-  static  String serviceRoleKey = String.fromEnvironment(
-    'SUPABASE_SERVICE_ROLE_KEY',
-    defaultValue: dotenv.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '',
-  );
+  static String get serviceRoleKey {
+    const fromEnv = String.fromEnvironment('SUPABASE_SERVICE_ROLE_KEY');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '';
+  }
 }
