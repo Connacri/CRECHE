@@ -30,27 +30,30 @@ class ParentDashboard extends StatefulWidget {
 
 class _ParentDashboardState extends State<ParentDashboard> {
   int _selectedIndex = 0;
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _isDataLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAndLoadData();
-    });
+    _checkAndLoadData();
   }
 
   void _checkAndLoadData() {
     final authProvider = context.read<AuthProviderV2>();
-    if (authProvider.userData != null && !_isDataLoaded) {
+    if (authProvider.userData != null && !_isDataLoaded && !_isLoading) {
+      // Use microtask or post frame callback if needed, but here we can call loadData directly 
+      // as it handles its own setState
       _loadData();
     }
   }
 
   Future<void> _loadData() async {
-    if (_isDataLoaded) return;
+    if (_isDataLoaded || _isLoading) return;
+    
     setState(() => _isLoading = true);
+    debugPrint('🔄 [ParentDashboard] Starting initial data load...');
+    
     try {
       final authProvider = context.read<AuthProviderV2>();
       if (authProvider.userData != null) {
@@ -71,24 +74,25 @@ class _ParentDashboardState extends State<ParentDashboard> {
         
         _isDataLoaded = true;
       }
-      setState(() => _isLoading = false);
     } catch (e) {
       debugPrint('❌ Error loading dashboard data: $e');
-      setState(() => _isLoading = false);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProviderV2>();
-    final childProvider = context.watch<ChildEnrollmentProvider>();
+    // Only watch specific auth state needed for logic
+    final authStatus = context.select<AuthProviderV2, AppAuthState>((p) => p.state);
+    final hasUserData = context.select<AuthProviderV2, bool>((p) => p.userData != null);
     
-    // Auto-load if data is not loaded yet and user data is available
-    if (auth.userData != null && !_isDataLoaded && !_isLoading) {
+    // Auto-load if data is not loaded yet and user data becomes available (e.g. after login)
+    if (hasUserData && !_isDataLoaded && !_isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
     }
-
-    final isGlobalLoading = auth.isLoading || childProvider.isLoading;
 
     return Scaffold(
       extendBody: true,
@@ -105,7 +109,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
           ),
           SafeArea(
             bottom: false,
-            child: (isGlobalLoading && _isLoading) 
+            child: (authStatus == AppAuthState.loading || (_isLoading && !_isDataLoaded))
                 ? const Center(child: CircularProgressIndicator()) 
                 : _getSelectedPage(),
           ),
