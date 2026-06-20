@@ -68,7 +68,6 @@ class HybridImagePickerService {
         maxHeight: 1080,
         imageQuality: 85,
       );
-      if (pickedFiles == null) return null;
       return pickedFiles.map((x) => File(x.path)).toList();
     } catch (e) {
       debugPrint('❌ [HybridPicker] pickMultiImage error: $e');

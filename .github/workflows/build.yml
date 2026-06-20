@@ -122,10 +122,14 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows
+        shell: pwsh
         run: |
-          flutter build windows --release \
-            --build-name=${{ needs.version.outputs.version }} \
-            --build-number=${{ github.run_number }} \
+          $version = "${{ needs.version.outputs.version }}"
+          $runNumber = "${{ github.run_number }}"
+          
+          flutter build windows --release `
+            --build-name=$version `
+            --build-number=$runNumber `
             --dart-define-from-file=.env
 
       - name: Build Installer

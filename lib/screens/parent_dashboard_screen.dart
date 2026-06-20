@@ -185,7 +185,7 @@ class _UserHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Bonjour,', style: TextStyle(color: Colors.white, fontSize: 14)),
-                Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(userName.capitalize(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               ],
             ),
             const Spacer(),
@@ -254,11 +254,11 @@ class _QuickChildren extends StatelessWidget {
                             key: ValueKey(child.photoUrl ?? child.id),
                             radius: 30,
                             backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                            child: child.photoUrl == null ? Text(child.firstName[0]) : null,
+                            child: child.photoUrl == null ? Text(child.firstName[0].capitalize()) : null,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(child.firstName, style: const TextStyle(fontSize: 12)),
+                        Text(child.firstName.capitalize(), style: const TextStyle(fontSize: 12)),
                       ],
                     ),
                   );
@@ -607,7 +607,7 @@ class _CoursesPage extends StatelessWidget {
         
         final enrolledChildrenNames = children
             .where((child) => childProvider.isChildEnrolledInCourse(child.id, course.id))
-            .map((child) => child.firstName)
+            .map((child) => child.firstName.capitalize())
             .toList();
 
         // The blue dot ONLY applies to ACTIVE courses that were EDITED (modified)
@@ -738,7 +738,7 @@ class _BillingPage extends StatelessWidget {
                       ? CachedNetworkImageProvider(child.photoUrl!)
                       : null,
                   child: child.photoUrl == null
-                      ? Text(child.firstName[0],
+                      ? Text(child.firstName[0].capitalize(),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
                       : null,
                 ),
@@ -747,7 +747,7 @@ class _BillingPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(child.fullName,
+                      Text(child.fullName.capitalize(),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       Text(
                         '${enrollments.length} inscription${enrollments.length > 1 ? "s" : ""}',
@@ -888,7 +888,7 @@ class _BillingPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    course.category.displayName,
+                    course.category.displayName.capitalize(),
                     style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                   ),
                 ],
@@ -1006,7 +1006,7 @@ class _BillingPage extends StatelessWidget {
                   data: jsonEncode({
                     'type': 'enrollment_payment',
                     'id': enrollment.id,
-                    'child_name': child.firstName,
+                    'child_name': child.firstName.capitalize(),
                     'amount': enrollment.totalAmount ?? 0.0,
                   }),
                   version: QrVersions.auto,
@@ -1053,7 +1053,7 @@ class _BillingPage extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
-        status.displayName,
+        status.displayName.capitalize(),
         style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );
@@ -1091,7 +1091,7 @@ class _GeofencingSection extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${child.firstName} est dans le transport', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('${child.firstName.capitalize()} est dans le transport', style: const TextStyle(fontWeight: FontWeight.bold)),
                             Text('Vitesse: ${loc['speed']?.toStringAsFixed(1)} km/h • Zone: Centre-Ville', style: const TextStyle(fontSize: 12)),
                           ],
                         ),
@@ -1153,10 +1153,10 @@ class _ChildrenTimelines extends StatelessWidget {
                               CircleAvatar(
                                 radius: 14,
                                 backgroundImage: child.photoUrl != null ? CachedNetworkImageProvider(child.photoUrl!) : null,
-                                child: child.photoUrl == null ? Text(child.firstName[0]) : null,
+                                child: child.photoUrl == null ? Text(child.firstName[0].capitalize()) : null,
                               ),
                               const SizedBox(width: 8),
-                              Text(child.firstName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(child.firstName.capitalize(), style: const TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           ),
                           const Divider(),
