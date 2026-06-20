@@ -1,4 +1,4 @@
-enum ChildGender { male, female, other }
+enum ChildGender { male, female}
 
 class MedicalInfo {
   final List<String> allergies;
@@ -100,7 +100,7 @@ class ChildModel {
       dateOfBirth: DateTime.parse(data['date_of_birth']),
       gender: ChildGender.values.firstWhere(
         (g) => g.name == data['gender'],
-        orElse: () => ChildGender.other,
+        orElse: () => ChildGender.male,
       ),
       photoUrl: data['photo_url'],
       birthCertificateUrl: data['birth_certificate_url'],
@@ -133,20 +133,7 @@ class ChildModel {
     };
   }
 
-  factory ChildModel.mock() {
-    return ChildModel(
-      id: 'mock-id',
-      parentId: 'mock-parent',
-      firstName: 'Enfant',
-      lastName: 'Inconnu',
-      dateOfBirth: DateTime.now().subtract(const Duration(days: 365 * 3)),
-      gender: ChildGender.other,
-      medicalInfo: MedicalInfo(),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      isActive: false,
-    );
-  }
+
 
   ChildModel copyWith({
     String? id,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:creche/dependences/calendar_timeline/calendar_timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -77,7 +78,7 @@ class ChildProfileDialog extends StatelessWidget {
                   pinned: true,
                   flexibleSpace: FlexibleSpaceBar(
                     title: Text(
-                      '${childModel.firstName} ${childModel.lastName}',
+                      '${childModel.firstName.capitalize()} ${childModel.lastName.capitalize()}',
                       style: const TextStyle(
                         color: Colors.white, 
                         fontWeight: FontWeight.bold,
@@ -101,7 +102,7 @@ class ChildProfileDialog extends StatelessWidget {
                                 color: colorScheme.primary,
                                 child: Center(
                                   child: Text(
-                                    childModel.firstName[0],
+                                    childModel.firstName[0].capitalize(),
                                     style: const TextStyle(fontSize: 80, color: Colors.white),
                                   ),
                                 ),
@@ -139,7 +140,7 @@ class ChildProfileDialog extends StatelessWidget {
                         ),
                         Row(
                           children: [
-                            Expanded(child: _buildInfoRow(context, childModel.gender == ChildGender.male ? Icons.male : Icons.female, 'Genre', childModel.gender == ChildGender.male ? 'Garçon' : childModel.gender == ChildGender.female ? 'Fille' : 'Autre')),
+                              Expanded(child: _buildInfoRow(context, childModel.gender == ChildGender.male ? Icons.male : Icons.female, 'Genre', childModel.gender == ChildGender.male ? 'Garçon' : childModel.gender == ChildGender.female ? 'Fille' : 'Autre')),
                             Expanded(child: _buildInfoRow(context, Icons.school, 'Niveau', childModel.schoolGrade ?? 'Non spécifié')),
                           ],
                         ),
@@ -554,6 +555,8 @@ class ChildProfileDialog extends StatelessWidget {
   }
 
   String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
+
+
 }
 
 class FullScreenImageViewer extends StatelessWidget {

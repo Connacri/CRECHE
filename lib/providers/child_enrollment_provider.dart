@@ -560,6 +560,14 @@ class ChildEnrollmentProvider with ChangeNotifier {
     return _enrollments.fold(0.0, (sum, e) => sum + e.remainingAmount);
   }
 
+  double get totalDueParent => _enrollments
+      .where((e) => e.status == EnrollmentStatus.approved)
+      .fold(0.0, (sum, e) => sum + e.remainingAmount);
+
+  double get totalUpcomingParent => _enrollments
+      .where((e) => e.status == EnrollmentStatus.pending)
+      .fold(0.0, (sum, e) => sum + (e.totalAmount ?? 0.0));
+
   DateTime? getNextRenewalDateForChild(String childId) {
     final enrollments = getEnrollmentsForChild(childId).where((e) => e.status == EnrollmentStatus.approved).toList();
     if (enrollments.isEmpty) return null;

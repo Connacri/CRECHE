@@ -118,19 +118,24 @@ class _ParentDashboardState extends State<ParentDashboard> {
     );
   }
 
+  void switchTab(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
   Widget _getSelectedPage() {
     switch (_selectedIndex) {
-      case 0: return const _HomePage();
+      case 0: return _HomePage(onSwitchTab: switchTab);
       case 1: return const _CoursesPage();
       case 2: return const _BillingPage();
       case 3: return const ProfileScreen();
-      default: return const _HomePage();
+      default: return _HomePage(onSwitchTab: switchTab);
     }
   }
 }
 
 class _HomePage extends StatelessWidget {
-  const _HomePage();
+  final Function(int) onSwitchTab;
+  const _HomePage({required this.onSwitchTab});
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +143,8 @@ class _HomePage extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         const _UserHeader(),
+        const SizedBox(height: 32),
+        _WalletCard(onDetailsTap: () => onSwitchTab(2)),
         const SizedBox(height: 32),
         const _QuickChildren(),
         const SizedBox(height: 32),
@@ -185,17 +192,206 @@ class _UserHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Bonjour,', style: TextStyle(color: Colors.white, fontSize: 14)),
-                Text(userName.capitalize(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(userName.capitalize(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
               ],
             ),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.notifications_outlined),
+              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
               onPressed: () {},
             ),
           ],
         );
       },
+    );
+  }
+}
+
+class _WalletCard extends StatelessWidget {
+  final VoidCallback onDetailsTap;
+  const _WalletCard({required this.onDetailsTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ChildEnrollmentProvider>(
+      builder: (context, provider, _) {
+        final totalDue = provider.totalDueParent;
+        final totalUpcoming = provider.totalUpcomingParent;
+        final totalBalance = totalDue + totalUpcoming;
+
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -20,
+                  top: -20,
+                  child: Icon(
+                    Icons.account_balance_wallet,
+                    size: 120,
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Portefeuille',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Solde total',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.wallet, color: Colors.white, size: 20),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        '${totalBalance.toStringAsFixed(0)} DA',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildWalletStat(
+                              'Dû',
+                              '${totalDue.toStringAsFixed(0)} DA',
+                              Colors.redAccent,
+                            ),
+                            Container(
+                              height: 30,
+                              width: 1,
+                              color: Colors.white24,
+                              margin: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            _buildWalletStat(
+                              'À venir',
+                              '${totalUpcoming.toStringAsFixed(0)} DA',
+                              Colors.orangeAccent,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          onPressed: onDetailsTap,
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Theme.of(context).colorScheme.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text(
+                            'Voir les détails des factures',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWalletStat(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

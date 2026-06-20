@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_cropper/image_cropper.dart';
 import '../models/child_model_complete.dart';
+import '../models/models_widgets.dart';
 import '../providers/child_enrollment_provider.dart';
 import '../services/hybrid_image_picker.dart';
 
@@ -38,6 +39,8 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   File? _medicalCertificate;
   bool _isLoading = false;
 
+  String? _selectedBloodType;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +50,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     
     final medical = widget.child?.medicalInfo;
     _bloodTypeController = TextEditingController(text: medical?.bloodType);
+    _selectedBloodType = medical?.bloodType;
     _allergiesController = TextEditingController(text: medical?.allergies.join(', '));
     _medicationsController = TextEditingController(text: medical?.medications.join(', '));
     _emergencyContactController = TextEditingController(text: medical?.emergencyContact);
@@ -106,7 +110,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     final provider = context.read<ChildEnrollmentProvider>();
 
     final medicalInfo = MedicalInfo(
-      bloodType: _bloodTypeController.text.trim(),
+      bloodType: _selectedBloodType,
       allergies: _allergiesController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
       medications: _medicationsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
       emergencyContact: _emergencyContactController.text.trim(),
@@ -213,28 +217,129 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                     if (date != null) setState(() => _dateOfBirth = date);
                   },
                 ),
-                DropdownButtonFormField<ChildGender>(
-                  initialValue: _gender,
-                  decoration: const InputDecoration(labelText: 'Genre', prefixIcon: Icon(Icons.wc)),
-                  items: ChildGender.values.map((g) => DropdownMenuItem(
-                    value: g,
-                    child: Text(g == ChildGender.male ? 'Garçon' : g == ChildGender.female ? 'Fille' : 'Autre'),
-                  )).toList(),
-                  onChanged: (v) => setState(() => _gender = v!),
-                ),
-                TextFormField(
-                  controller: _schoolGradeController,
-                  decoration: const InputDecoration(labelText: 'Niveau scolaire (ex: Petite Section)', prefixIcon: Icon(Icons.school)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: SegmentedButton<ChildGender>(
+                        showSelectedIcon: false,
+                        segments: const [
+                          ButtonSegment(
+                            value: ChildGender.male,
+                            icon: Icon(Icons.male, size: 28),
+                            tooltip: 'Garçon',
+                          ),
+                          ButtonSegment(
+                            value: ChildGender.female,
+                            icon: Icon(Icons.female, size: 28),
+                            tooltip: 'Fille',
+                          ),
+                        ],
+                        selected: {_gender},
+                        onSelectionChanged: (Set<ChildGender> newSelection) {
+                          setState(() => _gender = newSelection.first);
+                        },
+                        style: SegmentedButton.styleFrom(
+                          visualDensity: VisualDensity.comfortable,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          selectedBackgroundColor: _gender == ChildGender.male 
+                              ? Colors.blue.withValues(alpha: 0.2) 
+                              : Colors.pink.withValues(alpha: 0.2),
+                          selectedForegroundColor: _gender == ChildGender.male 
+                              ? Colors.blue 
+                              : Colors.pink,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 4,
+                      child: TextFormField(
+                        controller: _schoolGradeController,
+                        decoration: const InputDecoration(
+                          labelText: 'Niveau',
+                          prefixIcon: Icon(Icons.school),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 
                 const SizedBox(height: 32),
                 const Text('Santé & Urgence', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
                 const Divider(),
-                
-                TextFormField(
-                  controller: _bloodTypeController,
-                  decoration: const InputDecoration(labelText: 'Groupe Sanguin (ex: A+)', prefixIcon: Icon(Icons.bloodtype)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Groupe sanguin',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: bloodTypes.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 1.8,
+                      ),
+                      itemBuilder: (context, index) {
+                        final type = bloodTypes[index];
+                        final selected = _selectedBloodType == type;
+
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedBloodType = type;
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: selected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                type,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
+
+                // TextFormField(
+                //   controller: _bloodTypeController,
+                //   decoration: const InputDecoration(labelText: 'Groupe Sanguin (ex: A+)', prefixIcon: Icon(Icons.bloodtype)),
+                // ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _allergiesController,
                   decoration: const InputDecoration(
@@ -271,20 +376,29 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                 const Divider(),
                 const SizedBox(height: 16),
                 
-                _buildDocumentPicker(
-                  label: "Extrait de naissance",
-                  file: _birthCertificate,
-                  currentUrl: widget.child?.birthCertificateUrl,
-                  onTap: _pickBirthCertificate,
-                  onRemove: () => setState(() => _birthCertificate = null),
-                ),
-                const SizedBox(height: 24),
-                _buildDocumentPicker(
-                  label: "Certificat médical",
-                  file: _medicalCertificate,
-                  currentUrl: widget.child?.medicalCertificateUrl,
-                  onTap: _pickMedicalCertificate,
-                  onRemove: () => setState(() => _medicalCertificate = null),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _buildDocumentPicker(
+                        label: "Extrait de naissance",
+                        file: _birthCertificate,
+                        currentUrl: widget.child?.birthCertificateUrl,
+                        onTap: _pickBirthCertificate,
+                        onRemove: () => setState(() => _birthCertificate = null),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildDocumentPicker(
+                        label: "Certificat médical",
+                        file: _medicalCertificate,
+                        currentUrl: widget.child?.medicalCertificateUrl,
+                        onTap: _pickMedicalCertificate,
+                        onRemove: () => setState(() => _medicalCertificate = null),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
               ],
@@ -320,33 +434,49 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center),
+        const SizedBox(height: 12),
         if (hasFile)
           Stack(
             children: [
               Container(
-                height: 150,
+                height: 180,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   child: isImage
                       ? (file != null
                           ? Image.file(file, fit: BoxFit.cover)
                           : CachedNetworkImage(imageUrl: currentUrl!, fit: BoxFit.cover, placeholder: (c, u) => const Center(child: CircularProgressIndicator())))
                       : Container(
-                          color: Colors.grey[100],
+                          color: Colors.grey[50],
                           child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.description, size: 50, color: Colors.blue),
+                                Icon(Icons.description_rounded, size: 60, color: Colors.blue.shade400),
                                 const SizedBox(height: 8),
-                                Text(file != null ? file.path.split('/').last : "Document existant", style: const TextStyle(fontSize: 12)),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: Text(
+                                    file != null ? file.path.split('/').last : "Document",
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -368,16 +498,41 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
             ],
           )
         else
-          OutlinedButton.icon(
-            onPressed: onTap,
-            icon: const Icon(Icons.upload_file),
-            label: const Text("Télécharger le document"),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.blue.withValues(alpha: 0.2),
+                  width: 2,
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_circle_outline_rounded, size: 48, color: Colors.blue.shade300),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Ajouter",
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
       ],
     );
   }
+
+
 }
