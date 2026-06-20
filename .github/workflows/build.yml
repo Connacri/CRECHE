@@ -22,59 +22,19 @@ jobs:
         id: v
         run: |
           git fetch --tags --force
-          # Get the highest tag by version number, or default to v1.2.104
           LAST_TAG=$(git tag -l "v*" | sort -V | tail -n1)
           if [ -z "$LAST_TAG" ]; then
             LAST_TAG="v1.2.104"
           fi
           VERSION=${LAST_TAG#v}
-
-          # Split version into major, minor, patch
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-          # Increment patch
           PATCH=$((PATCH + 1))
-          
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Computed version: $NEW_VERSION"
 
-  # ✅ Nouveau job pour préparer l'environnement
-  prepare-env:
-    runs-on: ubuntu-latest
-    outputs:
-      env_file: ${{ steps.create-env.outputs.env_file }}
-    steps:
-      - name: Create .env file
-        id: create-env
-        run: |
-          cat << EOF > .env
-          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-          EOF
-          
-          # Optionnel: Ajouter la clé service role seulement si nécessaire
-          # SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          
-          echo "✅ .env file created"
-          echo "env_file=.env" >> $GITHUB_OUTPUT
-          
-          # Vérifier que le fichier existe
-          if [ -f ".env" ]; then
-            echo "✅ .env file verified"
-          else
-            echo "❌ .env file creation failed"
-            exit 1
-          fi
-
-      - name: Upload .env as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: env-file
-          path: .env
-          retention-days: 1  # Supprimer après 1 jour pour sécurité
-
   build-android:
-    needs: [version, prepare-env]
+    needs: version
     runs-on: ubuntu-latest
 
     steps:
@@ -92,28 +52,23 @@ jobs:
           channel: stable
           cache: true
 
-      # ✅ Télécharger le .env créé par prepare-env
-      - name: Download .env file
-        uses: actions/download-artifact@v4
-        with:
-          name: env-file
-          path: .
-
-      - name: Verify .env exists
+      # ✅ Créer le .env directement dans ce job
+      - name: Create .env file
         run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+          echo "✅ .env file created"
+          # Vérification rapide
           if [ -f ".env" ]; then
-            echo "✅ .env file found"
-            # Afficher les premières lignes pour debug (sans révéler les clés)
-            head -n 2 .env
+            echo "✅ .env file verified"
           else
-            echo "❌ .env file not found"
+            echo "❌ .env file creation failed"
             exit 1
           fi
 
       - name: Install deps
         run: flutter pub get
 
-      # ✅ Build avec dart-define-from-file
       - name: Build APK
         run: |
           flutter build apk --release \
@@ -132,9 +87,10 @@ jobs:
         with:
           name: apk
           path: release/creche-android.v${{ needs.version.outputs.version }}.apk
+          retention-days: 30
 
   build-windows:
-    needs: [version, prepare-env]
+    needs: version
     runs-on: windows-latest
 
     steps:
@@ -146,27 +102,25 @@ jobs:
           channel: stable
           cache: true
 
-      # ✅ Télécharger le .env pour Windows
-      - name: Download .env file
-        uses: actions/download-artifact@v4
-        with:
-          name: env-file
-          path: .
-
-      - name: Verify .env exists
+      # ✅ Créer le .env pour Windows
+      - name: Create .env file
         shell: pwsh
         run: |
+          @"
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          "@ | Out-File -FilePath .env -Encoding utf8
+          Write-Host "✅ .env file created"
           if (Test-Path ".env") {
-            Write-Host "✅ .env file found"
+            Write-Host "✅ .env file verified"
           } else {
-            Write-Host "❌ .env file not found"
+            Write-Host "❌ .env file creation failed"
             exit 1
           }
 
       - name: Install deps
         run: flutter pub get
 
-      # ✅ Build Windows avec dart-define-from-file
       - name: Build Windows
         run: |
           flutter build windows --release \
@@ -181,7 +135,6 @@ jobs:
           $ROOT = "${{ github.workspace }}"
           $ISCC = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           
-          # Set environment variable for Inno Setup GetEnv
           $env:APP_VERSION = $VERSION
           
           $SOURCE_DIR = "$ROOT\build\windows\x64\runner\Release"
@@ -220,32 +173,7 @@ jobs:
         with:
           name: windows
           path: release/
-
-  # ✅ Optionnel: Job pour nettoyer le .env
-  cleanup:
-    needs: [build-android, build-windows]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Delete .env artifact
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-            
-            const envArtifact = artifacts.artifacts.find(a => a.name === 'env-file');
-            if (envArtifact) {
-              await github.rest.actions.deleteArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: envArtifact.id,
-              });
-              console.log('✅ env-file artifact deleted');
-            }
+          retention-days: 30
 
   release:
     needs: [version, build-android, build-windows]
@@ -271,9 +199,7 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          # Create tag if it doesn't exist, ignore error if it does
           git tag v${{ needs.version.outputs.version }} || echo "Tag v${{ needs.version.outputs.version }} already exists"
-          # Push tag, ignore error if it already exists on remote
           git push origin v${{ needs.version.outputs.version }} || echo "Tag v${{ needs.version.outputs.version }} already exists on remote"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
