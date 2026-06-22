@@ -649,53 +649,56 @@ class _CalendarSectionState extends State<_CalendarSection> {
                           .map((child) => child.firstName.capitalize())
                           .toList();
 
-                      return ListTile(
-                        onTap: () {
-                          if (course.id.isNotEmpty && course.id != 'mock-id') {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(
-                              course: course,
-                              enrolledChildren: enrolledChildrenNames,
-                            )));
-                          }
-                        },
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              schedule.timeSlot.displayTime,
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-                              textAlign: TextAlign.center,
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          onTap: () {
+                            if (course.id.isNotEmpty && course.id != 'mock-id') {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(
+                                course: course,
+                                enrolledChildren: enrolledChildrenNames,
+                              )));
+                            }
+                          },
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                schedule.timeSlot.displayTime,
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
-                        ),
-                        title: Text(
-                          schedule.courseTitle ?? 'Cours #${schedule.courseId.substring(0, 5)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(schedule.location ?? 'Salle non définie', style: const TextStyle(fontSize: 12)),
-                            if (enrolledChildrenNames.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(
-                                  'Pour: ${enrolledChildrenNames.join(", ")}',
-                                  style: TextStyle(
-                                    fontSize: 11, 
-                                    color: Theme.of(context).colorScheme.primary, 
-                                    fontWeight: FontWeight.w600
+                          title: Text(
+                            schedule.courseTitle ?? 'Cours #${schedule.courseId.substring(0, 5)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(schedule.location ?? 'Salle non définie', style: const TextStyle(fontSize: 12)),
+                              if (enrolledChildrenNames.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    'Pour: ${enrolledChildrenNames.join(", ")}',
+                                    style: TextStyle(
+                                      fontSize: 11, 
+                                      color: Theme.of(context).colorScheme.primary, 
+                                      fontWeight: FontWeight.w600
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
+                          trailing: const Icon(Icons.chevron_right, size: 16),
                         ),
-                        trailing: const Icon(Icons.chevron_right, size: 16),
                       );
                     },
                   );
