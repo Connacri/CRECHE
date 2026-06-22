@@ -706,7 +706,12 @@ class ChildEnrollmentProvider with ChangeNotifier {
   }
 
   void _setError(String? value) { _error = value; notifyListeners(); }
-  void _setLoading(bool value) { _isLoading = value; notifyListeners(); }
+  void _setLoading(bool value) {
+    if (_isLoading != value) {
+      _isLoading = value;
+      if (hasListeners) notifyListeners();
+    }
+  }
 }
 
 extension EnrollmentModelExtensions on EnrollmentModel {

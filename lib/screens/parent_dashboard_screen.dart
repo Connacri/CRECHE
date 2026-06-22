@@ -36,7 +36,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
   @override
   void initState() {
     super.initState();
-    _checkAndLoadData();
+    // Schedule data loading after the first frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkAndLoadData();
+    });
   }
 
   void _checkAndLoadData() {
@@ -91,7 +94,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
     
     // Auto-load if data is not loaded yet and user data becomes available (e.g. after login)
     if (hasUserData && !_isDataLoaded && !_isLoading) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+      // FIX: Wrap in post frame callback to avoid "setState() during build" error
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadData();
+      });
     }
 
     return Scaffold(

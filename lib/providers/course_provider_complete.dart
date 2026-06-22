@@ -563,8 +563,10 @@ class CourseProvider extends ChangeNotifier {
   }
 
   void _setLoading(bool value) {
-    _isLoading = value;
-    notifyListeners();
+    if (_isLoading != value) {
+      _isLoading = value;
+      if (hasListeners) notifyListeners();
+    }
   }
 
   void _setError(String error) {
