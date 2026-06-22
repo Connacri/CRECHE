@@ -798,22 +798,25 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
       await showModalBottomSheet(
         context: context,
         builder: (sheetContext) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: availableMaps.map((map) {
-              return ListTile(
-                leading: const Icon(Icons.map_outlined),
-                title: Text(map.mapName),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  map.showMarker(
-                    coords: Coords(_course.location.latitude, _course.location.longitude),
-                    title: _course.title,
-                    description: _course.location.address,
-                  );
-                },
-              );
-            }).toList(),
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: availableMaps.map((map) {
+                return ListTile(
+                  leading: const Icon(Icons.map_outlined),
+                  title: Text(map.mapName),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    map.showMarker(
+                      coords: Coords(_course.location.latitude, _course.location.longitude),
+                      title: _course.title,
+                      description: _course.location.address,
+                    );
+                  },
+                );
+              }).toList(),
+            ),
           ),
         ),
       );
