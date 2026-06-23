@@ -358,14 +358,19 @@ class _AddCoachDialogState extends State<_AddCoachDialog> {
                 const SizedBox(height: 12),
                 Text('Résultats:', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[700])),
                 const SizedBox(height: 8),
-                ..._searchResults.map((coach) => ListTile(
-                  dense: true,
-                  selected: _selectedCoach?['id'] == coach['id'],
-                  leading: CircleAvatar(radius: 18, child: Text((coach['name'] as String? ?? '?')[0].toUpperCase())),
-                  title: Text(coach['name'] ?? ''),
-                  subtitle: Text(coach['email'] ?? ''),
-                  onTap: () => setState(() => _selectedCoach = coach),
-                )),
+                Material(
+                  color: Colors.transparent,
+                  child: Column(
+                    children: _searchResults.map((coach) => ListTile(
+                      dense: true,
+                      selected: _selectedCoach?['id'] == coach['id'],
+                      leading: CircleAvatar(radius: 18, child: Text((coach['name'] as String? ?? '?')[0].toUpperCase())),
+                      title: Text(coach['name'] ?? ''),
+                      subtitle: Text(coach['email'] ?? ''),
+                      onTap: () => setState(() => _selectedCoach = coach),
+                    )).toList(),
+                  ),
+                ),
               ],
               if (_selectedCoach != null) ...[
                 const SizedBox(height: 12),

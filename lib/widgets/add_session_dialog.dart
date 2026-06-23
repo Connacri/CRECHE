@@ -148,17 +148,23 @@ class _AddSessionDialogState extends State<AddSessionDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: ListTile(
-                      title: const Text('Début'),
-                      subtitle: Text(_startTime.format(context)),
-                      onTap: () => _selectTime(true),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        title: const Text('Début'),
+                        subtitle: Text(_startTime.format(context)),
+                        onTap: () => _selectTime(true),
+                      ),
                     ),
                   ),
                   Expanded(
-                    child: ListTile(
-                      title: const Text('Fin'),
-                      subtitle: Text(_endTime.format(context)),
-                      onTap: () => _selectTime(false),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        title: const Text('Fin'),
+                        subtitle: Text(_endTime.format(context)),
+                        onTap: () => _selectTime(false),
+                      ),
                     ),
                   ),
                 ],

@@ -201,21 +201,24 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                   validator: (v) => v!.isEmpty ? 'Requis' : null,
                 ),
                 const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today, color: Colors.blue),
-                  title: Text(_dateOfBirth == null
-                      ? 'Sélectionner la date de naissance'
-                      : 'Né(e) le: ${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 3)),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
-                      lastDate: DateTime.now(),
-                    );
-                    if (date != null) setState(() => _dateOfBirth = date);
-                  },
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today, color: Colors.blue),
+                    title: Text(_dateOfBirth == null
+                        ? 'Sélectionner la date de naissance'
+                        : 'Né(e) le: ${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 3)),
+                        firstDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) setState(() => _dateOfBirth = date);
+                    },
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(

@@ -434,14 +434,17 @@ class _LocationPickerDialogWindowsState
         itemCount: _searchResults.length,
         itemBuilder: (context, index) {
           final result = _searchResults[index];
-          return ListTile(
-            leading: const Icon(Icons.location_on),
-            title: Text(
-              result.displayName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          return Material(
+            color: Colors.transparent,
+            child: ListTile(
+              leading: const Icon(Icons.location_on),
+              title: Text(
+                result.displayName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              onTap: () => _selectSearchResult(result),
             ),
-            onTap: () => _selectSearchResult(result),
           );
         },
       ),

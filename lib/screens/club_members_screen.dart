@@ -294,29 +294,32 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
                   const Center(child: CircularProgressIndicator())
                 else
                   Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: searchResults.length,
-                      itemBuilder: (context, i) {
-                        final user = searchResults[i];
-                        return ListTile(
-                          title: Text(user['name'] ?? ''),
-                          subtitle: Text(user['email'] ?? ''),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.add_circle, color: Colors.green),
-                            onPressed: () async {
-                              final auth = context.read<AuthProviderV2>();
-                              await _clubService.addMember(
-                                clubId: auth.currentUser!.uid,
-                                userId: user['id'],
-                              );
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                              }
-                            },
-                          ),
-                        );
-                      },
+                    child: Material(
+                      color: Colors.transparent,
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: searchResults.length,
+                        itemBuilder: (context, i) {
+                          final user = searchResults[i];
+                          return ListTile(
+                            title: Text(user['name'] ?? ''),
+                            subtitle: Text(user['email'] ?? ''),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.add_circle, color: Colors.green),
+                              onPressed: () async {
+                                final auth = context.read<AuthProviderV2>();
+                                await _clubService.addMember(
+                                  clubId: auth.currentUser!.uid,
+                                  userId: user['id'],
+                                );
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
               ],
