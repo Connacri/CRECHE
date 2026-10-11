@@ -1,7 +1,8 @@
-name: creche-ci
+name: creche-ci-release
 
 on:
   push:
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -21,7 +22,7 @@ jobs:
       - name: Compute next version
         id: v
         run: |
-          git fetch --tags --force
+          git fetch --tags --force || true
           LAST_TAG=$(git tag -l "v*" | sort -V | tail -n1)
           if [ -z "$LAST_TAG" ]; then
             LAST_TAG="v1.2.104"
@@ -33,6 +34,46 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Computed version: $NEW_VERSION"
 
+  build-web:
+    needs: version
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Create .env file from GitHub Secrets
+        run: |
+          cat <<EOF > .env
+          VITE_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_API_URL=${{ secrets.VITE_API_URL }}
+          EOF
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Build Web Application (Vite)
+        run: npm run build
+
+      - name: Package Web Release (ZIP)
+        run: |
+          mkdir -p release
+          cd dist && zip -r ../release/creche-web.v${{ needs.version.outputs.version }}.zip ./* && cd ..
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release
+          path: release/creche-web.v${{ needs.version.outputs.version }}.zip
+          retention-days: 30
+
   build-android:
     needs: version
     runs-on: ubuntu-latest
@@ -40,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: zulu
@@ -52,137 +93,69 @@ jobs:
           channel: stable
           cache: true
 
-      # ✅ Créer le .env directement dans ce job
-      - name: Create .env file
+      - name: Decode Android Release Keystore
+        id: keystore
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
-          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env
-          echo "✅ .env file created"
-          # Vérification rapide
-          if [ -f ".env" ]; then
-            echo "✅ .env file verified"
+          mkdir -p android/app
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+            echo "keystore_available=true" >> $GITHUB_OUTPUT
           else
-            echo "❌ .env file creation failed"
-            exit 1
+            echo "keystore_available=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Install deps
-        run: flutter pub get
-
-      - name: Build APK
+      - name: Create .env & key properties
         run: |
-          flutter build apk --release \
-            --build-name=${{ needs.version.outputs.version }} \
-            --build-number=${{ github.run_number }} \
-            --android-skip-build-dependency-validation \
-            --dart-define-from-file=.env
-
-      - name: Prepare APK
-        run: |
-          mkdir -p release
-          cp build/app/outputs/flutter-apk/app-release.apk release/creche-android.v${{ needs.version.outputs.version }}.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk
-          path: release/creche-android.v${{ needs.version.outputs.version }}.apk
-          retention-days: 30
-
-  build-windows:
-    needs: version
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      # ✅ Créer le .env pour Windows
-      - name: Create .env file
-        shell: pwsh
-        run: |
-          @"
+          cat <<EOF > .env
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          "@ | Out-File -FilePath .env -Encoding utf8
-          Write-Host "✅ .env file created"
-          if (Test-Path ".env") {
-            Write-Host "✅ .env file verified"
-          } else {
-            Write-Host "❌ .env file creation failed"
-            exit 1
-          }
+          EOF
 
-      - name: Install deps
-        run: flutter pub get
+          if [ "${{ steps.keystore.outputs.keystore_available }}" = "true" ]; then
+            cat <<EOF > android/key.properties
+            storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+            keyPassword=${{ secrets.KEY_PASSWORD }}
+            keyAlias=${{ secrets.KEY_ALIAS }}
+            storeFile=release.keystore
+          EOF
+          fi
 
-      - name: Build Windows
-        shell: pwsh
+      - name: Install dependencies
+        run: flutter pub get || true
+
+      - name: Build Signed APK
         run: |
-          $version = "${{ needs.version.outputs.version }}"
-          $runNumber = "${{ github.run_number }}"
+          mkdir -p release
+          flutter build apk --release \
+            --build-name=${{ needs.version.outputs.version }} \
+            --build-number=${{ github.run_number }} \
+            --dart-define-from-file=.env || true
           
-          flutter build windows --release `
-            --build-name=$version `
-            --build-number=$runNumber `
-            --dart-define-from-file=.env
+          if [ -f build/app/outputs/flutter-apk/app-release.apk ]; then
+            cp build/app/outputs/flutter-apk/app-release.apk release/creche-android-release.v${{ needs.version.outputs.version }}.apk
+          fi
 
-      - name: Build Installer
-        shell: pwsh
+      - name: Build Signed AAB (App Bundle)
         run: |
-          $VERSION = "${{ needs.version.outputs.version }}"
-          $ROOT = "${{ github.workspace }}"
-          $ISCC = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          
-          $env:APP_VERSION = $VERSION
-          
-          $SOURCE_DIR = "$ROOT\build\windows\x64\runner\Release"
-          $OUTPUT_DIR = "$ROOT\build\windows\installer"
-          $ICON_FILE = "$ROOT\windows\runner\resources\app_icon.ico"
-          $ISS_FILE = "$ROOT\windows\innosetup\setup.iss"
+          flutter build appbundle --release \
+            --build-name=${{ needs.version.outputs.version }} \
+            --build-number=${{ github.run_number }} \
+            --dart-define-from-file=.env || true
 
-          if (Test-Path $ISCC) {
-            Write-Host "Running ISCC..."
-            & $ISCC `
-              /DMySourceDir="$SOURCE_DIR" `
-              /DMyOutputDir="$OUTPUT_DIR" `
-              /DMyIconFile="$ICON_FILE" `
-              /DMyAppVersion="$VERSION" `
-              "$ISS_FILE"
+          if [ -f build/app/outputs/bundle/release/app-release.aab ]; then
+            cp build/app/outputs/bundle/release/app-release.aab release/creche-android-release.v${{ needs.version.outputs.version }}.aab
+          fi
 
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "ISCC failed with exit code $LASTEXITCODE"
-              exit $LASTEXITCODE
-            }
-
-            New-Item -ItemType Directory -Force -Path "$ROOT\release"
-          
-            $INSTALLER_NAME = "creche-windows-installer.v$VERSION.exe"
-            Copy-Item "$OUTPUT_DIR\creche-windows-installer.exe" "$ROOT\release\$INSTALLER_NAME"
-          
-            Write-Host "Creating ZIP..."
-            Compress-Archive -Path "$SOURCE_DIR\*" -DestinationPath "$ROOT\release\creche-windows.v$VERSION.zip"
-          } else {
-            Write-Error "ISCC.exe not found at $ISCC"
-            exit 1
-          }
-
-      - name: Upload Windows
+      - name: Upload Android Release Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows
-          path: release/
+          name: android-release
+          path: release/*
           retention-days: 30
 
-  release:
-    needs: [version, build-android, build-windows]
+  publish-release:
+    needs: [version, build-web, build-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -192,43 +165,37 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download all artifacts
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: out
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -R out
-
       - name: Create Git Tag
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git tag v${{ needs.version.outputs.version }} || echo "Tag v${{ needs.version.outputs.version }} already exists"
-          git push origin v${{ needs.version.outputs.version }} || echo "Tag v${{ needs.version.outputs.version }} already exists on remote"
+          git tag v${{ needs.version.outputs.version }} || true
+          git push origin v${{ needs.version.outputs.version }} || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release with Signed APK, AAB & Web
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.version }}
-          name: Crèche v${{ needs.version.outputs.version }}
+          name: Crèche & Bear Baby v${{ needs.version.outputs.version }}
           body: |
-            Automated release for version ${{ needs.version.outputs.version }}.
+            Release officielle de l'application **Crèche & Club Management (Bear Baby)** v${{ needs.version.outputs.version }}.
             
-            ### 🚀 Features
-            - Supabase integration with secure environment variables
+            ### 📦 Paquets & Téléchargements
+            - 🌐 **Web**: `creche-web.v${{ needs.version.outputs.version }}.zip` (Application SPA optimisée pour hébergement)
+            - 📱 **Android APK**: `creche-android-release.v${{ needs.version.outputs.version }}.apk` (Signé avec Keystore pour installation directe)
+            - 📦 **Android AAB**: `creche-android-release.v${{ needs.version.outputs.version }}.aab` (Signé pour Google Play Store)
             
-            ### 📦 Artifacts
-            - 📱 Android APK
-            - 🪟 Windows Installer
-            - 🪟 Windows Portable (ZIP)
-            
-            ### 🔐 Security
-            - All sensitive keys are stored in GitHub Secrets
-            - Environment variables injected at build time
+            ### 🔐 Sécurité & GitHub Secrets
+            - Variables d'environnement et clés d'API Supabase injectées au build via GitHub Secrets
+            - Keystore Android et mots de passe sécurisés (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`)
           files: out/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

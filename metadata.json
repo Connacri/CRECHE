@@ -1,0 +1,8 @@
+{
+  "name": "Crèche & Club Management",
+  "description": "Comprehensive childcare and school club management platform with role-based portals for parents, schools, coaches, and suppliers. Features real-time child activity tracking, course enrollments, attendance, weekly planning, events, and logistics.",
+  "requestFramePermissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
